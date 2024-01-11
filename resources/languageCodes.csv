@@ -1,0 +1,33 @@
+LanguageName, TwoLetterCode, ThreeLetterCode, DeepLSupport, DifferentSourceLanguage, SourceLanguageName, SourceLanagugeTwoLetterCode, SourceLanguageThreeLetterCode
+Bulgarian, BG, BUL, True, False
+Chinese (simplified), ZH, CHI, True, True, Chinese, ZH, CHI
+Chinese (traditional), ZH-ZH, ZHO, False, True, Chinese, ZH, CHI
+Czech, CS, CES, True, False
+Danish, DA, DAN, True, False
+Dutch, NL, NLD, True, False
+English (American), EN-US, ENG, True, True, English, EN, ENG
+English (British), EN-GB, ENG-GB, True, True, English, EN, ENG
+Estonian, ET, EST, True, False
+Finish, FI, FIN, True, False
+French, FR, FRA, True, False
+German, DE, DEU, True, False
+Greek, EL, ELL, True, False
+Hungarian, HU, HUN, True, False
+Indonesian, ID, IND, True, False
+Italian, IT, ITA, True, False
+Japanese, JA, JPN, True, False
+Korean, KO, KOR, True, False
+Latvian, LV, LAV, True, False
+Lithuanian, LT, LIT, True, False
+Norwegian (Bokmal), NB, NOB, True, False
+Polish, PL, POL, True, False
+Portuguese (European), PT-PT, POR, True, True, Portuguese, PT, POR
+Portuguese (Brazilian), PT-BR, POR-BRA, True, True, Portuguese, PT, POR
+Romanian, RO, RON, True, False
+Russian, RU, RUS, True, False
+Slovak, SK, SLK, True, False
+Slovenian, SL, SLV, True, False
+Spanish, ES, SPA, True, False
+Swedish, SV, SWE, True, False
+Turkish, TR, TUR, True, False
+Ukrainian, UK, UKR, True, False

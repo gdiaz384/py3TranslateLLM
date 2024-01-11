@@ -1,0 +1,30 @@
+#This file establishes the definitions for the built in parser to use with KAG3 kirkikri game engine scripts (.ks).
+#This file is parsed after reading the raw.untranslated.ks file and after the characterDictionary,
+#but before the the pre and postTranslation dictionaries.
+
+#If a line begins with one of the following characters, then do not process it.
+#Separate each character with a space. Groups of characters are not currently supported.
+ignoreLinesThatStartWith=[ * ; 【
+
+#When do paragraphs end? Valid options are on: 'emptyLine', 'newLine'.
+#Input will stop automatically regardless of this setting when maximumParagraphSize is reached or if an invalid line is reached.
+#Setting paragraphDelimiter=newLine will force a 1:1 relationship between input and pre-wordwrap output lines.
+paragraphDelimiter=emptyLine
+
+#Maximum number of lines per paragraph. A sane setting for this is 2-5 lines maximum per paragraph. 
+#Look at the script.ks file to see how text is laid out. This setting is ignored if paragraphDelimiter=newLine.
+maximumNumberOfLinesPerParagraph=3
+
+#What is the maximum length for translated text before triggering word wrap? The correct setting for this depends on
+#the font used, which can sometimes be changed by the user at runtime, and the target language.
+#Sane values are 30-60. This setting strongly influences the number of calculated output lines.
+wordWrap=45
+
+#The number of untranslated input lines will not always match the number of translated output lines, especially with
+#different wordWrap amounts. How should this situation be handled? Valid values are: none, strict, dynamic.
+#none=Disable word wrapping and always dump all translated text onto one line. Replace subsequent untranslated lines with empty lines.
+#strict=If the number of input lines and translated lines match exactly, then replace as normal. Otherwise, do nothing.
+    #The lines with a mismatch will be placed into a 'mixmatch.xlsx' file, and it is the user's responsibility to sort through those lines.
+#dynamic=If there are fewer lines after translation, replace the extra untranslated lines with empty lines.
+    #If there are more lines after translation, then append the extra lines to the last untranslated line.
+wordWrapMode=dynamic
