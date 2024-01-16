@@ -21,97 +21,125 @@ from pathlib import Path     #override file in file system with another, experim
 from datetime import datetime #used to get current date and time
 from collections import deque #Used to hold rolling history of translated items to use as context for new translations
 import requests                #do basic http stuff, like submitting post/get requests to APIs. This library must be installed using: pip install requests
-from openpyxl import Workbook#used as the core internal data structure and also to read/write xlsx files
-import csv                          #read and write to csv files, such as read in resources/languageCodes.csv
+from openpyxl import Workbook #used as the core internal data structure and also to read/write xlsx files
+import csv                          #Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
+import codecs                 #Improves error handling when dealing with text file codecs.
+import resources.dealWithEncoding as dealWithEncoding   #This implements the 'chardet' library which is installed with 'pip install chardet'
 
-#set default static variables
-version='v0.1 - 2024Jan10'
-defaultEncodingType='utf-8'
-defaultEncodingTypeForKSFiles='shift-jis'
+
+#set defaults and static variables
+version='v0.1 - 2024Jan16'
+
+defaultTextEncoding='utf-8'
+defaultTextEncodingForKSFiles='shift-jis'
 defaultConsoleEncodingType='utf-8'
+defaultLanguageCodesFile='resources/languageCodes.csv'
+defaultSourceLanguage='Japanese'
+defaultTargetLanguage='English'
+#defaultInvalidOption='invalid'
+defaultKoboldCppPort=5001
+defaultSugoiPort=14366
+#defaultSugoiPort=14467
+defaultInputEncodingErrorHandler='strict'
+defaultOutputEncodingErrorHandler='namereplace'
+
 translationEngines='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, sugoi'
-usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM KoboldCpp --file myInputFile.ks\n Translation Engines: '+translationEngines+'.'
+usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM KoboldCpp -file myInputFile.ks\n Translation Engines: '+translationEngines+'.'
 
 #add command line options
-command_Line_parser=argparse.ArgumentParser(description='Description: CLI wrapper script for various NMT and LLM models.' + usageHelp)
-command_Line_parser.add_argument('translationEngine', help='specify translation engine to use, options='+translationEngines+'.',type=str)
+commandLineParser=argparse.ArgumentParser(description='Description: CLI wrapper script for various NMT and LLM models.' + usageHelp)
+commandLineParser.add_argument('translationEngine', help='Specify translation engine to use, options='+translationEngines+'.',type=str)
 
-command_Line_parser.add_argument('-file', '--fileToTranslate', help='The raw file name to translate, including path.',default='invalid.txt',type=str)
-command_Line_parser.add_argument('-fe', '--fileToTranslateEncoding', help='Specify input file encoding, default=utf-8.',type=str)
-command_Line_parser.add_argument('-pfile', '--parsingDefinitions', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default='invalid',type=str)
-command_Line_parser.add_argument('-pfe', '--parsingDefinitionsEncoding', help='Specify encoding for parsing definitions file, default=utf-8.',default=defaultEncodingType,type=str)
-command_Line_parser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text.', default='Japanese',type=str)
-command_Line_parser.add_argument('-tl', '--targetLanguage', help='Specify language of source text.', default='English',type=str)
+commandLineParser.add_argument('-file', '--fileToTranslate', help='The raw file name to translate, including path.',default=None,type=str)
+commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='Specify input file encoding, default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-pfile', '--parsingDefinitions', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None,type=str)
+commandLineParser.add_argument('-pfe', '--parsingDefinitionsEncoding', help='Specify encoding for parsing definitions file, default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+defaultSourceLanguage, default=defaultSourceLanguage,type=str)
+commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+defaultTargetLanguage, default=defaultTargetLanguage,type=str)
 
-command_Line_parser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv',default='invalid',type=str)
-command_Line_parser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv, default=utf-8.',default=defaultEncodingType,type=str)
-command_Line_parser.add_argument('-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv',default='invalid',type=str)
-command_Line_parser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv, default=utf-8.',default=defaultEncodingType,type=str)
-command_Line_parser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.',default='invalid',type=str)
-command_Line_parser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv, default=utf-8.',default=defaultEncodingType,type=str)
-command_Line_parser.add_argument('-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv.',default='resources/languageCodes.csv',type=str)
-command_Line_parser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv, default=utf-8.',default=defaultEncodingType,type=str)
+commandLineParser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv',default=None,type=str)
+commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv, Default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv',default=None,type=str)
+commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.',default=None,type=str)
+commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\''+defaultLanguageCodesFile+'\'.',default=defaultLanguageCodesFile,type=str)
+commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv, default='+defaultTextEncoding,type=str)
 
-command_Line_parser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph translations.',action='store_true')
-command_Line_parser.add_argument('-a', '--address', help='Specify the protocol and IP for local NMT/LLM server, Example: http://192.168.0.100',default='invalid',type=str)
-command_Line_parser.add_argument('-p', '--port', help='Specify the port for the local NMT/LLM server, Example: 5001',default='invalid',type=str)
+commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph translations.',action='store_true')
+commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.',action='store_true')
+commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100',default=None,type=str)
+commandLineParser.add_argument('-p', '--port', help='Specify the port for the NMT/LLM server. Example: 5001',default=None,type=str)
 
-command_Line_parser.add_argument('-ce', '--consoleEncoding', help='Specify encoding for standard output, default=utf-8.',default=defaultConsoleEncodingType,type=str)
-command_Line_parser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.',action='store_true')
-command_Line_parser.add_argument('-vb', '--verbose', help='Print lots of information.',action='store_true')
-command_Line_parser.add_argument('-d', '--debug', help='Print too much information.',action='store_true')
-command_Line_parser.add_argument('-v', '--version', help='Print version information and exit.',action='store_true')    
+commandLineParser.add_argument('-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\''+defaultInputEncodingErrorHandler+'\'.',default=defaultInputEncodingErrorHandler,type=str)
+commandLineParser.add_argument('-eh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\''+defaultOutputEncodingErrorHandler+'\'.',default=defaultOutputEncodingErrorHandler,type=str)
+commandLineParser.add_argument('-ce', '--consoleEncoding', help='Specify encoding for standard output, default='+defaultConsoleEncodingType,default=defaultConsoleEncodingType,type=str)
+commandLineParser.add_argument('-vb', '--verbose', help='Print more information.',action='store_true')
+commandLineParser.add_argument('-d', '--debug', help='Print too much information.',action='store_true')
+commandLineParser.add_argument('-v', '--version', help='Print version information and exit.',action='store_true')    
 
 #import options from command line options
-command_Line_arguments=command_Line_parser.parse_args()
-if command_Line_arguments.version == True:
-    sys.exit('\n '+version)
-translationEngine=command_Line_arguments.translationEngine
+commandLineArguments=commandLineParser.parse_args()
 
-fileToTranslateFileName=command_Line_arguments.fileToTranslate
-#if an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change
-if fileToTranslateFileName != 'invalid.txt':
-    #if an input file name was specified, then....
+consoleEncoding=commandLineArguments.consoleEncoding
+
+
+if commandLineArguments.version == True:
+    sys.exit('\n '+version)
+translationEngine=commandLineArguments.translationEngine
+
+fileToTranslateFileName=commandLineArguments.fileToTranslate
+#Overall: If an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change.
+#if an input file name was specified, then
+if fileToTranslateFileName != None:
     fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
     #print(fileToTranslateFileNameOnly)
     #print('Extension:'+fileToTranslateFileNameExtensionOnly)
-    if command_Line_arguments.fileToTranslateEncoding == None:
-        #if no encoding was specified, then...
+    #if no encoding was specified, then...
+    if commandLineArguments.fileToTranslateEncoding == None:
         if fileToTranslateFileNameExtensionOnly == '.ks':
-            fileToTranslateEncoding=defaultEncodingTypeForKSFiles #set encoding to shift-jis
-            print('Note: KAG3 (.ks) input file specified, but no encoding was specified. Defaulting to '+defaultEncodingTypeForKSFiles+' instead of '+defaultEncodingType+'. If this behavior is not desired or produces corrupt input, please specify an encoding using --fileToTranslateEncoding (-fe) option instead.')
+            fileToTranslateEncoding=defaultTextEncodingForKSFiles #set encoding to shift-jis
+            print('Note: KAG3 (.ks) input file specified, but no encoding was specified. Defaulting to '+defaultTextEncodingForKSFiles+' instead of '+defaultTextEncoding+'. If this behavior is not desired or produces corrupt input, please specify an encoding using --fileToTranslateEncoding (-fe) option instead.')
         else:
-            fileToTranslateEncoding=defaultEncodingType#set encoding to default encoding
+            #If a file was specified, and if an encoding was not specified, and if the file is not a .ks file, then try to detect encoding
+            #fileToTranslateEncoding=defaultTextEncoding#set encoding to default encoding
+            fileToTranslateEncoding = dealWithEncoding.ofThisFile(fileToTranslateFileName, commandLineArguments.fileToTranslateEncoding, defaultTextEncoding)
     else:
-        fileToTranslateEncoding=command_Line_arguments.fileToTranslateEncoding#set encoding to user specified encoding
+        fileToTranslateEncoding=commandLineArguments.fileToTranslateEncoding#set encoding to user specified encoding
 else:
-    fileToTranslateEncoding=defaultEncodingType#if an input file name was not specified, set encoding to default encoding
+    fileToTranslateEncoding=defaultTextEncoding#if an input file name was not specified, set encoding to default encoding
 
-parsingDefinitionsFileName=command_Line_arguments.parsingDefinitions
-parsingDefinitionsEncoding=command_Line_arguments.parsingDefinitionsEncoding
-sourceLanguageRaw=command_Line_arguments.sourceLanguage
-targetLanguageRaw=command_Line_arguments.targetLanguage
+parsingDefinitionsFileName=commandLineArguments.parsingDefinitions
+parsingDefinitionsEncoding=commandLineArguments.parsingDefinitionsEncoding
+sourceLanguageRaw=commandLineArguments.sourceLanguage
+targetLanguageRaw=commandLineArguments.targetLanguage
 
-charaNamesDictionaryFileName=command_Line_arguments.characterNamesDictionary
-charaNamesDictionaryEncoding=command_Line_arguments.characterNamesDictionaryEncoding
-preDictionaryFileName=command_Line_arguments.preTranslationDictionary
-preDictionaryEncoding=command_Line_arguments.preTranslationDictionaryEncoding
-postDictionaryFileName=command_Line_arguments.postTranslationDictionary
-postDictionaryEncoding=command_Line_arguments.postTranslationDictionaryEncoding
-languageCodesFileName=command_Line_arguments.languageCodesFile
-languageCodesEncoding=command_Line_arguments.languageCodesFileEncoding
+charaNamesDictionaryFileName=commandLineArguments.characterNamesDictionary
+#charaNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
+preDictionaryFileName=commandLineArguments.preTranslationDictionary
+#preDictionaryEncoding=commandLineArguments.preTranslationDictionaryEncoding
+postDictionaryFileName=commandLineArguments.postTranslationDictionary
+#postDictionaryEncoding=commandLineArguments.postTranslationDictionaryEncoding
+languageCodesFileName=commandLineArguments.languageCodesFile
+#languageCodesEncoding=commandLineArguments.languageCodesFileEncoding
 
-lineByLineMode=command_Line_arguments.lineByLineMode
-address=command_Line_arguments.address#must be reachable, how to test for that?
-port=command_Line_arguments.port #port should be conditionaly guessed, if no port specified and an address was specified, then try to guess port as either 80 or 443 depending upon protocol
+lineByLineMode=commandLineArguments.lineByLineMode
+resume=commandLineArguments.resume
+address=commandLineArguments.address  #must be reachable, how to test for that?
+port=commandLineArguments.port                #port should be conditionaly guessed, if no port specified and an address was specified, then try to guess port as either 80 or 443 depending upon protocol
 
-consoleEncodingType=command_Line_arguments.consoleEncoding
-resume=command_Line_arguments.resume
-verbose=command_Line_arguments.verbose
-debug=command_Line_arguments.debug
 
-#parse input file from imported command line options and validate input combinations
-#like...a valid file (raw.unparsed.txt) must exist if using parseOnly
+
+verbose=commandLineArguments.verbose
+debug=commandLineArguments.debug
+
+
+
+#
+
+
+
+#parse imported command line option values and continue validating input combinations
 #or... either a raw.unparsed.txt or a raw.untranslated.csv if selecting one of the other engines
 #or NMT without address option, Also warn about defaulting to specific port.
 
@@ -134,11 +162,36 @@ elif (translationEngine.lower()=='deepl_web') or (translationEngine.lower()=='de
 elif (translationEngine.lower()=='sugoi'):
     mode='sugoi'
 else:
-    sys.exit(('\n Error. Invalid translation engine specified: "' + translationEngine + '"' + usageHelp).encode(consoleEncodingType))
+    sys.exit(('\n Error. Invalid translation engine specified: "' + translationEngine + '"' + usageHelp).encode(consoleEncoding))
 
-print(('Mode is set to: \''+mode+'\'').encode(consoleEncodingType))
+print(('Mode is set to: \''+mode+'\'').encode(consoleEncoding))
 if implemented == False:
-    sys.exit(('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncodingType))
+    sys.exit(('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding))
+
+
+#validate: a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist if using parseOnly 
+#fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
+if mode == 'parseOnly':
+    #check if -file exists   'scratchpad/ks_testFiles/A01.ks'
+    if os.path.isfile(fileToTranslateFileName) != True:
+        sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
+
+    #check if file exists   'scratchpad/ks_testFiles/A01.ks'
+    if os.path.isfile(fileToTranslateFileName) != True:
+        if fileToTranslateFileName == 'invalid.txt':
+            sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
+        else:
+            sys.exit(('\n Error: Unable to find input file "' + fileToTranslateFileName + '"\n' + usageHelp).encode(consoleEncoding))
+
+    #check if valid parsing definition file exists 'scratchpad/ks_testFiles/A01.ks'
+    if os.path.isfile(fileToTranslateFileName) != True:
+        if fileToTranslateFileName == 'invalid.txt':
+            sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
+        else:
+            sys.exit(('\n Error: Unable to find input file "' + fileToTranslateFileName + '"\n' + usageHelp).encode(consoleEncoding))
+
+
+
 
 if sourceLanguageRaw.lower() == 'english':
     sourceLanguageRaw = 'English (American)'
@@ -185,7 +238,7 @@ def getCurrentMonthFromNumbers(x):
     elif (x == '12'):
         return 'Dec'
     else:
-          sys.exit('Unspecified error.'.encode(consoleEncodingType))
+          sys.exit('Unspecified error.'.encode(consoleEncoding))
 
 #print(datetime.today().strftime('%Y-%m-%d'))
 today=datetime.today()
@@ -203,18 +256,18 @@ currentTimeFull=currentHour+'-'+currentMinutes+'-'+currentSeconds
 currentDateAndTimeFull=currentDateFull+'-'+currentTimeFull
 
 if (verbose == True) or (debug == True):
-    print(currentDateAndTimeFull.encode(consoleEncodingType))
+    print(currentDateAndTimeFull.encode(consoleEncoding))
 
 #TODO. Export an existing spreadsheet to a file.
 #reference it using the workbook, not the active spreadsheet
 def exportToCSV(workBook, nameWithoutExtension):
-    print('Hello World'.encode(consoleEncodingType))
+    print('Hello World'.encode(consoleEncoding))
 def exportToXLSX(workBook, nameWithoutExtension):
-    print('Hello World'.encode(consoleEncodingType))
+    print('Hello World'.encode(consoleEncoding))
     #theWorkbook.save(filename="myAwesomeSpreadsheet.xlsx")
     workBook.save(filename=nameWithoutExtension+".xlsx")
 def exportToODF(workBook, nameWithoutExtension):
-    print('Hello World'.encode(consoleEncodingType))
+    print('Hello World'.encode(consoleEncoding))
 
 
 #This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
@@ -257,8 +310,8 @@ def getRowAndColumnFromCell(myInputCell):
 #The rowLocation specified is the nth rowLocation, not the [0,1,2,3...row] because rows start with 1
 def replaceRow(newRowDataInAList, rowLocation):
     global mySpreadsheet
-    print(str(len(newRowDataInAList)).encode(consoleEncodingType))
-    print(str(range(len(newRowDataInAList))).encode(consoleEncodingType))
+    print(str(len(newRowDataInAList)).encode(consoleEncoding))
+    print(str(range(len(newRowDataInAList))).encode(consoleEncoding))
     for i in range(len(newRowDataInAList)):
         #columns begin with 1 instead of 0, so add 1 when referencing the target column, but not the source
         mySpreadsheet[getCell(mySpreadsheet.cell(row=int(rowLocation), column=i+1))]=newRowDataInAList[i]
@@ -278,7 +331,7 @@ def searchHeader(spreadsheet, searchTerm):
         #    print('found')
         #else:
         #    print('notfound')
-        break
+        break #stop searching after first row
     return cellFound
 
 #Example:
@@ -290,7 +343,7 @@ def searchHeader(spreadsheet, searchTerm):
 #    print('searchTerm:\"'+searchTerm+'" was found at:'+str(isFound))
 
 
-#This returns either None if there is no cell with the search term, or it will return the raw cell address. Case sensitive.
+#This returns either None if there is no cell with the search term, or the raw cell address. Case and whitespace sensitive.
 #To determine the row, the column, or both from the raw cell address, use getRowAndColumnFromCell(rawCellAddress)
 def searchSpreadsheet(spreadsheet, searchTerm):
     for row in spreadsheet.iter_rows():
@@ -300,13 +353,32 @@ def searchSpreadsheet(spreadsheet, searchTerm):
     return None
 
 
+#These return either None if there is no cell with the search term, or the raw cell address. Case insensitive. Whitespace sensitive.
+#To determine the row, the column, or both from the raw cell address, use getRowAndColumnFromCell(rawCellAddress)
+def searchRowsCaseInsensitive(spreadsheet, searchTerm):
+    for row in spreadsheet.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, str):
+                if cell.value.lower() == str(searchTerm).lower():
+                    return cell
+    return None
+
+def searchColumnsCaseInsensitive(spreadsheet, searchTerm):
+    for column in spreadsheet.iter_cols():
+        for cell in column:
+            if isinstance(cell.value, str):
+                if cell.value.lower() == str(searchTerm).lower():
+                    return cell
+    return None
+
+
 #give this function a spreadsheet object (subclass of workbook) and it will print the contents of that sheet
 def printAllTheThings(mySpreadsheetName):
     for row in mySpreadsheetName.iter_rows(min_row=1, values_only=True):
         temp=''
         for cell in row:
             temp=temp+','+str(cell)
-        print(temp[1:].encode(consoleEncodingType))#ignore first , in output
+        print(temp[1:].encode(consoleEncoding))#ignore first , in output
 
 #Example: printAllTheThings(mySpreadsheet)
 
@@ -331,7 +403,7 @@ def printAllTheThings(mySpreadsheetName):
 
 #import languageCodes.csv, but first check to see if it exists
 if os.path.isfile(languageCodesFileName) != True:
-    sys.exit(('\n Error. Unable to find languageCodes.csv "' + languageCodesFileName + '"' + usageHelp).encode(consoleEncodingType))
+    sys.exit(('\n Error. Unable to find languageCodes.csv "' + languageCodesFileName + '"' + usageHelp).encode(consoleEncoding))
 
 languageCodesWorkbook = Workbook()
 languageCodesSpreadsheet = languageCodesWorkbook.active
@@ -343,7 +415,7 @@ with open(languageCodesFileName, newline='', encoding=languageCodesEncoding) as 
     csvReader = csv.reader(myFile)
     for line in csvReader:
         if debug == True:
-            print(str(line).encode(consoleEncodingType))
+            print(str(line).encode(consoleEncoding))
         #clean up whitespace for entities
         for i in range(len(line)):
             line[i]=line[i].strip()
@@ -351,7 +423,7 @@ with open(languageCodesFileName, newline='', encoding=languageCodesEncoding) as 
 
 if debug == True:
     print('')
-    print(('The following has been read from ' + str(languageCodesFileName)).encode(consoleEncodingType))
+    print(('The following has been read from ' + str(languageCodesFileName)).encode(consoleEncoding))
     printAllTheThings(languageCodesSpreadsheet)
 
 internalLanguageSourceName=None
@@ -379,22 +451,22 @@ for column in languageCodesSpreadsheet.iter_cols():
                 #print('"'+cellVal+'"!="'+srcLang+'"')
 
 if sourceLanguageCell == None:
-    sys.exit(('\n Error. The following language was not found in"' + languageCodesFileName + '":"' + sourceLanguageRaw+'"').encode(consoleEncodingType))
+    sys.exit(('\n Error. The following language was not found in"' + languageCodesFileName + '":"' + sourceLanguageRaw+'"').encode(consoleEncoding))
 else:
-    print(('SourceLanguage:'+sourceLanguageRaw+':'+str(sourceLanguageCell)).encode(consoleEncodingType))
+    print(('SourceLanguage:'+sourceLanguageRaw+':'+str(sourceLanguageCell)).encode(consoleEncoding))
 #Assume sourceLanguageCell has a valid value now.
 sourceLanguageRow, sourceLanguageColumn = getRowAndColumnFromCell(sourceLanguageCell)
 #print(languageCodesSpreadsheet['A'+sourceLanguageRow].value)
 
 if debug == True:
-    print((str(languageCodesSpreadsheet['A'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['B'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['C'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['D'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['E'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['F'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['G'+sourceLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['H'+sourceLanguageRow].value)).encode(consoleEncodingType))
+    print((str(languageCodesSpreadsheet['A'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['B'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['C'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['D'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['E'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['F'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['G'+sourceLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['H'+sourceLanguageRow].value)).encode(consoleEncoding))
 
 if str(languageCodesSpreadsheet['E'+sourceLanguageRow].value) == 'False':
     internalLanguageSourceName=languageCodesSpreadsheet['A'+sourceLanguageRow].value
@@ -406,14 +478,14 @@ elif str(languageCodesSpreadsheet['E'+sourceLanguageRow].value) == 'True':
     internalLanguageSourceThreeCode=languageCodesSpreadsheet['H'+sourceLanguageRow].value
 else:
     print('')
-    print(languageCodesSpreadsheet['E'+sourceLanguageRow].value)
-    sys.exit('Unspecified error.'.encode(consoleEncodingType))
+    print((languageCodesSpreadsheet['E'+sourceLanguageRow].value).encode())
+    sys.exit('Unspecified error.'.encode(consoleEncoding))
 
 if debug == True:
-    print(str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value)))
-    print(internalLanguageSourceName)
-    print(internalLanguageSourceTwoCode)
-    print(internalLanguageSourceThreeCode)
+    print(str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value)).encode())
+    print(internalLanguageSourceName.encode())
+    print(internalLanguageSourceTwoCode.encode())
+    print(internalLanguageSourceThreeCode.encode())
 
 targetLanguageCell=None
 #print(sourceLanguageRaw)
@@ -435,22 +507,22 @@ for column in languageCodesSpreadsheet.iter_cols():
                 #print('"'+cellVal+'"!="'+srcLang+'"')
 
 if targetLanguageCell == None:
-    sys.exit(('\n Error. The following language was not found in"' + languageCodesFileName + '":"' + targetLanguageRaw+'"').encode(consoleEncodingType))
+    sys.exit(('\n Error. The following language was not found in"' + languageCodesFileName + '":"' + targetLanguageRaw+'"').encode(consoleEncoding))
 else:
-    print(('TargetLanguage:'+targetLanguageRaw+':'+str(targetLanguageCell)).encode(consoleEncodingType))
+    print(('TargetLanguage:'+targetLanguageRaw+':'+str(targetLanguageCell)).encode(consoleEncoding))
 #Assume targetLanguageCell has a valid value now.
 targetLanguageRow, targetLanguageColumn = getRowAndColumnFromCell(targetLanguageCell)
 #print(languageCodesSpreadsheet['A'+targetLanguageRow].value)
 
 if debug == True:
-    print((str(languageCodesSpreadsheet['A'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['B'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['C'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['D'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['E'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['F'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['G'+targetLanguageRow].value)).encode(consoleEncodingType))
-    print((str(languageCodesSpreadsheet['H'+targetLanguageRow].value)).encode(consoleEncodingType))
+    print((str(languageCodesSpreadsheet['A'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['B'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['C'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['D'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['E'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['F'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['G'+targetLanguageRow].value)).encode(consoleEncoding))
+    print((str(languageCodesSpreadsheet['H'+targetLanguageRow].value)).encode(consoleEncoding))
 
 if str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'False':
     internalLanguageSourceName=languageCodesSpreadsheet['A'+targetLanguageRow].value
@@ -462,21 +534,21 @@ elif str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'True':
     internalLanguageDestinationThreeCode=languageCodesSpreadsheet['H'+targetLanguageRow].value
 else:
     print('')
-    print(str(languageCodesSpreadsheet['E'+targetLanguageRow].value).encode(consoleEncodingType))
-    sys.exit('Unspecified error.'.encode(consoleEncodingType))
+    print(str(languageCodesSpreadsheet['E'+targetLanguageRow].value).encode(consoleEncoding))
+    sys.exit('Unspecified error.'.encode(consoleEncoding))
 
 if debug == True:
-    print((str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value))).encode(consoleEncodingType))
-    print(str(internalLanguageDestinationName).encode(consoleEncodingType))
-    print(str(internalLanguageDestinationTwoCode).encode(consoleEncodingType))
-    print(str(internalLanguageDestinationThreeCode).encode(consoleEncodingType))
+    print((str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value))).encode(consoleEncoding))
+    print(str(internalLanguageDestinationName).encode(consoleEncoding))
+    print(str(internalLanguageDestinationTwoCode).encode(consoleEncoding))
+    print(str(internalLanguageDestinationThreeCode).encode(consoleEncoding))
 
 #check if file exists   'scratchpad/ks_testFiles/A01.ks'
 if os.path.isfile(fileToTranslateFileName) != True:
     if fileToTranslateFileName == 'invalid.txt':
-        sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncodingType))
+        sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
     else:
-        sys.exit(('\n Error: Unable to find input file "' + fileToTranslateFileName + '"\n' + usageHelp).encode(consoleEncodingType))
+        sys.exit(('\n Error: Unable to find input file "' + fileToTranslateFileName + '"\n' + usageHelp).encode(consoleEncoding))
 #then read entire file into memory
 #If there is an error reading the contents into memory, just close it.
 try:
@@ -486,7 +558,7 @@ finally:
     inputFileHandle.close()#always executes, probably
 
 #debug code
-#print(inputFileHandle.read().encode(consoleEncodingType))
+#print(inputFileHandle.read().encode(consoleEncoding))
 #inputFileHandle.close()  #tidy up
 
 #CharaNamesDictionary time to shine
@@ -494,6 +566,9 @@ CharacterNames=['[＠クロエ]','Chloe']#change this to a dictionary
 #If an ignored line starts with a character name, that could create problems, so swap names first, then parse lines into main database.
 #if one was specified, import character definitions file, and perform swaps while inputfile is still in memory but has not yet been parsed line by line.
 #inputFileContents.replaceStuffHere()
+
+#somehow this line needs to run
+inputFileContents=inputFileContents.replace('[＠クロエ]','Chloe')
 
 
 #Import parse settings from parsingDefintionsFile, if parsing is required which is if....
@@ -513,7 +588,7 @@ wordWrap=45
     #The lines with a mismatch will be placed into a 'mixmatch.xlsx' file, and it is the user's responsibility to sort through those lines.
 #dynamic=If there are fewer lines after translation, replace the extra untranslated lines with empty lines.
     #If there are more lines after translation, then append the extra lines to the last untranslated line.
-wordWrapMode=dynamic
+wordWrapMode='dynamic'
 
 
 #initialize main data structure
@@ -541,8 +616,8 @@ mainDatabaseSpreadsheet.append(initialHeaders)
 #printAllTheThings(mainDatabaseSpreadsheet)
 
 #start parsing input file line by line
-#print(inputFileContents.encode(consoleEncodingType))
-#print(inputFileContents.partition('\n')[0].encode(consoleEncodingType)) #prints only first line
+#print(inputFileContents.encode(consoleEncoding))
+#print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
 
 temporaryDict={}        #Dictionaries do not allow duplicates, so insert all entries into a dictionary first to de-duplicate entries, then read dictionary into first column (skip first line/row in target spreadsheet)
 #thisdict.update({"x": "y"}) #add to/update dictionary
@@ -559,11 +634,11 @@ while inputFileContents != '' :
     #debug code
     #print only if debug option specified
     if debug == True:
-        print(myLine.encode(consoleEncodingType)) #prints line that is currently being processed
+        print(myLine.encode(consoleEncoding)) #prints line that is currently being processed
     #myLine[:1]#this gets only the first character of a string #what will this output if a line contains only whitespace or only a new line #answer: '' -an empty string for new lines, but probably the whitespace for lines with whitespace
     if myLine[:1].strip() != '':#if the first character is not empty or filled with whitespace
         if debug == True:
-            print(myLine[:1].encode(consoleEncodingType))
+            print(myLine[:1].encode(consoleEncoding))
 
      #if the first character is an ignore character or if the first character is whitespace, then set invalidLine=True
     invalidLine=False
@@ -574,7 +649,7 @@ while inputFileContents != '' :
         if paragraphDelimitor == 'emptyLine': #_if paragraphDelimitor='newLine', then this is the same as line-by-line mode, right?
             invalidLine=True
         pass
-   
+
     if invalidLine == True: 
         #then commit any currently working string to databaseDatastructure, add to temporary dictionary to be added later
         if temporaryString != None:
@@ -602,7 +677,7 @@ while inputFileContents != '' :
             #and increment counter
             currentParagraphLineCount+=1
         else:
-            sys.exit('Unspecified error.'.encode(consoleEncodingType))
+            sys.exit('Unspecified error.'.encode(consoleEncoding))
         #if max paragraph limit has been reached
         if (currentParagraphLineCount >= maximumNumberOfLinesPerParagraph) or (paragraphDelimitor == 'newLine'):  
             #then commit currently working string to databaseDatastructure, #add to temporary dictionary to be added later
@@ -620,14 +695,14 @@ while inputFileContents != '' :
 
 #debug code
 if inputFileContents == '' :
-    print('inputFileContents is now empty of everything including new lines.'.encode(consoleEncodingType))
+    print('inputFileContents is now empty of everything including new lines.'.encode(consoleEncoding))
     #feed temporaryDictionary into spreadsheet
     currentRow=2
     #for ever item in the dictionary
-    #print(str(temporaryDict).encode(consoleEncodingType))
+    #print(str(temporaryDict).encode(consoleEncoding))
     for text, metadata in temporaryDict.items():
-        #print(text.encode(consoleEncodingType))
-        #print(metadata.encode(consoleEncodingType))
+        #print(text.encode(consoleEncoding))
+        #print(metadata.encode(consoleEncoding))
         #add item to spreadsheet column1 (A) and incrementing rows starting with row #2
         mainDatabaseSpreadsheet['A'+str(currentRow)]=text
         mainDatabaseSpreadsheet['B'+str(currentRow)]=metadata
@@ -639,11 +714,11 @@ if debug == True:
 
 #create backup of database when it is initially created
 print('')
-#print(('creating backup at: backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx').encode(consoleEncodingType))
+#print(('creating backup at: backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx').encode(consoleEncoding))
 print('')
 Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #mainDatabaseWorkbook.save('backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx')
-#print(inputFileContents.partition('\n')[0].encode(consoleEncodingType)) #prints only first line
+#print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
 
 
 
