@@ -1,0 +1,7 @@
+openpyxl
+requests
+chardet
+deepl
+odfpy
+xlrd
+xlwt

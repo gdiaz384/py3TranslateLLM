@@ -5,7 +5,7 @@ Description: A small helper library to help with dealing with text encoding in f
 
 Usage: See below. Like at the bottom.
 
-Pick your license: Public Domain, GPL (any), or BSD (any), or MIT/Apache
+License: See main program.
 
 ##stop reading now##
 
@@ -18,7 +18,7 @@ consoleEncoding='utf-8'
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os.path                                   #Test if file exists.
-from pathlib import Path                  #It is not clear how this is useful, but it might be required. IDK.
+from pathlib import Path                  #It is not clear how this is useful here, but it might be required. IDK.
 import sys                                         #End program on fail condition.
 try:
     import chardet                              #Detect character encoding from files using heuristics.
@@ -41,7 +41,7 @@ def detectEncoding(myFileName):
             print((myFileName+':'+str(detector.result)).encode(consoleEncoding))
     return temp
 
-#returns a string containing the encoding to use, relies on detectEncoding(filename)
+#returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down
 #if (no encoding specified) and (automaticallyDetectEncoding == True): 
 #def handleDeterminingFileEncoding(myFileName, rawCommandLineOption, defaultEncoding):
 def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):

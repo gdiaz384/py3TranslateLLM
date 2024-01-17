@@ -18,44 +18,56 @@ The focus is the spreadsheet formats, but a built in customizable parser support
 
 - DeepL API (Pro), NMT.
 - DeepL (Web hook), NMT.
-- Sugoi Offline Translator, NMT.
+- fairseq/Sugoi Offline Translator, NMT.
 - Open document spreadsheet (.ods).
 - Microsoft excel document (.xls).
 - KAG3 used in Tyrano script (.ts ?).
 
 Not Planned:
 
-- JSON. Does anyone want this? Open a feature request if so.
-- OpenAI's GPT 3.5/4+.
-    - For OpenAI's LLM, consider:
-    - [DazedMTL](//github.com/dazedanon/DazedMTLTool)
-        - Supports both 3.5 and 4.0 models.
+- OpenAI's GPT 3.5/4+. For OpenAI's LLM, consider:
+    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both 3.5 and 4.0 models.
+- Sugoi Translator Premium/Papago/DeepL.
+- JSON. Does anyone want this? Open a feature request if so. Provide an `example.json`.
 
 ## What are the best LLM models available?
 
-- Guide: huggingface's [chatbot-arena-leaderboard](//huggingface.co/spaces/lmsys/chatbot-arena-leaderboard)
+- Guide: huggingface's [chatbot-arena-leaderboard](//huggingface.co/spaces/lmsys/chatbot-arena-leaderboard).
 - Example: [Mixtral 8x7b v0.1](//huggingface.co/TheBloke/Mixtral-8x7B-v0.1-GGUF).
-    - Pick a non-K_M version.
     - The size of the model is also the RAM requirements to load it into memory.
     - The more it fits into GPU memory (VRAM), the better the performance.
-- Not all the models are compatible with KoboldCPP. See their [documentation]() for compatible model formats.
+- Not all models listed on leaderboard are compatible with KoboldCPP. See their [documentation](//github.com/LostRuins/koboldcpp/wiki) for compatible model formats.
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan16`
+`Current version: 0.1 - 2024Jan16 pre-alpha`
 
-Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when when core functionality can been fully implemented.
+Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented.
 
+1. Install [Python 3.7+](//www.python.org/downloads). For Windows 7, use [this repository](//github.com/adang1345/PythonWin7/).
+    - Make sure `Add to Path` is checked/selected.
+    - Open an command prompt.
+    - `python --version` #Check to make sure Python 3.7+ is installed.
+    - #Optional but reccomended. Update python's package manager program.
+1. Download py3TranslateLLM using one of the following methods:
+    1. Git:  #Requires `git` to be installed.
+        1. Open an administrative command prompt.
+        2. Navigate to a directory that supports downloading and arbitrary file execution.
+        3. `git clone https://github.com/gdiaz384/py3TranslateLLM`
+    1. Download the latest project archive:
+        - Click on the green `< > Code` button at the top -> Download ZIP.
+    1. Download from last stable release:
+        - Click on on "Releases" at the side (desktop), or bottom (mobile), or [here](//github.com/gdiaz384/py3TranslateLLM/releases).
+        - Download either of the archive formats (.zip or .tar.gz).
+1. If applicable, extract py3TranslateLLM to a directory that supports arbitrary file execution.
 1. Open an administrative command prompt.
-2. Navigate to a directory that supports downloading and arbitrary file execution.
-3. `git clone []`   #Requires `git` to be installed.
-4. `cd py3TranslateLLM`
-5. `python --version` #Check to make sure Python 3.7+ is installed.
+1. `cd /d py3TranslateLLM`  #change directory to enter the `py3TranslateLLM` folder.
 6. `pip install -r requirements.txt`
 7. `python py3TranslateLLM.py --help`
 
+Install/configure these other projects as needed:
 - DeepL:
-    - [DeepL API](//www.deepl.com/pro?cta=header-pro) support is implemented using their Python library which is installed with:
+    - [DeepL API](//www.deepl.com/pro?cta=header-pro) support is implemented using their [Python library](//pypi.org/project/deepl) which was installed with:
         - `pip install -r requirements.txt` but it can be installed separately with:
         - `pip install DeepL`
         - Usage of the DeepL API, both Free and Pro, requires an [account](//www.deepl.com/login) and credit card verification.
@@ -65,11 +77,18 @@ Warning: py3TranslateLLM is currently undergoing active development but the proj
     - CPU/Nvidia GPUs: [KoboldCPP](//github.com/LostRuins/koboldcpp), [FAQ](//github.com/LostRuins/koboldcpp/wiki).
     - AMD GPUs: [KoboldCPP-ROCM](//github.com/YellowRoseCx/koboldcpp-rocm).
     - Developed and tested using `KoboldCPP_nocuda.exe` v1.53 which implements KoboldCPP API v1.
-- Sugoi NMT requires [Sugoi Translator](//sugoitoolkit.com/). Tested using Sugoi Offline Translator 4.0 (part of Sugoi Toolkit 6.0).
+- [fairseq](//github.com/facebookresearch/fairseq) is a library released by Facebook/Meta for data training.
+    - Sugoi NMT is a wrapper for fairseq that comes preconfigured with a Japanese->English dictionary.
+    - To install and use fairseq outside of Jpn->Eng translation, refer to fairseq's [documentation](//fairseq.readthedocs.io/en/latest) and obtain an appropriately trained model.
+- Sugoi NMT, a wrapper for fairseq that only does Jpn->Eng translation, requires Sugoi Translator which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
     - DL: [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Translator+Toolkit).
     - Reccomended: Update the base [model](//www.kecl.ntt.co.jp/icl/lirg/jparacrawl).
         - Download -> NMT Models (based on v3.0) -> Direction -> Japanese-to-English -> big -> Download
         - Move `big.pretrain.pt`, `dict.en.txt`, and `dict.ja.txt` to: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
+    - Reccomended: Remove some of the included spyware.
+        - Open: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\main.js`
+        - Comment out `/*  */` or delete the analytics.
+    - Tested using Sugoi Offline Translator 4.0 which is part of Sugoi Toolkit 6.0/7.0.
 
 ## Usage:
 
@@ -79,7 +98,8 @@ py3TranslateLLM.py koboldcpp --address=http://192.168.1.100 --port=5001
 py3TranslateLLM.py deepl_api_free [options]
 py3TranslateLLM.py deepl_api_pro [options]
 py3TranslateLLM.py deepl_web [options]
-py3TranslateLLM.py sugoi [options]
+py3TranslateLLM.py sugoi [options] #sugoi is an alias for fairseq
+py3TranslateLLM.py fairseq [options]
 ```
 
 ## Notes:
@@ -109,6 +129,7 @@ py3TranslateLLM.py sugoi [options]
     - Empty lines are ignored.
 - If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. `resume` (`-r`) technically exists, but can be overly picky.
 - In addition to the libraries listed below, py3TranslateLLM also uses several libraries from the Python standard library. See source code for an enumeration of those.
+- Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
 
 ### Notes about encodings:
 
@@ -182,53 +203,48 @@ py3TranslateLLM.py sugoi [options]
 
 `partial list:`
 
-parameter | value or description | example (partial)
+Parameter | Description | Example(s)
 --- | --- | ---
-[engine] | deepl_api_free, deepl_api_pro, deepl_web, sugoi | `deepl_api_free`
-address | a valid network address including the protocol but not the port number | `--address=http://192.168.1.100`
-port | a valid port number | `--port=5001`, `--port=8080`, `--port=443`
+[engine] | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl_api_free`, `deepl_api_pro`, `deepl_web`, `fairseq`, `sugoi`
+address | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`
+port | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
 
 ## Regarding python libraries:
 
 - Different libraries are not all forward/backwards compatible with all major python versions or compatible with this or that version of (various) libraries they import, but they still have to somehow all work together with matching versions on a wide variety of different computers. Does that sound like hell? Well, welcome to software development. So anyway, below are the versions that were tested and developed while using Python 3.7.6. The user's local enviornment may differ leading to undefined behavior. Have fun.
 - It is not necessarily clear what versions work with what other versions, so just install whatever and hope it works:
 
-Library Name | Req, Recc, or Opt | Description | Install command | Version used to develop py3TranslateLLM
+Library name | Required, Reccomended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
 --- | --- | --- | --- | ---
-[openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and xlsx support. | `pip install openpyxl` | 3.1.2
+[openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Microsoft Excel Document (.xlsx) support. | `pip install openpyxl` | 3.1.2
 dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | Unversioned.
+openpyxlHelpers | Required. | Various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | Unversioned.
 [requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests`, `pip install deepL` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Reccomended. | Improves text codec handling. | `pip install chardet` | 5.2.0
 [DeepL-python](//github.com/DeepLcom/deepl-python) | Reccomended. | Used for DeepL NMT, optional otherwise. | `pip install deepl` | 1.16.1
+[xlrd](//pypi.org/project/xlrd/) | Optional. | Provides reading from Microsoft Excel Document (.xls). | `pip install xlrd` | 2.0.1
+[xlwt](//pypi.org/project/xlwt/) | Optional. | Provides writing to Microsoft Excel Document (.xls). | `pip install xlwt` | 1.3.0
 [odfpy](//pypi.org/project/odfpy) | Optional. | Provides interoperability for Open Document Spreadsheet (.ods). | `pip install odfpy` | 1.4.1
-[xlrd](//pypi.org/project/xlrd/) | Optional | Provides reading from Microsoft Excel Document (.xls). | `pip install xlrd` | 2.0.1
-[xlwt](//pypi.org/project/xlwt/) | Optional | Provides writing to Microsoft Excel Document (.xls). | `pip install xlwt` | 1.3.0
 
-### Installing and managing python library versions with `pip`:
+###  Guide: Installing and managing Python library versions with `pip`:
 
-- `python --version` #Find out what major python version is installed. 3.5, 3.6, 3.7, etc
+- `python --version` #Find out what major python version is installed. 3.5, 3.6, 3.7, etc and where it is located.
+    - `where python` #Windows.
+    - `which python` #Linux.
+        - If `python` is a symlink, as is the norm, then follow it to the target:
+        - `ls -la /usr/bin/python` #Use the path specified in the previous command.
 - `python -m pip install --upgrade pip` #Update pip.
 - `pip --version`
-- `pip install -r requirements.txt` #Use this command to install a predefined list of libraries. Alternatively:
+- `pip install -r requirements.txt` #Use this syntax to install a predefined list of libraries from a file. Alternatively:
 - `pip install <libraryName>` #Examples:
     - `pip install openpyxl`
-- `pip index versions <libraryName>`  #Use this command to list what versions are available for a library. Requires `pip >= 21.2`. Examples:
+- `pip index versions <libraryName>`  #Use this syntax to list available versions for a library. Requires `pip >= 21.2`. Examples:
     - `pip index versions openpyxl`
     - `pip index versions deepl`
 - `pip install <libraryName>=1.3` #Use this syntax to install a specific library version. Examples:
     - `pip install deepl==1.16.1`
     - `pip install openpyxl==3.1.2`
 - `pip install --help`      #For additional confusion.
-
-
-`pip index versions pandas` #search different versions
-- `pip install python3-pandas` #LinuxOnly
-- [pandas](//pandas.pydata.org). Used as UI for xls/xlsx/ods/csv conversions. `pip install pandas==1.3.5` Developed and tested using version 1.3.5.
-    - For Linux use `python3-pandas`
-- numpy - Core pandas dependency. Installed automatically by pip. Developed and tested using version `numpy-1.21.6`
-- python-dateutil - Core pandas dependency. Installed automatically by pip. Developed and tested using version `dateutil-2.8.2`
-- pytz - Core pandas dependency. Installed automatically by pip. Developed and tested using version `pytz-2023.3.post1`
-- xlsxwriter - Provides engine services to pandas. `pip install xlsxwriter` Developed and tested using version `xlsxwriter-3.1.9`
 
 ## Licenses:
 
@@ -239,9 +255,16 @@ dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | I
 - [xlrd](//pypi.org/project/xlrd)'s [license](//github.com/python-excel/xlrd/blob/master/LICENSE) and [source code](//github.com/python-excel/xlrd).
 - [xlwt](//pypi.org/project/xlwt/)'s [license](//github.com/python-excel/xlwt/blob/master/LICENSE) and [source code](//github.com/python-excel).
 - [KoboldCPP](//github.com/LostRuins/koboldcpp) is [AGPL v3](//github.com/LostRuins/koboldcpp/blob/concedo/LICENSE.md). The GGML library and llama.cpp part of KoboldCPP has this [license](//github.com/LostRuins/koboldcpp/blob/concedo/MIT_LICENSE_GGML_LLAMACPP_ONLY).
-- DeepL's [various plans](//www.deepl.com/pro) and [Terms of Use](//www.deepl.com/en/pro-license). DeepL's [python library](//github.com/DeepLcom/deepl-python) for their API has this [license](//github.com/DeepLcom/deepl-python/blob/main/LICENSE).
-- [Sugoi](//sugoitoolkit.com) and [source code](//github.com/leminhyen2/Sugoi-Japanese-Translator). The pretrained model for Sugoi NMT has its own non-commericial [license](//www.kecl.ntt.co.jp/icl/lirg/jparacrawl). 'Sugoi NMT' is a wrapper for [fairsequence](//github.com/facebookresearch/fairseq), [license](//github.com/facebookresearch/fairseq/blob/main/LICENSE), which, along with the pretrained model, does the heavy lifting for 'Sugoi NMT'.
+- DeepL's [various plans](//www.deepl.com/pro) and [Terms of Use](//www.deepl.com/en/pro-license). DeepL's [python library](//pypi.org/project/deepl) for their API has this [license](//github.com/DeepLcom/deepl-python/blob/main/LICENSE) and [source code](//github.com/DeepLcom/deepl-python).
+- [fairseq](//github.com/facebookresearch/fairseq) and [license](//github.com/facebookresearch/fairseq/blob/main/LICENSE).
+- [Sugoi](//sugoitoolkit.com) and [source code](//github.com/leminhyen2/Sugoi-Japanese-Translator).
+    - The pretrained model used in Sugoi NMT has its own non-commericial [license](//www.kecl.ntt.co.jp/icl/lirg/jparacrawl).
+    - 'Sugoi NMT' is a wrapper for fairseq which, along with the pretrained model, does the heavy lifting for 'Sugoi NMT'.
     - Sugoi NMT is one part of the 'Sugoi Translator Toolkit' which is itself part of the free-as-in-free-beer distributed 'Sugoi Toolkit' which contains other projects like manga translation and upscaling.
     - The use of Github to post source code for Sugoi Toolkit suggests intent to keep the wrapper code under a permissive license. A more concrete license may be available on discord.
-- p3yTranslateLLM is [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
-    - Feel free to use it, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available. The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
+- py3TranslateLLM.py and the associated libraries are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
+    - Feel free to use it, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
+    - The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
+    - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.
+        - This assumes the licenses for projects used in the binary are compatible with one another. If the licenses used for a particular binary are not compatible with one another, then the resulting binary is not considered redistributable. Only lawyers can determine that, and also only lawyers need to worry about it.
+

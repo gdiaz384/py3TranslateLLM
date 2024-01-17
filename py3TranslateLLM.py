@@ -12,31 +12,40 @@ License:
 
 """
 #import various libraries that py3TranslateLLM depends on
-import argparse                 #used to add command line options
-import os, os.path              #extract extension from filename, and test if file exists
-import sys                         #end program on fail condition
-import io                            #manipulate files (open/read/write/close)
-from pathlib import Path     #override file in file system with another, experimental library
-#from io import IOBase      #test if variable is a file object (an "IOBase" object)
-from datetime import datetime #used to get current date and time
+import argparse                    #Used to add command line options.
+import os, os.path                 #Extract extension from filename, and test if file exists.
+from pathlib import Path       #Override file in file system with another and create subfolders.
+import sys                              #End program on fail condition.
+import io                                 #Manipulate files (open/read/write/close).
+#from io import IOBase        #Test if variable is a file object (an "IOBase" object)
+from datetime import datetime #Used to get current date and time
 from collections import deque #Used to hold rolling history of translated items to use as context for new translations
-import requests                #do basic http stuff, like submitting post/get requests to APIs. This library must be installed using: pip install requests
-from openpyxl import Workbook #used as the core internal data structure and also to read/write xlsx files
-import csv                          #Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
-import codecs                 #Improves error handling when dealing with text file codecs.
-import resources.dealWithEncoding as dealWithEncoding   #This implements the 'chardet' library which is installed with 'pip install chardet'
+import requests                    #Do basic http stuff, like submitting post/get requests to APIs. This library must be installed using: pip install requests
+
+import openpyxl                   #Used as the core internal data structure and also to read/write xlsx files.
+import resources.openpyxlHelpers as openpyxlHelpers #A helper/wrapper library to aid in using openpyxl as a datastructure.
+
+#import codecs                      #Improves error handling when dealing with text file codecs.
+import resources.dealWithEncoding as dealWithEncoding   #dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 
 
 #set defaults and static variables
-version='v0.1 - 2024Jan16'
+version='v0.1 - 2024Jan17 pre-alpha'
 
 defaultTextEncoding='utf-8'
 defaultTextEncodingForKSFiles='shift-jis'
 defaultConsoleEncodingType='utf-8'
+
 defaultLanguageCodesFile='resources/languageCodes.csv'
 defaultSourceLanguage='Japanese'
 defaultTargetLanguage='English'
-#defaultInvalidOption='invalid'
+#Valid options are 'English (American)' and 'English (British)'
+defaultEnglishLanguage='English (American)'
+#Valid options are 'Chinese (simplified)' and 'Chinese (traditional)'
+defaultChineseLanguage='Chinese (simplified)'
+#Valid options are 'Portuguese (European)' and 'Portuguese (Brazilian)'
+defaultPortugueseLanguage='Portuguese (European)'
+
 defaultKoboldCppPort=5001
 defaultSugoiPort=14366
 #defaultSugoiPort=14467
@@ -50,21 +59,27 @@ usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM Kob
 commandLineParser=argparse.ArgumentParser(description='Description: CLI wrapper script for various NMT and LLM models.' + usageHelp)
 commandLineParser.add_argument('translationEngine', help='Specify translation engine to use, options='+translationEngines+'.',type=str)
 
-commandLineParser.add_argument('-file', '--fileToTranslate', help='The raw file name to translate, including path.',default=None,type=str)
-commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='Specify input file encoding, default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('fileToTranslate', help='Either the raw file to translate or the spreadsheet file to resume translating from, including path.',default=None,type=str)
+commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-o', '--outputFile', help='The file to insert translations into, including path. Default is same as input file.',default=None,type=str)
+commandLineParser.add_argument('-ofe', '--outputFileEncoding', help='The encoding of the output file. Default is same as input file.',default=None,type=str)
+
 commandLineParser.add_argument('-pfile', '--parsingDefinitions', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None,type=str)
-commandLineParser.add_argument('-pfe', '--parsingDefinitionsEncoding', help='Specify encoding for parsing definitions file, default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-pfe', '--parsingDefinitionsEncoding', help='Specify encoding for parsing definitions file, default='+defaultTextEncoding,default=None,type=str)
 commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+defaultSourceLanguage, default=defaultSourceLanguage,type=str)
 commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+defaultTargetLanguage, default=defaultTargetLanguage,type=str)
 
-commandLineParser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv',default=None,type=str)
-commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv, Default='+defaultTextEncoding,type=str)
-commandLineParser.add_argument('-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv',default=None,type=str)
-commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+defaultTextEncoding,type=str)
-commandLineParser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.',default=None,type=str)
-commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default='+defaultTextEncoding,type=str)
 commandLineParser.add_argument('-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\''+defaultLanguageCodesFile+'\'.',default=defaultLanguageCodesFile,type=str)
-commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv, default='+defaultTextEncoding,type=str)
+commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv, default='+defaultTextEncoding,default=None,type=str)
+
+commandLineParser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv',default=None,type=str)
+commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv, Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv',default=None,type=str)
+commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.',default=None,type=str)
+commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.',default=None,type=str)
+commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+defaultTextEncoding,default=None,type=str)
 
 commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph translations.',action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.',action='store_true')
@@ -77,73 +92,41 @@ commandLineParser.add_argument('-ce', '--consoleEncoding', help='Specify encodin
 commandLineParser.add_argument('-vb', '--verbose', help='Print more information.',action='store_true')
 commandLineParser.add_argument('-d', '--debug', help='Print too much information.',action='store_true')
 commandLineParser.add_argument('-v', '--version', help='Print version information and exit.',action='store_true')    
-
 #import options from command line options
 commandLineArguments=commandLineParser.parse_args()
-
 consoleEncoding=commandLineArguments.consoleEncoding
 
-
 if commandLineArguments.version == True:
-    sys.exit('\n '+version)
+    sys.exit(('\n '+version).encode(consoleEncoding))
 translationEngine=commandLineArguments.translationEngine
 
 fileToTranslateFileName=commandLineArguments.fileToTranslate
-#Overall: If an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change.
-#if an input file name was specified, then
-if fileToTranslateFileName != None:
-    fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
-    #print(fileToTranslateFileNameOnly)
-    #print('Extension:'+fileToTranslateFileNameExtensionOnly)
-    #if no encoding was specified, then...
-    if commandLineArguments.fileToTranslateEncoding == None:
-        if fileToTranslateFileNameExtensionOnly == '.ks':
-            fileToTranslateEncoding=defaultTextEncodingForKSFiles #set encoding to shift-jis
-            print('Note: KAG3 (.ks) input file specified, but no encoding was specified. Defaulting to '+defaultTextEncodingForKSFiles+' instead of '+defaultTextEncoding+'. If this behavior is not desired or produces corrupt input, please specify an encoding using --fileToTranslateEncoding (-fe) option instead.')
-        else:
-            #If a file was specified, and if an encoding was not specified, and if the file is not a .ks file, then try to detect encoding
-            #fileToTranslateEncoding=defaultTextEncoding#set encoding to default encoding
-            fileToTranslateEncoding = dealWithEncoding.ofThisFile(fileToTranslateFileName, commandLineArguments.fileToTranslateEncoding, defaultTextEncoding)
-    else:
-        fileToTranslateEncoding=commandLineArguments.fileToTranslateEncoding#set encoding to user specified encoding
-else:
-    fileToTranslateEncoding=defaultTextEncoding#if an input file name was not specified, set encoding to default encoding
-
 parsingDefinitionsFileName=commandLineArguments.parsingDefinitions
-parsingDefinitionsEncoding=commandLineArguments.parsingDefinitionsEncoding
 sourceLanguageRaw=commandLineArguments.sourceLanguage
 targetLanguageRaw=commandLineArguments.targetLanguage
+languageCodesFileName=commandLineArguments.languageCodesFile
 
 charaNamesDictionaryFileName=commandLineArguments.characterNamesDictionary
-#charaNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
 preDictionaryFileName=commandLineArguments.preTranslationDictionary
-#preDictionaryEncoding=commandLineArguments.preTranslationDictionaryEncoding
 postDictionaryFileName=commandLineArguments.postTranslationDictionary
-#postDictionaryEncoding=commandLineArguments.postTranslationDictionaryEncoding
-languageCodesFileName=commandLineArguments.languageCodesFile
-#languageCodesEncoding=commandLineArguments.languageCodesFileEncoding
+postWritingToFileDictionaryFileName=commandLineArguments.postWritingToFileDictionary
+
+
 
 lineByLineMode=commandLineArguments.lineByLineMode
 resume=commandLineArguments.resume
-address=commandLineArguments.address  #must be reachable, how to test for that?
-port=commandLineArguments.port                #port should be conditionaly guessed, if no port specified and an address was specified, then try to guess port as either 80 or 443 depending upon protocol
-
-
+address=commandLineArguments.address  #Must be reachable. How to test for that?
+port=commandLineArguments.port                #Port should be conditionaly guessed. If no port specified and an address was specified, then try to guess port as either 80, 443, or default settings depending upon protocol and translationEngine selected.
 
 verbose=commandLineArguments.verbose
 debug=commandLineArguments.debug
 
+#Validate input settings and combinations from parsed imported command line option values
+#and continue validating input combinations
+#Either a raw.unparsed.txt must be specified or a raw.untranslated.csv if selecting one of the other engines
+#Check for NMT without address option. If NMT with address, then handle port assignment. Warn if defaulting to specific port.
 
-
-#
-
-
-
-#parse imported command line option values and continue validating input combinations
-#or... either a raw.unparsed.txt or a raw.untranslated.csv if selecting one of the other engines
-#or NMT without address option, Also warn about defaulting to specific port.
-
-mode='invalid'
+mode=None
 implemented=False
 #validate input from command line options
 if (translationEngine.lower()=='parseonly'):
@@ -159,40 +142,112 @@ elif (translationEngine.lower()=='deepl_api_pro') or (translationEngine.lower()=
     mode='deepl_api_pro'
 elif (translationEngine.lower()=='deepl_web') or (translationEngine.lower()=='deepl-web'):
     mode='deepl_web'
-elif (translationEngine.lower()=='sugoi'):
+elif (translationEngine.lower()=='sugoi') :
     mode='sugoi'
+    #Unlike fairseq, Sugoi has a default port association and only supports Jpn->Eng translations, so having a dedicated entry for it is still useful for input validation. However, this mode should be updated to fairseq once input has been validated properly.
+elif (translationEngine.lower()=='fairseq'):
+    mode='fairseq'
 else:
     sys.exit(('\n Error. Invalid translation engine specified: "' + translationEngine + '"' + usageHelp).encode(consoleEncoding))
 
-print(('Mode is set to: \''+mode+'\'').encode(consoleEncoding))
+print(('Mode is set to: \''+str(mode)+'\'').encode(consoleEncoding))
 if implemented == False:
     sys.exit(('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding))
 
 
-#validate: a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist if using parseOnly 
-#fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
+#if using parseOnly, a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist. Spreadsheet formats are not valid with parseOnly command, but some valid file must be specified. 
+#Therefore, that file must always have an extension due to overloading of --inputFile. Not necessarily. parseOnly means the extension could be non-existant but input is still clarified as 100% a text file. Therefore, #split extension code should retun None to fileToTranslateFileNameExtensionOnly in those cases, and that not signify an error during parseOnly. Question: how does os.path.splitext(fileName) actually work? Answer: If the extension does not exist, then it returns an empty string '' object for the extension. A None comparison will not work, but...   if myFileExtOnly == '':   ... will return true and conditionally execute.
+
+fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
+
 if mode == 'parseOnly':
     #check if -file exists   'scratchpad/ks_testFiles/A01.ks'
     if os.path.isfile(fileToTranslateFileName) != True:
         sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
+    #split extension
 
     #check if file exists   'scratchpad/ks_testFiles/A01.ks'
     if os.path.isfile(fileToTranslateFileName) != True:
-        if fileToTranslateFileName == 'invalid.txt':
+        if fileToTranslateFileName == None:
             sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
         else:
             sys.exit(('\n Error: Unable to find input file "' + fileToTranslateFileName + '"\n' + usageHelp).encode(consoleEncoding))
 
-    #check if valid parsing definition file exists 'scratchpad/ks_testFiles/A01.ks'
-    if os.path.isfile(fileToTranslateFileName) != True:
-        if fileToTranslateFileName == 'invalid.txt':
+    #check if valid parsing definition file exists 'parseKirikiri.txt' #TODO
+    if os.path.isfile(parsingDefinitionsFileName) != True:
+        if parsingDefinitionsFileName == None:
             sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
         else:
             sys.exit(('\n Error: Unable to find input file "' + fileToTranslateFileName + '"\n' + usageHelp).encode(consoleEncoding))
 
+#if using koboldcpp, an address must be specified
+#if port not specified, set port to kobold default port
+
+#if using deepl_api_free, pro
+#library must be available
+#api key must exist
+
+#if using deepl_web... TODO validate anything it needs
+
+#if using fairseq, address must be specified
+#try to guess port from protocol and warn user
+
+#if using sugoi, address must be specified
+#if port not specified, set port to default sugoi port and warn user
+#change mode to fairseq
 
 
 
+##Set Encodings for files using dealWithEncoding.py helper library as dealWithEncoding.ofThisFile(myfile). 
+#First one is a special case since the encoding must be changed to shift-jis in the case of .ks (file extension).
+#If an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change.
+#if an input file name was specified, then
+if fileToTranslateFileName != None:
+    #fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)#Moved further up, made global/module wide.
+    #print(fileToTranslateFileNameOnly)
+    #print('Extension:'+fileToTranslateFileNameExtensionOnly)
+    #if no encoding was specified, then...
+    if commandLineArguments.fileToTranslateEncoding == None:
+        if fileToTranslateFileNameExtensionOnly == '.ks':
+            fileToTranslateEncoding=defaultTextEncodingForKSFiles #set encoding to shift-jis
+            print(('Warning: KAG3 (.ks) input file specified, but no encoding was specified. Defaulting to '+defaultTextEncodingForKSFiles+' instead of '+defaultTextEncoding+'. If this behavior is not desired or produces corrupt input, please specify an encoding using --fileToTranslateEncoding (-fe) option instead.').encode(consoleEncoding))
+        else:
+            #If a file was specified, and if an encoding was not specified, and if the file is not a .ks file, then try to detect encoding
+            #fileToTranslateEncoding=defaultTextEncoding#set encoding to default encoding
+            fileToTranslateEncoding = dealWithEncoding.ofThisFile(fileToTranslateFileName, commandLineArguments.fileToTranslateEncoding, defaultTextEncoding)
+    else:
+        fileToTranslateEncoding=commandLineArguments.fileToTranslateEncoding#set encoding to user specified encoding
+else:
+    fileToTranslateEncoding=defaultTextEncoding#if an input file name was not specified, set encoding to default encoding
+
+#For the output file encoding:
+#if the user specified an input file, use the input file's encoding for the output file
+#if the user did not specify an input file, then the program cannot run.
+#The input file must be either a raw file (.ks, .txt, .ts) or a spreadsheet file (.csv, .xlsx, .xls, .ods)
+#Raw files can be spreadsheets with one column, but spreadsheet files cannot be raw files. So include a switch that signifies to process text files as psudo .csv spreadsheets? No. Just have user convert them to .csv manually instead. Then no special handling is needed for 'special' \n deliminated .csv's. This feature can be added later if requested.
+#However, when using files exported from other programs. There will be no metadata. Instead of adding a cli flag, fallback to line-by-line mode instead and warn user about it. Fallback to line by line mode should also occur if the metadata is corrupted.
+
+#set rest of encodings using dealWithEncoding.ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
+
+#parsingDefinitionsEncoding=commandLineArguments.parsingDefinitionsEncoding
+#charaNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
+#languageCodesEncoding=commandLineArguments.languageCodesFileEncoding
+
+#preDictionaryEncoding=commandLineArguments.preTranslationDictionaryEncoding
+#postDictionaryEncoding=commandLineArguments.postTranslationDictionaryEncoding
+#postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictionaryEncoding
+
+
+
+
+
+
+
+
+
+
+
+#Substitute a few language entries to certain defaults due to collisions and aliases.
 if sourceLanguageRaw.lower() == 'english':
     sourceLanguageRaw = 'English (American)'
 elif sourceLanguageRaw.lower() == 'castilian':
@@ -258,129 +313,7 @@ currentDateAndTimeFull=currentDateFull+'-'+currentTimeFull
 if (verbose == True) or (debug == True):
     print(currentDateAndTimeFull.encode(consoleEncoding))
 
-#TODO. Export an existing spreadsheet to a file.
-#reference it using the workbook, not the active spreadsheet
-def exportToCSV(workBook, nameWithoutExtension):
-    print('Hello World'.encode(consoleEncoding))
-def exportToXLSX(workBook, nameWithoutExtension):
-    print('Hello World'.encode(consoleEncoding))
-    #theWorkbook.save(filename="myAwesomeSpreadsheet.xlsx")
-    workBook.save(filename=nameWithoutExtension+".xlsx")
-def exportToODF(workBook, nameWithoutExtension):
-    print('Hello World'.encode(consoleEncoding))
 
-
-#This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
-#such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
-def getRowAndColumnFromCell(myInputCell):
-    #print('raw cell data='+str(myInputCell))
-    #basically, split the string according to . and then split it again according to > to get back only the CellAddress
-    myInputCell=str(myInputCell).split('.', maxsplit=1)[1].split('>')[0]
-    index=0
-    for i in range(10):
-        try:
-            int(myInputCell[index:index+1])
-            index=i
-            break #this break and the assignment above will only execute when the int conversion works
-        except:
-            #this will execute if there is an error, like int('A')
-            #this will not execute if the int conversion succeds
-            #print('index='+str(index))
-            pass
-        index+=1
-    currentColumn=myInputCell[:index]#does not include character in string[Index] because index is after the :
-    currentRow=myInputCell[index:]#includes character specified by string[index] because index is before the :
-    #return ['pie', 'apple']
-    return [currentRow, currentColumn]
-
-#Example:
-#myRawCell=''
-#for row in mySpreadsheet:
-#    for i in row:
-#        if i.value == 'lots of pies':
-#            print(str(i) + '=' + str(i.value))
-#            myRawCell=i
-#currentRow, currentColumn = getRowAndColumnFromCell(myRawCell)
-
-
-#helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
-#Note: This is only for modifying existing rows and only for mySpreadsheet. To add a brand new row, use append:
-    #Example: newRow = ['pies', 'lots of pies']
-    #mySpreadsheet.append(newRow)
-#The rowLocation specified is the nth rowLocation, not the [0,1,2,3...row] because rows start with 1
-def replaceRow(newRowDataInAList, rowLocation):
-    global mySpreadsheet
-    print(str(len(newRowDataInAList)).encode(consoleEncoding))
-    print(str(range(len(newRowDataInAList))).encode(consoleEncoding))
-    for i in range(len(newRowDataInAList)):
-        #columns begin with 1 instead of 0, so add 1 when referencing the target column, but not the source
-        mySpreadsheet[getCell(mySpreadsheet.cell(row=int(rowLocation), column=i+1))]=newRowDataInAList[i]
-
-#Example: replaceRow(newRow,7)
-
-
-#this returns either None if there is no cell with the search term, or it will return the raw cell address if it found it, case sensitive
-#to determine the row, the column, or both from the raw cell address, call getRowAndColumnFromCell(rawCellAddress)
-def searchHeader(spreadsheet, searchTerm):
-    cellFound=None
-    for row in spreadsheet[1]:
-        for i in row:
-            if i.value == searchTerm:
-                cellFound=i
-        #if cellFound != None:
-        #    print('found')
-        #else:
-        #    print('notfound')
-        break #stop searching after first row
-    return cellFound
-
-#Example:
-#cellFound=None
-#isFound=searchHeader(mySpreadsheet,searchTerm)
-#if isFound == None:
-#    print('was not found')
-#else:
-#    print('searchTerm:\"'+searchTerm+'" was found at:'+str(isFound))
-
-
-#This returns either None if there is no cell with the search term, or the raw cell address. Case and whitespace sensitive.
-#To determine the row, the column, or both from the raw cell address, use getRowAndColumnFromCell(rawCellAddress)
-def searchSpreadsheet(spreadsheet, searchTerm):
-    for row in spreadsheet.iter_rows():
-        for cell in row:
-            if cell.value == searchTerm:
-                return cell
-    return None
-
-
-#These return either None if there is no cell with the search term, or the raw cell address. Case insensitive. Whitespace sensitive.
-#To determine the row, the column, or both from the raw cell address, use getRowAndColumnFromCell(rawCellAddress)
-def searchRowsCaseInsensitive(spreadsheet, searchTerm):
-    for row in spreadsheet.iter_rows():
-        for cell in row:
-            if isinstance(cell.value, str):
-                if cell.value.lower() == str(searchTerm).lower():
-                    return cell
-    return None
-
-def searchColumnsCaseInsensitive(spreadsheet, searchTerm):
-    for column in spreadsheet.iter_cols():
-        for cell in column:
-            if isinstance(cell.value, str):
-                if cell.value.lower() == str(searchTerm).lower():
-                    return cell
-    return None
-
-
-#give this function a spreadsheet object (subclass of workbook) and it will print the contents of that sheet
-def printAllTheThings(mySpreadsheetName):
-    for row in mySpreadsheetName.iter_rows(min_row=1, values_only=True):
-        temp=''
-        for cell in row:
-            temp=temp+','+str(cell)
-        print(temp[1:].encode(consoleEncoding))#ignore first , in output
-
-#Example: printAllTheThings(mySpreadsheet)
 
 
 
@@ -401,25 +334,8 @@ def printAllTheThings(mySpreadsheetName):
 #Examples for 5-7: English, EN, ENG; Portuguese, PT, POR
 #Each row/entry is eight columns total
 
-#import languageCodes.csv, but first check to see if it exists
-if os.path.isfile(languageCodesFileName) != True:
-    sys.exit(('\n Error. Unable to find languageCodes.csv "' + languageCodesFileName + '"' + usageHelp).encode(consoleEncoding))
-
-languageCodesWorkbook = Workbook()
+languageCodesWorkbook = openpyxlHelpers.importFromCSV(languageCodesFileName)
 languageCodesSpreadsheet = languageCodesWorkbook.active
-
-#It looks like quoting fields in csv's that use commas , and new
-#lines works but only as double quotes " and not single quotes '
-#Spaces are also preserved as-is if they are within the ,
-with open(languageCodesFileName, newline='', encoding=languageCodesEncoding) as myFile:
-    csvReader = csv.reader(myFile)
-    for line in csvReader:
-        if debug == True:
-            print(str(line).encode(consoleEncoding))
-        #clean up whitespace for entities
-        for i in range(len(line)):
-            line[i]=line[i].strip()
-        languageCodesSpreadsheet.append(line)
 
 if debug == True:
     print('')
@@ -435,6 +351,9 @@ internalLanguageDestinationThreeCode=None
 
 sourceLanguageCell=None
 #print(sourceLanguageRaw)
+
+#replace this code with dedicated search functions from openpyxlHelpers
+#use....openpyxlHelpers.searchColumnsCaseInsensitive(spreadsheet, searchTerm)
 
 #Search for valid sourceLanguageRaw and targetLanguageRaw. Case insensitive.
 for column in languageCodesSpreadsheet.iter_cols():
@@ -524,24 +443,35 @@ if debug == True:
     print((str(languageCodesSpreadsheet['G'+targetLanguageRow].value)).encode(consoleEncoding))
     print((str(languageCodesSpreadsheet['H'+targetLanguageRow].value)).encode(consoleEncoding))
 
-if str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'False':
-    internalLanguageSourceName=languageCodesSpreadsheet['A'+targetLanguageRow].value
-    internalLanguageSourceTwoCode=languageCodesSpreadsheet['B'+targetLanguageRow].value
-    internalLanguageSourceThreeCode=languageCodesSpreadsheet['C'+targetLanguageRow].value
-elif str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'True':
-    internalLanguageDestinationName=languageCodesSpreadsheet['F'+targetLanguageRow].value
-    internalLanguageDestinationTwoCode=languageCodesSpreadsheet['G'+targetLanguageRow].value
-    internalLanguageDestinationThreeCode=languageCodesSpreadsheet['H'+targetLanguageRow].value
-else:
-    print('')
-    print(str(languageCodesSpreadsheet['E'+targetLanguageRow].value).encode(consoleEncoding))
-    sys.exit('Unspecified error.'.encode(consoleEncoding))
+#if str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'False':
+
+#The destination language does not have its source language code modified, so just set the values unconditionally.
+internalLanguageDestinationName=languageCodesSpreadsheet['A'+targetLanguageRow].value
+internalLanguageDestinationTwoCode=languageCodesSpreadsheet['B'+targetLanguageRow].value
+internalLanguageDestinationThreeCode=languageCodesSpreadsheet['C'+targetLanguageRow].value
+
+#elif str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'True':
+#    internalLanguageDestinationName=languageCodesSpreadsheet['F'+targetLanguageRow].value
+#    internalLanguageDestinationTwoCode=languageCodesSpreadsheet['G'+targetLanguageRow].value
+#    internalLanguageDestinationThreeCode=languageCodesSpreadsheet['H'+targetLanguageRow].value
+#else:
+#    print('')
+#    print(str(languageCodesSpreadsheet['E'+targetLanguageRow].value).encode(consoleEncoding))
+#    sys.exit('Unspecified error.'.encode(consoleEncoding))
 
 if debug == True:
     print((str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value))).encode(consoleEncoding))
     print(str(internalLanguageDestinationName).encode(consoleEncoding))
     print(str(internalLanguageDestinationTwoCode).encode(consoleEncoding))
     print(str(internalLanguageDestinationThreeCode).encode(consoleEncoding))
+
+
+
+#maybe....
+#openpyxlHelpers.importFromTextFile(fileName, fileNameEncoding, parseFile, parseFileEncoding)
+#What are valid inputs? .csv, .xlsx, .xls, .ods, .txt, .ks, .ts (t-script)
+#.csv, .xlsx, .xls, .ods are spreadsheet formats that follow a predefined format. They do not have parse files.
+#Therefore only .txt, .ks and .ts are valid inputs for openpyxlHelpers.importFromTextFile()
 
 #check if file exists   'scratchpad/ks_testFiles/A01.ks'
 if os.path.isfile(fileToTranslateFileName) != True:
@@ -552,7 +482,7 @@ if os.path.isfile(fileToTranslateFileName) != True:
 #then read entire file into memory
 #If there is an error reading the contents into memory, just close it.
 try:
-    inputFileHandle = open(fileToTranslateFileName,'rt',encoding=fileToTranslateEncoding) #open in read only text mode #Will error out if file does not exist, works with both \ and / to traverse folders
+    inputFileHandle = codecs.open(fileToTranslateFileName,'r',encoding=fileToTranslateEncoding) #open in read only text mode #Will error out if file does not exist. io.open() works with both \ and / to traverse folders. Unknown if codecs.open() is the same.
     inputFileContents=inputFileHandle.read()
 finally:
     inputFileHandle.close()#always executes, probably
@@ -575,7 +505,7 @@ inputFileContents=inputFileContents.replace('[＠クロエ]','Chloe')
 #if... parseOnly mode specified, resume has not specified (resume implies there is a file under backup/)
 #always parse regardless of mode if one is specified, and then import data from other sources as it becomes available. Keep track of whether or not main data structure exists, or is supposed to be created from resume data (backup/ folder, csv, xls/xlsx, ods).
 ignoreLinesThatStartWith=[ '[' , '*' , ';' , '【' ]     #this is a list of strings where each entry contains a character that marks a line to skip processing it, only one character is considered per entry
-paragraphDelimitor='emptyLine'         #Valid options: emptyLine, newLine  #Once input has started, when should it stop? Input will stop automatically regardless of this setting when maximumParagraphSize is reached.
+paragraphDelimiter='emptyLine'         #Valid options: emptyLine, newLine  #Once input has started, when should it stop? Input will stop automatically regardless of this setting when maximumParagraphSize is reached.
 maximumNumberOfLinesPerParagraph=3        #Maximum number of lines per paragraph. A sane setting for this is 2-5 lines maximum per paragraph.
 #What is the maximum length for translated text before triggering word wrap? The correct setting for this depends on
 #the font used, which can sometimes be changed by the user at runtime, and the target language.
@@ -596,7 +526,7 @@ mainDatabaseWorkbook = Workbook()
 mainDatabaseSpreadsheet = mainDatabaseWorkbook.active
 
 #This will hold raw untranslated text, number of lines each entry was derived from, and columns containing maybe translated data. Maximum columns supported = 9[?]. Columns 0 and 1 are reserved for Raw untranslated text and [1] is reserved for the number of lines that column 0 represents, even if it is always 1 because line-by-line parsing (lineByLineMode) is specified.
-#Alternatively, lineByLineMode can instead specify to feed each line into the translator but the paragraphDelimitor=emptyLine can support multiple lines in the main data structure. That might be more flexible, or make things worse. Leave it to user to decide on a case-by-case basis by allowing for this possibility.
+#Alternatively, lineByLineMode can instead specify to feed each line into the translator but the paragraphDelimiter=emptyLine can support multiple lines in the main data structure. That might be more flexible, or make things worse. Leave it to user to decide on a case-by-case basis by allowing for this possibility.
 #class Database:
 #    def __init__(self):
 #This data structure must somehow hold:
@@ -643,12 +573,12 @@ while inputFileContents != '' :
      #if the first character is an ignore character or if the first character is whitespace, then set invalidLine=True
     invalidLine=False
     for i in ignoreLinesThatStartWith:
-        if myLine[:1].strip() == i:
+        if myLine.strip()[:1] == i:   #This should strip whitespace first, and then compare because sometimes dialogue can be indented but still be valid. Valid syntax: myLine.strip()[:1] 
             invalidLine=True
-    if myLine[:1].strip() == '':
-        if paragraphDelimitor == 'emptyLine': #_if paragraphDelimitor='newLine', then this is the same as line-by-line mode, right?
-            invalidLine=True
-        pass
+    if myLine.strip()[:1] == '':
+        #if the line is empty, then always skip it. Regardless of paragraphDelimiter == emptyLine or newLine, empty lines signify a new paragraph start, or it would be too difficult to tell when one paragraph ends and another starts.
+        invalidLine=True
+        #if paragraphDelimiter == 'emptyLine': #Old code.  if paragraphDelimiter='newLine', then this is the same as line-by-line mode, right?
 
     if invalidLine == True: 
         #then commit any currently working string to databaseDatastructure, add to temporary dictionary to be added later
@@ -660,7 +590,7 @@ while inputFileContents != '' :
         #and reset currentParagraphLineCount
         currentParagraphLineCount=0
     #while myLine[:1] != the first character is not an ignore character, #while the line is valid to feed in as input, then
-    else:
+    elif invalidLine != True:
         #if the newLine after .strip() == '' #an empty string
             #then end of paragraph reached. Commit any changes to temporaryString if there are any
             #and break out of loop
@@ -679,7 +609,7 @@ while inputFileContents != '' :
         else:
             sys.exit('Unspecified error.'.encode(consoleEncoding))
         #if max paragraph limit has been reached
-        if (currentParagraphLineCount >= maximumNumberOfLinesPerParagraph) or (paragraphDelimitor == 'newLine'):  
+        if (currentParagraphLineCount >= maximumNumberOfLinesPerParagraph) or (paragraphDelimiter == 'newLine'):  
             #then commit currently working string to databaseDatastructure, #add to temporary dictionary to be added later
             #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
             temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False'
@@ -687,6 +617,8 @@ while inputFileContents != '' :
             temporaryString=None
             #and reset counter
             currentParagraphLineCount=0
+    else:
+        sys.exit('Unspecified error.'.encode(consoleEncoding))
 
     #remove the current line from inputFileContents, in preparating for reading the next line of inputFileContents
     inputFileContents=inputFileContents.partition('\n')[2] #removes first line from string
