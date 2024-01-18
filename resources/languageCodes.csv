@@ -21,8 +21,8 @@ Latvian, LV, LAV, True, False
 Lithuanian, LT, LIT, True, False
 Norwegian (Bokmal), NB, NOB, True, False
 Polish, PL, POL, True, False
-Portuguese (European), PT-PT, POR, True, True, Portuguese, PT, POR
-Portuguese (Brazilian), PT-BR, POR-BRA, True, True, Portuguese, PT, POR
+Portuguese (European), PT-PT, POR, True, True, Portuguese, PT-PT, POR
+Portuguese (Brazilian), PT-BR, POR-BRA, True, True, Portuguese, PT-PT, POR
 Romanian, RO, RON, True, False
 Russian, RU, RUS, True, False
 Slovak, SK, SLK, True, False

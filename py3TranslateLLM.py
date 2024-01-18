@@ -12,25 +12,24 @@ License:
 
 """
 #import various libraries that py3TranslateLLM depends on
-import argparse                    #Used to add command line options.
-import os, os.path                 #Extract extension from filename, and test if file exists.
-from pathlib import Path       #Override file in file system with another and create subfolders.
-import sys                              #End program on fail condition.
-import io                                 #Manipulate files (open/read/write/close).
-#from io import IOBase        #Test if variable is a file object (an "IOBase" object)
-from datetime import datetime #Used to get current date and time
-from collections import deque #Used to hold rolling history of translated items to use as context for new translations
-import requests                    #Do basic http stuff, like submitting post/get requests to APIs. This library must be installed using: pip install requests
-
-import openpyxl                   #Used as the core internal data structure and also to read/write xlsx files.
+import argparse                           #Used to add command line options.
+import os, os.path                        #Extract extension from filename, and test if file exists.
+from pathlib import Path              #Override file in file system with another and create subfolders.
+import sys                                     #End program on fail condition.
+import io                                        #Manipulate files (open/read/write/close).
+#from io import IOBase               #Test if variable is a file object (an "IOBase" object).
+#from datetime import datetime #Used to get current date and time.
+import datetime                            #Used to get current date and time. Newer import syntax. Might not work.
+from collections import deque    #Used to hold rolling history of translated items to use as context for new translations.
+import requests                            #Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'
+import openpyxl                           #Used as the core internal data structure and also to read/write xlsx files. Must be installed using pip.
 import resources.openpyxlHelpers as openpyxlHelpers #A helper/wrapper library to aid in using openpyxl as a datastructure.
-
-#import codecs                      #Improves error handling when dealing with text file codecs.
+#import codecs                           #Improves error handling when dealing with text file codecs.
 import resources.dealWithEncoding as dealWithEncoding   #dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 
 
 #set defaults and static variables
-version='v0.1 - 2024Jan17 pre-alpha'
+version='v0.1 - 2024Jan18 pre-alpha'
 
 defaultTextEncoding='utf-8'
 defaultTextEncodingForKSFiles='shift-jis'
@@ -63,14 +62,13 @@ commandLineParser.add_argument('fileToTranslate', help='Either the raw file to t
 commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+defaultTextEncoding,default=None,type=str)
 commandLineParser.add_argument('-o', '--outputFile', help='The file to insert translations into, including path. Default is same as input file.',default=None,type=str)
 commandLineParser.add_argument('-ofe', '--outputFileEncoding', help='The encoding of the output file. Default is same as input file.',default=None,type=str)
-
 commandLineParser.add_argument('-pfile', '--parsingDefinitions', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None,type=str)
 commandLineParser.add_argument('-pfe', '--parsingDefinitionsEncoding', help='Specify encoding for parsing definitions file, default='+defaultTextEncoding,default=None,type=str)
-commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+defaultSourceLanguage, default=defaultSourceLanguage,type=str)
-commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+defaultTargetLanguage, default=defaultTargetLanguage,type=str)
 
 commandLineParser.add_argument('-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\''+defaultLanguageCodesFile+'\'.',default=defaultLanguageCodesFile,type=str)
 commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv, default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+defaultSourceLanguage, default=defaultSourceLanguage,type=str)
+commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+defaultTargetLanguage, default=defaultTargetLanguage,type=str)
 
 commandLineParser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv',default=None,type=str)
 commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv, Default='+defaultTextEncoding,default=None,type=str)
@@ -102,9 +100,10 @@ translationEngine=commandLineArguments.translationEngine
 
 fileToTranslateFileName=commandLineArguments.fileToTranslate
 parsingDefinitionsFileName=commandLineArguments.parsingDefinitions
+outputFileName=commandLineArguments.outputFile
+languageCodesFileName=commandLineArguments.languageCodesFile
 sourceLanguageRaw=commandLineArguments.sourceLanguage
 targetLanguageRaw=commandLineArguments.targetLanguage
-languageCodesFileName=commandLineArguments.languageCodesFile
 
 charaNamesDictionaryFileName=commandLineArguments.characterNamesDictionary
 preDictionaryFileName=commandLineArguments.preTranslationDictionary
@@ -155,7 +154,7 @@ if implemented == False:
     sys.exit(('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding))
 
 
-#if using parseOnly, a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist. Spreadsheet formats are not valid with parseOnly command, but some valid file must be specified. 
+#if using parseOnly, a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist. Spreadsheet formats are not valid with parseOnly command, but some valid file must be specified.
 #Therefore, that file must always have an extension due to overloading of --inputFile. Not necessarily. parseOnly means the extension could be non-existant but input is still clarified as 100% a text file. Therefore, #split extension code should retun None to fileToTranslateFileNameExtensionOnly in those cases, and that not signify an error during parseOnly. Question: how does os.path.splitext(fileName) actually work? Answer: If the extension does not exist, then it returns an empty string '' object for the extension. A None comparison will not work, but...   if myFileExtOnly == '':   ... will return true and conditionally execute.
 
 fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
@@ -198,6 +197,27 @@ if mode == 'parseOnly':
 
 
 
+
+
+
+
+#Substitute a few language entries to certain defaults due to collisions and aliases.
+if sourceLanguageRaw.lower() == 'english':
+    sourceLanguageRaw = 'English (American)'
+elif sourceLanguageRaw.lower() == 'castilian':
+    sourceLanguageRaw = 'Spanish'
+elif sourceLanguageRaw.lower() == 'chinese':
+    sourceLanguageRaw = 'Chinese (simplified)'
+elif sourceLanguageRaw.lower() == 'portuguese':
+    sourceLanguageRaw = 'Portuguese (European)'
+
+if targetLanguageRaw.lower() == 'english':
+    targetLanguageRaw = 'English (American)'
+elif targetLanguageRaw.lower() == 'castilian':
+    targetLanguageRaw='Spanish'
+
+
+#Set encodings Last
 ##Set Encodings for files using dealWithEncoding.py helper library as dealWithEncoding.ofThisFile(myfile). 
 #First one is a special case since the encoding must be changed to shift-jis in the case of .ks (file extension).
 #If an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change.
@@ -220,7 +240,8 @@ if fileToTranslateFileName != None:
 else:
     fileToTranslateEncoding=defaultTextEncoding#if an input file name was not specified, set encoding to default encoding
 
-#For the output file encoding:
+#outputFileEncoding=
+#For the output file encoding:  
 #if the user specified an input file, use the input file's encoding for the output file
 #if the user did not specify an input file, then the program cannot run.
 #The input file must be either a raw file (.ks, .txt, .ts) or a spreadsheet file (.csv, .xlsx, .xls, .ods)
@@ -230,40 +251,16 @@ else:
 #set rest of encodings using dealWithEncoding.ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
 
 #parsingDefinitionsEncoding=commandLineArguments.parsingDefinitionsEncoding
-#charaNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
+
 #languageCodesEncoding=commandLineArguments.languageCodesFileEncoding
 
+#charaNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
 #preDictionaryEncoding=commandLineArguments.preTranslationDictionaryEncoding
 #postDictionaryEncoding=commandLineArguments.postTranslationDictionaryEncoding
 #postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictionaryEncoding
 
 
-
-
-
-
-
-
-
-
-
-#Substitute a few language entries to certain defaults due to collisions and aliases.
-if sourceLanguageRaw.lower() == 'english':
-    sourceLanguageRaw = 'English (American)'
-elif sourceLanguageRaw.lower() == 'castilian':
-    sourceLanguageRaw = 'Spanish'
-elif sourceLanguageRaw.lower() == 'chinese':
-    sourceLanguageRaw = 'Chinese (simplified)'
-elif sourceLanguageRaw.lower() == 'portuguese':
-    sourceLanguageRaw = 'Portuguese (European)'
-
-if targetLanguageRaw.lower() == 'english':
-    targetLanguageRaw = 'English (American)'
-elif targetLanguageRaw.lower() == 'castilian':
-    targetLanguageRaw='Spanish'
-
-
-###### define various helper functions, especially for main openpyxl data structure ###### 
+###### define various helper functions ###### 
 
 
 def getCurrentMonthFromNumbers(x):
@@ -522,8 +519,13 @@ wordWrapMode='dynamic'
 
 
 #initialize main data structure
-mainDatabaseWorkbook = Workbook()
-mainDatabaseSpreadsheet = mainDatabaseWorkbook.active
+#mainDatabaseWorkbook = Workbook()
+#mainDatabaseSpreadsheet = mainDatabaseWorkbook.active
+
+#Strawberry is a wrapper class for the workbook class with additional methods.
+#The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class.
+mainSpreadsheet=Strawberry()
+
 
 #This will hold raw untranslated text, number of lines each entry was derived from, and columns containing maybe translated data. Maximum columns supported = 9[?]. Columns 0 and 1 are reserved for Raw untranslated text and [1] is reserved for the number of lines that column 0 represents, even if it is always 1 because line-by-line parsing (lineByLineMode) is specified.
 #Alternatively, lineByLineMode can instead specify to feed each line into the translator but the paragraphDelimiter=emptyLine can support multiple lines in the main data structure. That might be more flexible, or make things worse. Leave it to user to decide on a case-by-case basis by allowing for this possibility.

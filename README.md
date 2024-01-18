@@ -8,7 +8,7 @@ This Python program is a CLI wrapper for the following translation engines:
 And provides interoperability for the following formats:
 
 - Comma separated value text documents (.csv).
-- Microsoft excel document (.xlsx).
+- Microsoft Excel document (.xlsx).
 - KAG3 used in the kirikiri game engine (.ks).
 - Random text files (.txt).
 
@@ -19,14 +19,14 @@ The focus is the spreadsheet formats, but a built in customizable parser support
 - DeepL API (Pro), NMT.
 - DeepL (Web hook), NMT.
 - fairseq/Sugoi Offline Translator, NMT.
-- Open document spreadsheet (.ods).
-- Microsoft excel document (.xls).
-- KAG3 used in Tyrano script (.ts ?).
+- OpenDocument spreadsheet (.ods).
+- Microsoft Excel document (.xls).
+- KAG3 used in Tyrano script (.ks/.ts?).
 
 Not Planned:
 
-- OpenAI's GPT 3.5/4+. For OpenAI's LLM, consider:
-    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both 3.5 and 4.0 models.
+- OpenAI's GPT. Instead cnsider:
+    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both v3.5 and v4.0 LLM models.
 - Sugoi Translator Premium/Papago/DeepL.
 - JSON. Does anyone want this? Open a feature request if so. Provide an `example.json`.
 
@@ -40,7 +40,7 @@ Not Planned:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan16 pre-alpha`
+`Current version: 0.1 - 2024Jan18 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented.
 
@@ -106,11 +106,16 @@ py3TranslateLLM.py fairseq [options]
 
 - For the spreadsheet formats (.csv, xlsx, .xls, .ods):
     - The first row is reserved for headers and is always ignored for data processing otherwise.
-    - The first column must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed and will be preserved in the output cell.
-    - The second column is reserved for metadata that py3TranslateLLM requires. Do not modify.
-    - The columns after the second column are used for KoboldCPP and DeepL output based on the first column.
-        - The order to the columns after the second one matters only in the following situation:
-        - The column furthest to the right will be preferred when writing back to files (.ks, .ts).
+    - The first column must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
+        - Paragraph spacing will not be preserved in the output cell, but will instead be regenerated dynamically when writting to the output files based upon the configurable word wrap settings.
+    - The second column is reserved for metadata used by py3TranslateLLM and always ignored otherwise.
+        - Do not modify the metadata column, including the header.
+    - The third column and columns after it are used for the translation engines (KoboldCPP/modelName and DeepL).
+        - One translation engine per column. If the current translation engine does not exist as a column, it will be added.
+            - KoboldCPP translation engines are in the format `koboldcpp/[modelName]`, therefore changing the model mid-translation will result in a completely new column because different models produce different output.
+        - The source content for the translation engine columns is always based on the first column.
+        - The order of the translation engine columns (3, 4, 5+) only matters in the following situation:
+            - The column furthest to the right will be preferred when writing back to files (.ks, .ts).
     - .csv files:
         - Must use a comma `,` as a delimiter.
         - Entries containing:
@@ -118,10 +123,9 @@ py3TranslateLLM.py fairseq [options]
             - comma(s) `,`
             - must be quoted using two double quotes `"` like so: `"Hello, world!"`
         - Single quotes `'` are not good enough. Use double quotes `"`
-        - Entries containing double quotes `"` within the entry must escape those quotes using a backlash `\` like: `Hel\"lo` and `"\"Hello, world!\""`
+        - Entries containing more than one double quote `"` within the entry must escape those quotes using a backlash `\` like: `"\"Hello, world!\""`
 - For the text formats used for input (.txt, .ks), the inbuilt parser will use the user provided settings to parse the file.
-    - If one is not specified, the user will be prompted to use one.
-    - Examples of text file parsing templates can also be found under `resources/templates/`.
+    - Examples of text file parsing templates can be found under `resources/templates/`.
 - The text formats used for templates and settings (.txt) have their own syntax:
     - `#` indicates that line is a comment.
     - Values are specified by using `Item=Value` Example:
@@ -164,7 +168,8 @@ py3TranslateLLM.py fairseq [options]
 
 - The list of supported languages can be found at `resources/languageCodes.csv`.
 - If using an LLM for translation that utilizes a language not listed in `languageCodes.csv`, then add that language as a new row to make py3TranslateLLM aware of it.
-- The default supported languages list is based on DeepL's [supported languages list](//support.deepl.com/hc/en-us/articles/360019925219-Languages-included-in-DeepL-Pro), excluding the addition of `Chinese (traditional)`.
+- The default supported languages list is based on DeepL's [supported languages list](//support.deepl.com/hc/en-us/articles/360019925219-Languages-included-in-DeepL-Pro) and their [openapi.yaml](//www.deepl.com/docs-api/api-access/openapi) specification, excluding the addition of `Chinese (traditional)`.
+    - Note that DeepL has a few quirks, like being picky about the target English dialect based upon the source language.
 - py3TranslateLLM uses mappings based upon [this](//www.loc.gov/standards/iso639-2/php/code_list.php) table and supports any of the following when specifying a language:
     1. the full language. Examples: `English`, `German`, `Spanish`, `Russian`.
     2. the 2 letter language code. Examples: `en-us`, `de`, `es`, `ru`.
