@@ -2,8 +2,8 @@
 
 This Python program is a CLI wrapper for the following translation engines:
 
-- KoboldCPP API [Large Language Model (LLM) -  Wiki](//en.wikipedia.org/wiki/Large_language_model).
-- DeepL API (Free): [Neural net Machine Translation (NMT) - Wiki](//en.wikipedia.org/wiki/Neural_machine_translation).
+- KoboldCPP API, [Large Language Model (LLM) -  Wiki](//en.wikipedia.org/wiki/Large_language_model).
+- DeepL API (Free), [Neural net Machine Translation (NMT) - Wiki](//en.wikipedia.org/wiki/Neural_machine_translation).
 
 And provides interoperability for the following formats:
 
@@ -25,7 +25,7 @@ The focus is the spreadsheet formats, but a built in customizable parser support
 
 Not Planned:
 
-- OpenAI's GPT. Instead cnsider:
+- OpenAI's GPT. Instead consider:
     - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both v3.5 and v4.0 LLM models.
 - Sugoi Translator Premium/Papago/DeepL.
 - JSON. Does anyone want this? Open a feature request if so. Provide an `example.json`.
@@ -40,7 +40,7 @@ Not Planned:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan18 pre-alpha`
+`Current version: 0.1 - 2024Jan19 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented.
 
@@ -92,6 +92,7 @@ Install/configure these other projects as needed:
 
 ## Usage:
 
+`TODO:`
 ```
 python py3TranslateLLM.py -h
 py3TranslateLLM.py koboldcpp --address=http://192.168.1.100 --port=5001
@@ -104,35 +105,60 @@ py3TranslateLLM.py fairseq [options]
 
 ## Notes:
 
+- Concept art:
+    - The design concept behind pyTranslateLLM is to produce the highest quality machine and AI translations possible for dialogue and narration by providing LLM/NMT models the information they need to translate to the best of their ability. This includes but is not limited to:
+        - Bunding the source language strings into paragraphs to increase context.
+        - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
+        - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
+        - Removing and/or substituting strings that should not be translated prior to forming paragraphs and submitting text for translation, examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
+            - This should help with understanding the submitted text as 'paragraphs' better.
+    - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
+    - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating context heavy languages, like Japanese.
+    - **If translating from context heavy languages, like English, there should not be any or only small differences in translation quality**. Just use G-Translate instead for such languages.
+    - The intent is to help translators by cutting down on the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
+    - Other programs can be used to find and parse small bits of untranslated text in text files and images. This program focuses on dialogue.
+    - While it is not the emphasis of this program, there is some code to help extract dialogue from certain common formats and then reinsert it automatically after translation including automatic handling of word wrap.
 - For the spreadsheet formats (.csv, xlsx, .xls, .ods):
     - The first row is reserved for headers and is always ignored for data processing otherwise.
     - The first column must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
         - Paragraph spacing will not be preserved in the output cell, but will instead be regenerated dynamically when writting to the output files based upon the configurable word wrap settings.
+            - This behavior can be disabled by setting paragraphDelimiter=newLine or enabling --lineByLineMode (-lbl) mode at runtime.
     - The second column is reserved for metadata used by py3TranslateLLM and always ignored otherwise.
-        - Do not modify the metadata column, including the header.
-    - The third column and columns after it are used for the translation engines (KoboldCPP/modelName and DeepL).
-        - One translation engine per column. If the current translation engine does not exist as a column, it will be added.
+        - Do not modify the metadata column.
+    - The third column and columns after it are used for the translation engines (KoboldCPP/modelName, DeepL API, DeepL (Web), Sugoi, fairseq).
+        - One translation engine per column. If the current translation engine does not exist as a column, it will be added dynamically.
             - KoboldCPP translation engines are in the format `koboldcpp/[modelName]`, therefore changing the model mid-translation will result in a completely new column because different models produce different output.
         - The source content for the translation engine columns is always based on the first column.
-        - The order of the translation engine columns (3, 4, 5+) only matters in the following situation:
+        - The order of the translation engine columns (3+) only matters in the following situation:
             - The column furthest to the right will be preferred when writing back to files (.ks, .ts).
     - .csv files:
         - Must use a comma `,` as a delimiter.
         - Entries containing:
             - new line character(s) `\n`, `\r\n` 
             - comma(s) `,`
-            - must be quoted using two double quotes `"` like so: `"Hello, world!"`
+            - must be quoted using two double quotes `"`. Example: `"Hello, world!"`
         - Single quotes `'` are not good enough. Use double quotes `"`
         - Entries containing more than one double quote `"` within the entry must escape those quotes using a backlash `\` like: `"\"Hello, world!\""`
-- For the text formats used for input (.txt, .ks), the inbuilt parser will use the user provided settings to parse the file.
+        - Whitespace is ignored for `languageCodes.csv`.
+        - Whitespace is preserved for all of the dictionaries.
+- For the text formats used for input (.ks, .ts), the inbuilt parser will use the user provided settings file to parse the file.
+    - A settings file is required when parsing such raw text files.
     - Examples of text file parsing templates can be found under `resources/templates/`.
 - The text formats used for templates and settings (.txt) have their own syntax:
     - `#` indicates that line is a comment.
     - Values are specified by using `Item=Value` Example:
         - `paragraphDelimiter=emptyLine`
     - Empty lines are ignored.
-- If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. `resume` (`-r`) technically exists, but can be overly picky.
+- If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. `--resume` (`-r`) technically exists, but can be overly picky.
 - In addition to the libraries listed below, py3TranslateLLM also uses several libraries from the Python standard library. See source code for an enumeration of those.
+- Not implemented yet: Settings can be specified at runtime from the command prompt or from `py3TranslateLLM.ini`.
+    - Settings read from the command prompt take priority over the `.ini`.
+    - Values are designated using the following syntax:
+        - `commandLineOption=value`
+        - The 'None' keyword for an option indicates no value. Example: `commandLineOption=None`
+        - Whitespace is ignored.
+        - Lines with only whitespace are ignored.
+        - Lines starting with `#` are ignored. In other words, `#` means a comment.
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
 
 ### Notes about encodings:
@@ -214,16 +240,16 @@ Parameter | Description | Example(s)
 address | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`
 port | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
 
-## Regarding python libraries:
+## Regarding Python libraries:
 
-- Different libraries are not all forward/backwards compatible with all major python versions or compatible with this or that version of (various) libraries they import, but they still have to somehow all work together with matching versions on a wide variety of different computers. Does that sound like hell? Well, welcome to software development. So anyway, below are the versions that were tested and developed while using Python 3.7.6. The user's local enviornment may differ leading to undefined behavior. Have fun.
+- Different libraries are not all forward/backwards compatible with all major Python versions or compatible with this or that version of (various) libraries they import, but they still have to somehow all work together with matching versions on a wide variety of different computers. Does that sound like hell? Well, welcome to software development. So anyway, below are the versions that were tested and developed while using Python 3.7.6. The user's local enviornment may differ leading to undefined behavior. Have fun.
 - It is not necessarily clear what versions work with what other versions, so just install whatever and hope it works:
 
 Library name | Required, Reccomended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
 --- | --- | --- | --- | ---
 [openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Microsoft Excel Document (.xlsx) support. | `pip install openpyxl` | 3.1.2
-dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | Unversioned.
-openpyxlHelpers | Required. | Various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | Unversioned.
+openpyxlHelpers | Required. | Has various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | Unversioned.
+dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | 0.1 2024Jan19.
 [requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests`, `pip install deepL` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Reccomended. | Improves text codec handling. | `pip install chardet` | 5.2.0
 [DeepL-python](//github.com/DeepLcom/deepl-python) | Reccomended. | Used for DeepL NMT, optional otherwise. | `pip install deepl` | 1.16.1
@@ -233,7 +259,7 @@ openpyxlHelpers | Required. | Various functions to manage using openpyxl as a da
 
 ###  Guide: Installing and managing Python library versions with `pip`:
 
-- `python --version` #Find out what major python version is installed. 3.5, 3.6, 3.7, etc and where it is located.
+- `python --version` #Find out what major Python version is installed. 3.5, 3.6, 3.7, etc and where it is located.
     - `where python` #Windows.
     - `which python` #Linux.
         - If `python` is a symlink, as is the norm, then follow it to the target:
@@ -267,7 +293,7 @@ openpyxlHelpers | Required. | Various functions to manage using openpyxl as a da
     - 'Sugoi NMT' is a wrapper for fairseq which, along with the pretrained model, does the heavy lifting for 'Sugoi NMT'.
     - Sugoi NMT is one part of the 'Sugoi Translator Toolkit' which is itself part of the free-as-in-free-beer distributed 'Sugoi Toolkit' which contains other projects like manga translation and upscaling.
     - The use of Github to post source code for Sugoi Toolkit suggests intent to keep the wrapper code under a permissive license. A more concrete license may be available on discord.
-- py3TranslateLLM.py and the associated libraries are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
+- py3TranslateLLM.py and the associated libraries under `resources/` are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
     - Feel free to use it, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
     - The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
     - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.

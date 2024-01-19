@@ -1,6 +1,11 @@
-# This file establishes the definitions for the built in parser to use with KAG3 kirkikri game engine scripts (.ks).
-# This file is parsed after reading the raw.untranslated.ks file and applied after characterNamesDictionary.csv,
-# but before the the pre and postTranslation dictionaries. Lines starting with # are comments.
+# This file establishes the definitions for the built in parser and file writer to use with KAG3 kirkikri game engine scripts (.ks).
+# Lines starting with # are comments.  The order is:
+#   - characterNamesDictionary.csv
+#   - Settings related to pasing dialogue as specified in this file.
+#   - preTranslationDictionary.csv
+#   - postTranslationDictionary.csv
+#   - Settings related to word wrap and outputing the translation into files as specified in this file.
+#   - postWritingToFileDictionary.csv
 
 # If a line begins with one of the following characters, then do not process it for dialogue. Separate each character with a space.
 # Groups of characters are not currently supported. Set to 'None' (without quotes) to parse every line. This setting is to help isolate
@@ -41,6 +46,7 @@ wordWrapMode=dynamic
 # Chloe
 # 「For Queen and country.」
 characterNamesAppearBeforeOrAfterDialogue=before
+#characterNamesAppearBeforeOrAfterDialogue=None
 
 # If the character name is not part of the main text, then how should it be detected? Valid values are 'None', a single character, or
 # a group of characters. Grouped characters will be treated as a single entity. Both BeginsWith and EndsWith must match
@@ -49,11 +55,13 @@ theCharacterNameAlwaysBeginsWith=【
 theCharacterNameAlwaysEndsWith=】
 #theCharacterNameAlwaysBeginsWith=[name text="
 #theCharacterNameAlwaysEndsWith="]
+#theCharacterNameAlwaysBeginsWith=None
+#theCharacterNameAlwaysEndsWith=None
 
-#As a rule, [codes] inside of square brackets are not sent to the translation engine but are reinserted back at the end of the
-#post-translated text. The following alterations honor the word wrap setting above. Since word wrap is calculated dynamically,
-#these will only be used if text is written back to the original file.
-#Important: Setting *any* of these settings to a value different than 'None' will disable reinsertion of [codes] after translation.
+# As a rule, [codes] inside of square brackets are not sent to the translation engine but are reinserted back at the end of the
+# post-translated text. The following alterations honor the word wrap setting above. Since word wrap is calculated dynamically,
+# these will only be used if text is written back to the original file.
+# Important: Setting *any* of these settings to a value different than 'None' will disable reinsertion of [codes] after translation.
 alwaysDeleteBeforeTranslation=None
 #alwaysDeleteBeforeTranslation=[r] [repage]
 alwaysDeleteAfterTranslation=None

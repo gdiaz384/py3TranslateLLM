@@ -11,6 +11,7 @@ License: See main program.
 
 """
 #set defaults
+version = '0.1 2024Jan19'
 printStuff=True
 debug=False
 #debug=True
@@ -51,6 +52,9 @@ def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
         return rawCommandLineOption
     #if (no encoding specified for file...):
     elif rawCommandLineOption == None:
+        #if the file was not specified at the command prompt and neither was the encoding, then just return the fallbackEncoding
+        if myFileName == None:
+            return fallbackEncoding
         #check if the file exists
         if os.path.isfile(myFileName) != True:
             #if the user did not specify an encoding and if the file does not exist, then just return the fallbackEncoding
