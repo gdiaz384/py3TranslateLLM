@@ -22,27 +22,32 @@ The focus is the spreadsheet formats, but a built in customizable parser support
 - OpenDocument spreadsheet (.ods).
 - Microsoft Excel document (.xls).
 - KAG3 used in Tyrano script (.ks/.ts?).
+- .JSON (Very limited support).
+    - To process additional types of JSON, open an issue and provide an `example.json`.
 
 Not Planned:
 
 - OpenAI's GPT. Instead consider:
     - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both v3.5 and v4.0 LLM models.
 - Sugoi Translator Premium/Papago/DeepL.
-- JSON. Does anyone want this? Open a feature request if so. Provide an `example.json`.
+- Most other translation engines, like Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
+    - Use [Translator++](//dreamsavior.net/download) for those.
 
 ## What are the best LLM models available?
 
-- Guide: huggingface's [chatbot-arena-leaderboard](//huggingface.co/spaces/lmsys/chatbot-arena-leaderboard).
-- Example: [Mixtral 8x7b v0.1](//huggingface.co/TheBloke/Mixtral-8x7B-v0.1-GGUF).
+- Guide: huggingface's [chatbot-arena-leaderboard](//huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Examples:
+    - [Mixtral 8x7b v0.1](//huggingface.co/TheBloke/Mixtral-8x7B-v0.1-GGUF).
+    - [Tulu-2-DPO](//huggingface.co/TheBloke/tulu-2-dpo-70B-GGUF).
+- Notes:
     - The size of the model is also the RAM requirements to load it into memory.
     - The more it fits into GPU memory (VRAM), the better the performance.
-- Not all models listed on leaderboard are compatible with KoboldCPP. See their [documentation](//github.com/LostRuins/koboldcpp/wiki) for compatible model formats.
+    - Not all models listed on leaderboard are compatible with KoboldCPP. See KoboldCPP's [documentation](//github.com/LostRuins/koboldcpp/wiki) for compatible model formats.
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan19 pre-alpha`
+`Current version: 0.1 - 2024Jan20 pre-alpha`
 
-Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented.
+Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented and the project has entered 'beta' development.
 
 1. Install [Python 3.7+](//www.python.org/downloads). For Windows 7, use [this repository](//github.com/adang1345/PythonWin7/).
     - Make sure `Add to Path` is checked/selected.
@@ -72,7 +77,9 @@ Install/configure these other projects as needed:
         - `pip install DeepL`
         - Usage of the DeepL API, both Free and Pro, requires an [account](//www.deepl.com/login) and credit card verification.
     - [DeepL Web](//www.deepl.com/translator) and DeepL's [native clients](//www.deepl.com/en/app) do not seem to have usage limits, and the Windows client at least does not require an account. They might do IP bans after a while.
-    - All usage of DeepL's translation services and is governed by their [Terms of Use](//www.deepl.com/en/pro-license).    
+    - All usage of DeepL's translation services and is governed by their [Terms of Use](//www.deepl.com/en/pro-license).
+    - For the DeepL API, an API key is needed. It must be in one of the following places:
+        - TODO: Put stuff here.
 - LLM support is currently implemented using the KoboldCPP's API which requires KoboldCPP:
     - CPU/Nvidia GPUs: [KoboldCPP](//github.com/LostRuins/koboldcpp), [FAQ](//github.com/LostRuins/koboldcpp/wiki).
     - AMD GPUs: [KoboldCPP-ROCM](//github.com/YellowRoseCx/koboldcpp-rocm).
@@ -110,8 +117,8 @@ py3TranslateLLM.py fairseq [options]
         - Bunding the source language strings into paragraphs to increase context.
         - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
         - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
-        - Removing and/or substituting strings that should not be translated prior to forming paragraphs and submitting text for translation, examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
-            - This should help with understanding the submitted text as 'paragraphs' better.
+        - Removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation, examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
+            - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
     - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
     - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating context heavy languages, like Japanese.
     - **If translating from context heavy languages, like English, there should not be any or only small differences in translation quality**. Just use G-Translate instead for such languages.
@@ -141,7 +148,7 @@ py3TranslateLLM.py fairseq [options]
         - Entries containing more than one double quote `"` within the entry must escape those quotes using a backlash `\` like: `"\"Hello, world!\""`
         - Whitespace is ignored for `languageCodes.csv`.
         - Whitespace is preserved for all of the dictionaries.
-- For the text formats used for input (.ks, .ts), the inbuilt parser will use the user provided settings file to parse the file.
+- For the text formats used for input (.txt, .ks, .ts), the inbuilt parser will use the user provided settings file to parse the file.
     - A settings file is required when parsing such raw text files.
     - Examples of text file parsing templates can be found under `resources/templates/`.
 - The text formats used for templates and settings (.txt) have their own syntax:
@@ -151,15 +158,35 @@ py3TranslateLLM.py fairseq [options]
     - Empty lines are ignored.
 - If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. `--resume` (`-r`) technically exists, but can be overly picky.
 - In addition to the libraries listed below, py3TranslateLLM also uses several libraries from the Python standard library. See source code for an enumeration of those.
-- Not implemented yet: Settings can be specified at runtime from the command prompt or from `py3TranslateLLM.ini`.
+- Settings can be specified at runtime from the command prompt or from `py3TranslateLLM.ini`.
     - Settings read from the command prompt take priority over the `.ini`.
     - Values are designated using the following syntax:
         - `commandLineOption=value`
-        - The 'None' keyword for an option indicates no value. Example: `commandLineOption=None`
+        - The 'None' keyword for an option indicates no value. Example: `preTranslationDictionary=None`
         - Whitespace is ignored.
         - Lines with only whitespace are ignored.
         - Lines starting with `#` are ignored. In other words, `#` means a comment.
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
+
+### The following files are required:
+
+Variable name | Description | Examples
+--- | --- | ---
+`fileToTranslate` | The file to translate. | `A01.ks`, `backup.2024Jan10.xlsx`
+`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Required if working from a text file or if outputting to one but not if only using spreadsheet formats. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
+`languageCodesFile` | Contains the list of supported languages. | `resources/ languageCodes.csv`
+
+### The following files are optional:
+
+Variable name | Description | Examples
+--- | --- | ---
+`py3TranslateLLM.ini` | This file may be used instead of the CLI to specifying input options. Keys in the key=value pairs are case sensitive. | `py3TranslateLLM.ini`, `renamedBinary.ini`
+`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Not required if working only with spreadsheet formats but required if reading from or writing to text files. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
+`outputFile` | The name and path of the file to use as output. Will be same as input if not specified. Specify a spreadsheet format to dump the raw data or a text file to output only the preferred translation. | `None`, `output.csv`, `myFolder/ output.xlsx`
+`characterNamesDictionary` | Entries will be submitted to the translation engine but then replaced back to the original text after translation. | `resources/ templates/ characterNamesDictionary_example.csv`
+`preTranslationDictionary` | Entries will be replaced prior to submission to the translation engine. | `preTranslationDictionary.csv`
+`postTranslationDictionary` | Entries will be replaced after translation. | `postTranslationDictionary.csv`
+`postWritingToFileDictionary` | After the translated text has been written back to a text file, the file will be opened again to perform these replacements. | `postWritingToFileDictionary.csv`
 
 ### Notes about encodings:
 
@@ -169,8 +196,8 @@ py3TranslateLLM.py fairseq [options]
 - For the supported encodings see: [standard-encodings](//docs.python.org/3.7/library/codecs.html#standard-encodings).  Common encodings:
     - `utf-8` - If at all possible, please only use `utf-8`, and use it for absolutely everything.
         - py3TranslateLLM uses `utf-8` as the default encoding for everything except kirikiri.
-    - `shift-jis` - Required by the kirikiri game engine and many Japanese visual novels/games/media.
-    - `utf-16-le` - a.k.a. `ucs2-bom-le`. Alternative encoding used by the kirikiri game engine. Todo: Double check this.
+    - `shift-jis` - Required by the kirikiri game engine and many Japanese visual novels, games, programs, and media in general.
+    - `utf-16-le` - a.k.a. `ucs2-bom-le`. Alternative encoding used by the kirikiri game engine. TODO: Double check this.
     - `cp437` - This is the old IBM/DOS code page for English that Windows with an English locale often uses by default. Thus, this is very often the encoding used by `cmd.exe`.
     - `cp1252` - This is the code page for western european languages that Windows with an English locale often uses by default. Thus, this is very often the encoding used by `cmd.exe`.
 - Windows specific notes:
@@ -185,6 +212,7 @@ py3TranslateLLM.py fairseq [options]
         - Makes it obvious that there were conversion errors.
         - Does not crash the program catastrophically.
         - Makes it easy to do ctrl+f replacements to fix any problems.
+            - Alternatively, use `postWritingToFileDictionary` to automate ctrl+f replacements.
     - If there are more than one or two such conversion errors per file, then the chosen file encoding settings are probably incorrect.
 - If the `chardet` library is available, it will be used to try to detect the character encoding of files via heuristics. While this imperfect solution is obviously very error prone, it is still better to have it than not.
     - To make it available: `pip install chardet`
@@ -197,10 +225,10 @@ py3TranslateLLM.py fairseq [options]
 - The default supported languages list is based on DeepL's [supported languages list](//support.deepl.com/hc/en-us/articles/360019925219-Languages-included-in-DeepL-Pro) and their [openapi.yaml](//www.deepl.com/docs-api/api-access/openapi) specification, excluding the addition of `Chinese (traditional)`.
     - Note that DeepL has a few quirks, like being picky about the target English dialect based upon the source language.
 - py3TranslateLLM uses mappings based upon [this](//www.loc.gov/standards/iso639-2/php/code_list.php) table and supports any of the following when specifying a language:
-    1. the full language. Examples: `English`, `German`, `Spanish`, `Russian`.
-    2. the 2 letter language code. Examples: `en-us`, `de`, `es`, `ru`.
-    3. the 3 letter language code. Examples: `eng`, `deu`, `spa`, `rus`.
-    4. Entries are case insensitive. Example: Both `lav` and `LAV` will work.
+    1. The full language: `English`, `German`, `Spanish`, `Russian`.
+    2. The 2 letter language code: `en-us`, `de`, `es`, `ru`.
+    3. The 3 letter language code: `eng`, `deu`, `spa`, `rus`.
+    4. Entries are case insensitive. Both `lav` and `LAV` will work.
 - DeepL only supports 2 letter language codes which creates some ambiguity regarding conversion to 3 letter language codes.
 - Note these quirks and 3 letter language code collisions:
     - `English` has a collision in the 3 letter code `Eng` between `English (American)` and `English (British)`.
@@ -236,13 +264,13 @@ py3TranslateLLM.py fairseq [options]
 
 Parameter | Description | Example(s)
 --- | --- | ---
-[engine] | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl_api_free`, `deepl_api_pro`, `deepl_web`, `fairseq`, `sugoi`
-address | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`
-port | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
+`-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `fairseq`, `sugoi`
+`-a`, `--address` | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`, `--address=http://localhost`
+`-p`, `--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--p=443`
 
 ## Regarding Python libraries:
 
-- Different libraries are not all forward/backwards compatible with all major Python versions or compatible with this or that version of (various) libraries they import, but they still have to somehow all work together with matching versions on a wide variety of different computers. Does that sound like hell? Well, welcome to software development. So anyway, below are the versions that were tested and developed while using Python 3.7.6. The user's local enviornment may differ leading to undefined behavior. Have fun.
+- Different libraries are not all forward/backwards compatible with all major Python versions or compatible with this or that version of (various) libraries they import, but they still have to somehow all work together with compatible versions on a wide variety of different computers. Does that sound like hell? Well, welcome to software development. So anyway, below are the versions that were tested and developed while using Python 3.7.6. The user's local enviornment may differ leading to undefined behavior. Have fun.
 - It is not necessarily clear what versions work with what other versions, so just install whatever and hope it works:
 
 Library name | Required, Reccomended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
@@ -250,7 +278,7 @@ Library name | Required, Reccomended, or Optional | Description | Install comman
 [openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Microsoft Excel Document (.xlsx) support. | `pip install openpyxl` | 3.1.2
 openpyxlHelpers | Required. | Has various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | Unversioned.
 dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | 0.1 2024Jan19.
-[requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests`, `pip install deepL` | 2.31.0
+[requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Reccomended. | Improves text codec handling. | `pip install chardet` | 5.2.0
 [DeepL-python](//github.com/DeepLcom/deepl-python) | Reccomended. | Used for DeepL NMT, optional otherwise. | `pip install deepl` | 1.16.1
 [xlrd](//pypi.org/project/xlrd/) | Optional. | Provides reading from Microsoft Excel Document (.xls). | `pip install xlrd` | 2.0.1

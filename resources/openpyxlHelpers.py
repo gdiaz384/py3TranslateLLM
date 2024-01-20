@@ -296,13 +296,14 @@ class Strawberry:
         #Partial solution, added "ignoreWhitespace" function parameter which defaults to True.
         #Reading from dictionaries can be called with the "False" option for maximum flexibility.
         #New problem: How to expose this functionality to user?
-        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding) as myFile:
+        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding) as myFile:#shouldn't this be codecs.open and with error handling options?
             csvReader = csv.reader(myFile)
             for line in csvReader:
                 if debug == True:
                     print(str(line).encode(consoleEncoding))
                 #clean up whitespace for entities
                 if ignoreWhitespace == True:
+                    #Not entirely sure what this for loop does or why it is needed, but just leave it alone. Was probably a bug fix for something at some point. Maybe it removes whitespace from like... , Eng,... and so forth?
                     for i in range(len(line)):
                         line[i]=line[i].strip()
                 #tempSpreadsheet.append(line)
