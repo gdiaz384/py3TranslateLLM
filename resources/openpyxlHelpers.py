@@ -12,16 +12,18 @@ License: See main program.
 """
 #set defaults
 printStuff=True
+verbose=False
 debug=False
 #debug=True
 consoleEncoding='utf-8'
+inputErrorHandling='strict'
+outputErrorHandling='namereplace'
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os.path                            #Extract extension from filename, and test if file exists.
 from pathlib import Path            #Override file in file system with another and create subfolders.
 import sys                                   #End program on fail condition.
 import openpyxl                          #Used as the core internal data structure and also to read/write xlsx files.
-import codecs                            #Improves error handling when dealing with text file codecs.
 import csv                                    #Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
 try:
     import odfpy                           #Provides interoperability for Open Document Spreadsheet (.ods).
@@ -81,6 +83,14 @@ class Strawberry:
         self.spreadsheet.append(newRow)
 
     #def appendColumn(self, newColumn) #Does not seem to be needed. Data is just not processed that way.
+
+    #This sets the value of the cell based upon the cellAddress in the form of 'A4'.
+    def setCellValue(cellAddress,value):
+        self.spreadsheet[cellAddress]=value
+
+    #This retuns the value of the cell based upon the cellAddress in the form of 'A4'.
+    def getCellValue(cellAddress):
+        return self.spreadsheet[cellAddress]
 
     #Full name of this function is getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
     #This functions would return 'B5' from: <Cell 'Sheet'.B5>
@@ -271,12 +281,11 @@ class Strawberry:
 
     #TODO:
     #1) Export an existing spreadsheet to a file.
-    #2) Import a file into an existing spreadsheet.
+    #2) Import a file into an existing spreadsheet or dictionary.
     #References/objects are done using workbooks, not the active spreadsheet.
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-
     def importFromCSV(self, fileNameWithPath,myFileNameEncoding,ignoreWhitespace=True):
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
@@ -295,8 +304,9 @@ class Strawberry:
         #Could also have a flag that switches back and forth.
         #Partial solution, added "ignoreWhitespace" function parameter which defaults to True.
         #Reading from dictionaries can be called with the "False" option for maximum flexibility.
-        #New problem: How to expose this functionality to user?
-        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding) as myFile:#shouldn't this be codecs.open and with error handling options?
+        #New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
+        #print(inputErrorHandling)
+        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling) as myFile:#shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
             csvReader = csv.reader(myFile)
             for line in csvReader:
                 if debug == True:

@@ -11,8 +11,9 @@ License: See main program.
 
 """
 #set defaults
-version = '0.1 2024Jan19'
+version = '0.1 2024Jan21'
 printStuff=True
+verbose=False
 debug=False
 #debug=True
 consoleEncoding='utf-8'
@@ -42,29 +43,42 @@ def detectEncoding(myFileName):
             print((myFileName+':'+str(detector.result)).encode(consoleEncoding))
     return temp
 
-#returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down
+#Returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down.
+#detectEncoding() is never really used, so it should probably just be deleted.
 #if (no encoding specified) and (automaticallyDetectEncoding == True): 
-#def handleDeterminingFileEncoding(myFileName, rawCommandLineOption, defaultEncoding):
+#v0: def handleDeterminingFileEncoding(myFileName, rawCommandLineOption, defaultEncoding):
 def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
     #elif (encoding was specified):
     if rawCommandLineOption != None:
         #set encoding to user specified encoding
         return rawCommandLineOption
+
     #if (no encoding specified for file...):
     elif rawCommandLineOption == None:
-        #if the file was not specified at the command prompt and neither was the encoding, then just return the fallbackEncoding
+
+        #if the file was not specified at the command prompt/.ini and neither was the encoding, then just return the fallbackEncoding
         if myFileName == None:
             return fallbackEncoding
+
         #check if the file exists
         if os.path.isfile(myFileName) != True:
             #if the user did not specify an encoding and if the file does not exist, then just return the fallbackEncoding
             if printStuff == True:
                 print(('Warning: The file:\"'+myFileName+'" does not exist. Returning:\"'+fallbackEncoding+'"').encode(consoleEncoding))
             return fallbackEncoding
+
         #Assume file exists now.
+        #So, binary spreadsheet files (.xlsx, .xls, .ods) do not have an associated encoding that can be read by charadet because they are binary files. If the user specified option from the command line/.ini has not been used to return already, then return fallbackEncoding for binary files.
+        myFile_NameOnly, myFile_ExtensionOnly = os.path.splitext(myFileName)
+        #binaryFile=False
+        if (myFile_ExtensionOnly == '.xlsx') or (myFile_ExtensionOnly == '.xls') or (myFile_ExtensionOnly == '.ods'):
+            #Files that do not have an extension will not be caught up in this, so it is fine.
+            return fallbackEncoding
+
         #chardetLibraryAvailable=False   #debug code
         #if automaticallyDetectEncoding library is available:
         if chardetLibraryAvailable == True:
+
             #set encoding to detectEncoding(myFileName)
             #actually, since this is a library anyway and the conditional import statement was moved elsewhere, then just move the function here to avoid breaking up the code pointlessly
             detector=chardet.UniversalDetector()
@@ -86,6 +100,7 @@ def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
                     print(('Warning: Unable to detect encoding of file \''+myFileName+'\' with high confidence. Using the following fallback encoding:\''+fallbackEncoding+'\'').encode(consoleEncoding))
                 temp=fallbackEncoding
             return temp
+
         elif chardetLibraryAvailable == False:
             #set encoding to default value
             if (printStuff == True) and (debug == True):

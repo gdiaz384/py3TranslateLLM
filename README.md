@@ -20,7 +20,7 @@ The focus is the spreadsheet formats, but a built in customizable parser support
 - DeepL (Web hook), NMT.
 - fairseq/Sugoi Offline Translator, NMT.
 - OpenDocument spreadsheet (.ods).
-- Microsoft Excel document (.xls).
+- Microsoft Excel 97/2000/XP (.xls).
 - KAG3 used in Tyrano script (.ks/.ts?).
 - .JSON (Very limited support).
     - To process additional types of JSON, open an issue and provide an `example.json`.
@@ -30,13 +30,20 @@ Not Planned:
 - OpenAI's GPT. Instead consider:
     - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both v3.5 and v4.0 LLM models.
 - Sugoi Translator Premium/Papago/DeepL.
-- Most other translation engines, like Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
+- Most other cloud based NMT translation engines, like Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
     - Use [Translator++](//dreamsavior.net/download) for those.
+- Microsoft Excel 95 (.xls).
+
+Undetermined if:
+
+- py3TranslateLLM should incorporate any cloud based LLMs.
+    - If so, which ones that can be used for translation are expected to be long lived and have unlimited use APIs?
 
 ## What are the best LLM models available?
 
 - Guide: huggingface's [chatbot-arena-leaderboard](//huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Examples:
     - [Mixtral 8x7b v0.1](//huggingface.co/TheBloke/Mixtral-8x7B-v0.1-GGUF).
+    - [Yi-34B-Chat](//huggingface.co/TheBloke/Yi-34B-Chat-GGUF).
     - [Tulu-2-DPO](//huggingface.co/TheBloke/tulu-2-dpo-70B-GGUF).
 - Notes:
     - The size of the model is also the RAM requirements to load it into memory.
@@ -45,22 +52,25 @@ Not Planned:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan20 pre-alpha`
+`Current version: 0.1 - 2024Jan21 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented and the project has entered 'beta' development.
 
 1. Install [Python 3.7+](//www.python.org/downloads). For Windows 7, use [this repository](//github.com/adang1345/PythonWin7/).
-    - Make sure `Add to Path` is checked/selected.
+    - Make sure the Python version matches the architecture of the host machine:
+        - For 64-bit Windows, download the 64-bit (amd64) installer.
+        - For 32-bit Windows, download the 32-bit installer.
+    - During installation, make sure `Add to Path` is selected.
     - Open an command prompt.
     - `python --version` #Check to make sure Python 3.7+ is installed.
-    - #Optional but reccomended. Update python's package manager program.
+    - `python -m pip install --upgrade pip` #Optional. Update pip, python's package manager program.
 1. Download py3TranslateLLM using one of the following methods:
+    1. Download the latest project archive:
+        - Click on the green `< > Code` button at the top -> Download ZIP.
     1. Git:  #Requires `git` to be installed.
         1. Open an administrative command prompt.
         2. Navigate to a directory that supports downloading and arbitrary file execution.
         3. `git clone https://github.com/gdiaz384/py3TranslateLLM`
-    1. Download the latest project archive:
-        - Click on the green `< > Code` button at the top -> Download ZIP.
     1. Download from last stable release:
         - Click on on "Releases" at the side (desktop), or bottom (mobile), or [here](//github.com/gdiaz384/py3TranslateLLM/releases).
         - Download either of the archive formats (.zip or .tar.gz).
@@ -109,9 +119,42 @@ py3TranslateLLM.py deepl_web [options]
 py3TranslateLLM.py sugoi [options] #sugoi is an alias for fairseq
 py3TranslateLLM.py fairseq [options]
 ```
+ 
+## Parameters
 
-## Notes:
+`partial list:`
 
+Parameter | Description | Example(s)
+--- | --- | ---
+`-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `fairseq`, `sugoi`
+`-a`, `--address` | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`, `-a=http://localhost`
+`--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
+
+
+### The following files are required:
+
+Variable name | Description | Examples
+--- | --- | ---
+`fileToTranslate` | The file to translate. | `A01.ks`, `backup.2024Jan10.xlsx`
+`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Required if working from a text file or if outputting to one but not if only using spreadsheet formats. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
+`languageCodesFile` | Contains the list of supported languages. | `resources/ languageCodes.csv`
+
+### The following files are optional:
+
+Variable name | Description | Examples
+--- | --- | ---
+`py3TranslateLLM.ini` | This file may be used instead of the CLI to specify input options. Keys in the key=value pairs are case sensitive. | `py3TranslateLLM.ini`, `renamedBinary.ini`
+`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Not required if working only with spreadsheet formats but required if reading from or writing to text files. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
+`outputFile` | The name and path of the file to use as output. Will be same as input if not specified. Specify a spreadsheet format to dump the raw data or a text file to output only the preferred translation. | `None`, `output.csv`, `myFolder/ output.xlsx`
+`promptFile` | This file has the prompt for the LLM. Only needed if using an LLM. | `resources/ templates/ prompt.Mixtral8x7b.example.txt`
+`characterNamesDictionary` | Entries will be submitted to the translation engine but then replaced back to the original text after translation. | `resources/ templates/ characterNamesDictionary_example.csv`
+`preTranslationDictionary` | Entries will be replaced prior to submission to the translation engine. | `preTranslationDictionary.csv`
+`postTranslationDictionary` | Entries will be replaced after translation. | `postTranslationDictionary.csv`
+`postWritingToFileDictionary` | After the translated text has been written back to a text file, the file will be opened again to perform these replacements. | `postWritingToFileDictionary.csv`
+
+## Release Notes:
+
+- [This xkcd](//xkcd.com/1319) is my life.
 - Concept art:
     - The design concept behind pyTranslateLLM is to produce the highest quality machine and AI translations possible for dialogue and narration by providing LLM/NMT models the information they need to translate to the best of their ability. This includes but is not limited to:
         - Bunding the source language strings into paragraphs to increase context.
@@ -119,10 +162,10 @@ py3TranslateLLM.py fairseq [options]
         - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
         - Removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation, examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
             - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
-    - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
     - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating context heavy languages, like Japanese.
     - **If translating from context heavy languages, like English, there should not be any or only small differences in translation quality**. Just use G-Translate instead for such languages.
-    - The intent is to help translators by cutting down on the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
+    - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
+    - The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
     - Other programs can be used to find and parse small bits of untranslated text in text files and images. This program focuses on dialogue.
     - While it is not the emphasis of this program, there is some code to help extract dialogue from certain common formats and then reinsert it automatically after translation including automatic handling of word wrap.
 - For the spreadsheet formats (.csv, xlsx, .xls, .ods):
@@ -153,12 +196,12 @@ py3TranslateLLM.py fairseq [options]
     - Examples of text file parsing templates can be found under `resources/templates/`.
 - The text formats used for templates and settings (.txt) have their own syntax:
     - `#` indicates that line is a comment.
-    - Values are specified by using `Item=Value` Example:
+    - Values are specified by using `item=value` Example:
         - `paragraphDelimiter=emptyLine`
     - Empty lines are ignored.
 - If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. `--resume` (`-r`) technically exists, but can be overly picky.
 - In addition to the libraries listed below, py3TranslateLLM also uses several libraries from the Python standard library. See source code for an enumeration of those.
-- Settings can be specified at runtime from the command prompt or from `py3TranslateLLM.ini`.
+- Settings can be specified at runtime from the command prompt and/or using `py3TranslateLLM.ini`.
     - Settings read from the command prompt take priority over the `.ini`.
     - Values are designated using the following syntax:
         - `commandLineOption=value`
@@ -166,27 +209,11 @@ py3TranslateLLM.py fairseq [options]
         - Whitespace is ignored.
         - Lines with only whitespace are ignored.
         - Lines starting with `#` are ignored. In other words, `#` means a comment.
+        - Keys in the key=value pairs are case sensitive. Many values are as well.
+        - Keys in the key=value pairs must match the command line options exactly.
+        - See: `py3TranslateLLM --help` and the **Parameters** enumeration below for valid values.
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
-
-### The following files are required:
-
-Variable name | Description | Examples
---- | --- | ---
-`fileToTranslate` | The file to translate. | `A01.ks`, `backup.2024Jan10.xlsx`
-`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Required if working from a text file or if outputting to one but not if only using spreadsheet formats. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
-`languageCodesFile` | Contains the list of supported languages. | `resources/ languageCodes.csv`
-
-### The following files are optional:
-
-Variable name | Description | Examples
---- | --- | ---
-`py3TranslateLLM.ini` | This file may be used instead of the CLI to specifying input options. Keys in the key=value pairs are case sensitive. | `py3TranslateLLM.ini`, `renamedBinary.ini`
-`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Not required if working only with spreadsheet formats but required if reading from or writing to text files. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
-`outputFile` | The name and path of the file to use as output. Will be same as input if not specified. Specify a spreadsheet format to dump the raw data or a text file to output only the preferred translation. | `None`, `output.csv`, `myFolder/ output.xlsx`
-`characterNamesDictionary` | Entries will be submitted to the translation engine but then replaced back to the original text after translation. | `resources/ templates/ characterNamesDictionary_example.csv`
-`preTranslationDictionary` | Entries will be replaced prior to submission to the translation engine. | `preTranslationDictionary.csv`
-`postTranslationDictionary` | Entries will be replaced after translation. | `postTranslationDictionary.csv`
-`postWritingToFileDictionary` | After the translated text has been written back to a text file, the file will be opened again to perform these replacements. | `postWritingToFileDictionary.csv`
+    - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
 
 ### Notes about encodings:
 
@@ -257,16 +284,6 @@ Variable name | Description | Examples
         - The above distinction between the two dialects only applies to selecting Portuguese as the target language. If selecting Portuguese as a source language, `Portuguese` is sufficent and will be used regardless.
     - `Romanian` has both RUM (B) and RON (T). It is unclear what DeepL supports. The 3 letter language code of `RON` is used.
     - `Spanish` has an alias of `Castilian`.
- 
-## Parameters
-
-`partial list:`
-
-Parameter | Description | Example(s)
---- | --- | ---
-`-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `fairseq`, `sugoi`
-`-a`, `--address` | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`, `--address=http://localhost`
-`-p`, `--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--p=443`
 
 ## Regarding Python libraries:
 
@@ -277,10 +294,11 @@ Library name | Required, Reccomended, or Optional | Description | Install comman
 --- | --- | --- | --- | ---
 [openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Microsoft Excel Document (.xlsx) support. | `pip install openpyxl` | 3.1.2
 openpyxlHelpers | Required. | Has various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | Unversioned.
-dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | 0.1 2024Jan19.
+py3TranslateLLMfunctions | Required. | Has various helper functions unrelated to main data structure. | Included with py3TranslateLLM. | Unversioned.
+dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | 0.1 2024Jan21.
 [requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Reccomended. | Improves text codec handling. | `pip install chardet` | 5.2.0
-[DeepL-python](//github.com/DeepLcom/deepl-python) | Reccomended. | Used for DeepL NMT, optional otherwise. | `pip install deepl` | 1.16.1
+[DeepL-python](//github.com/DeepLcom/deepl-python) | Reccomended. | Used for DeepL NMT via their API. , optional otherwise. | `pip install deepl` | 1.16.1
 [xlrd](//pypi.org/project/xlrd/) | Optional. | Provides reading from Microsoft Excel Document (.xls). | `pip install xlrd` | 2.0.1
 [xlwt](//pypi.org/project/xlwt/) | Optional. | Provides writing to Microsoft Excel Document (.xls). | `pip install xlwt` | 1.3.0
 [odfpy](//pypi.org/project/odfpy) | Optional. | Provides interoperability for Open Document Spreadsheet (.ods). | `pip install odfpy` | 1.4.1
@@ -307,7 +325,7 @@ dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | I
 
 ## Licenses:
 
-- Python standard library's [license](//docs.python.org/3/license.html).
+- Python standard library's [license](//docs.python.org/3/license.html). For source code, open the Python installation directory on the local system.
 - [openpyxl](//pypi.python.org/pypi/openpyxl)'s [license](//foss.heptapod.net/openpyxl/openpyxl/-/blob/3.1.2/LICENCE.rst) and [source code](//foss.heptapod.net/openpyxl/openpyxl).
 - [chardet](//pypi.org/project/chardet)'s license is [LGPL v2+](//github.com/chardet/chardet/blob/main/LICENSE). [Source code](//github.com/chardet/chardet).
 - [odfpy](//pypi.org/project/odfpy)'s, license is [GPL v2](//github.com/eea/odfpy/blob/master/GPL-LICENSE-2.txt). [Source code](//github.com/eea/odfpy).

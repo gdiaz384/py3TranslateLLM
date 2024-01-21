@@ -10,15 +10,18 @@
 # If a line begins with one of the following characters, then do not process it for dialogue. Separate each character with a space.
 # Groups of characters are not currently supported. Set to 'None' (without quotes) to parse every line. This setting is to help isolate
 # lines of dialogue. Names have special handling later, so include their delimiters here. Like with: 【Chloe】, include 【.
-ignoreLinesThatStartWith=[ * ; 【
+#ignoreLinesThatStartWith=None
+ignoreLinesThatStartWith=[ * ; 【 ・
 
 # When do paragraphs end? Valid options are to have paragraphs end on: 'emptyLine', or 'newLine'. Input will stop automatically
 # regardless of this setting when maximumNumberOfLinesPerParagraph is reached or if an ignoreLinesThatStartWith character.
 # is reached. Setting paragraphDelimiter=newLine will force a 1:1 relationship between input and pre-wordwrap output lines.
+#paragraphDelimiter=newLine
 paragraphDelimiter=emptyLine
 
 # What is the maximum number of lines per paragraph? A sane setting for this is 2-5 lines maximum per paragraph. 
 # Look at the script.ks file to see how text is laid out. This setting is ignored if paragraphDelimiter=newLine.
+#maximumNumberOfLinesPerParagraph=1
 maximumNumberOfLinesPerParagraph=3
 
 # What is the maximum length for translated text before triggering word wrap? The correct setting for this depends on
@@ -42,11 +45,12 @@ wordWrapMode=dynamic
 # 【Chloe】[audio Chloe_1B]
 # 「For Queen and country.」
 # In the above two lines, 【 and  】 are acting as delimiters, so 'before' is the correct setting.
-# 'within' is for character names that appear completely alone 'on top' of dialogue and without special delimiters. Example:
+# 'within' is for character names that appear completely alone 'on top' of dialogue and without special delimiters.
+# Use 'within' if the character name is on its own line. Example:
 # Chloe
 # 「For Queen and country.」
-characterNamesAppearBeforeOrAfterDialogue=before
 #characterNamesAppearBeforeOrAfterDialogue=None
+characterNamesAppearBeforeOrAfterDialogue=before
 
 # If the character name is not part of the main text, then how should it be detected? Valid values are 'None', a single character, or
 # a group of characters. Grouped characters will be treated as a single entity. Both BeginsWith and EndsWith must match
@@ -58,15 +62,16 @@ theCharacterNameAlwaysEndsWith=】
 #theCharacterNameAlwaysBeginsWith=None
 #theCharacterNameAlwaysEndsWith=None
 
-# As a rule, [codes] inside of square brackets are not sent to the translation engine but are reinserted back at the end of the
-# post-translated text. The following alterations honor the word wrap setting above. Since word wrap is calculated dynamically,
-# these will only be used if text is written back to the original file.
+# By default, [codes] inside of square brackets are not sent to the translation engine, even if they are present in paragraphs,
+# but are moved to the end of the post-translated text. The following alterations will honor the word wrap setting above, and
+# since word wrap is calculated dynamically, these will only be used if text is written back to the original file.
 # Important: Setting *any* of these settings to a value different than 'None' will disable reinsertion of [codes] after translation.
-alwaysDeleteBeforeTranslation=None
-#alwaysDeleteBeforeTranslation=[r] [repage]
+alwaysDeleteTheseBeforeTranslation=None
+#alwaysDeleteTheseBeforeTranslation=[r] [repage]
+alwaysDeleteThisStringBeforeTranslation=None
 alwaysDeleteAfterTranslation=None
-alwaysAddAfterTranslationStartOfLine=None
-alwaysAddAfterTranslationEndOfLine=None
+alwaysAddAfterTranslationAtStartOfLine=None
+alwaysAddAfterTranslationAtEndOfLine=None
 addAfterTranslationIfNotEndOfParagraph=None
 #addAfterTranslationIfNotEndOfParagraph=[r]
 addAfterTranslationAtEndOfParagraph=None
