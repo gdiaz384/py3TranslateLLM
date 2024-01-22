@@ -16,11 +16,11 @@ verbose=False
 debug=False
 #debug=True
 consoleEncoding='utf-8'
-inputErrorHandling='strict'
-#outputErrorHandling='namereplace'
 linesThatBeginWithThisAreComments='#'
 assignmentOperatorInSettingsFile='='
-#metadataDelimiter='_'
+inputErrorHandling='strict'
+#outputErrorHandling='namereplace'
+
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os, os.path                      #Extract extension from filename, and test if file exists.
@@ -28,6 +28,7 @@ from pathlib import Path            #Override file in file system with another a
 import sys                                   #End program on fail condition.
 import io                                      #Manipulate files (open/read/write/close).
 import datetime                          #Used to get current date and time.
+import openpyxl                          #Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
 import csv                                    #Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
 try:
     import odfpy                           #Provides interoperability for Open Document Spreadsheet (.ods).
@@ -44,6 +45,16 @@ try:
     xlwtLibraryIsAvailable=True
 except:
     xlwtLibraryIsAvailable=False
+
+
+#Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
+sysVersion=int(sys.version_info[1])
+if sysVersion >= 5:
+    outputErrorHandling='namereplace'
+elif sysVersion < 5:
+    outputErrorHandling='backslashreplace'    
+else:
+    sys.exit('Unspecified error.'.encode(defaultConsoleEncodingType))
 
 
 #Returns True or False depending upon if file exists or not.
@@ -71,8 +82,6 @@ def verifyThisFileExists(myFile,nameOfFileToOutputInCaseOfError=None):
 #Usage:
 #verifyThisFileExists('myfile.csv','myfile.csv')
 #verifyThisFileExists(myVar, 'myVar')
-
-
 
 
 #This function reads program settings from text files using a predetermined list of rules.
@@ -150,126 +159,6 @@ def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding
     return tempDictionary
 
 
-#parseRawInputTextFile() accepts an (input file name, the encoding for that text file, parseFileDictionary as a Python dictionary, the character dictionary as a Python dictionary) and returns a dictionary where the key is the dialogue, and the value is a list. The first value in the list is the character name, (or None for no chara name), and the second is metadata as a string using the specified delimiter.
-#This could also be a multidimension array, such as a list full of list pairs [ [ [],[ [][][] ] ] , [ [],[ [][][] ] ] ] because the output is highly regular, but that would allow duplicates. Executive decision was made to disallow duplicates for files since that is correct almost always. However, it does mess with the metadata sometimes by having the speaker be potentially incorrect.
-
-def parseRawInputTextFile(inputFile,inputFileEncoding,characterDictionary):
-
-    #The file has already been checked to exist and the encoding correctly determined, so just open it and read contents into a string. Then use that epicly long string for processing.
-    #Goal is to fill this string:
-    inputFileContents=''
-
-    #TODO: Put stuff here. 
-    #maybe....
-    #openpyxlHelpers.importFromTextFile(fileName, fileNameEncoding, parseFile, parseFileEncoding)
-    #What are valid inputs? .csv, .xlsx, .xls, .ods, .txt, .ks, .ts (t-script)
-    #.csv, .xlsx, .xls, .ods are spreadsheet formats that follow a predefined format. They do not have parse files.
-    #Therefore only .txt, .ks and .ts are valid inputs for openpyxlHelpers.importFromTextFile()
-
-    #Read entire file into memory
-    #If there is an error reading the contents into memory, just close it.
-    try:
-        inputFileHandle = open(fileToTranslateFileName,'r',encoding=inputFileEncoding,errors=inputFileEncoding) #open in read only text mode #Will error out if file does not exist. io.open() works with both \ and / to traverse folders.
-        inputFileContents=inputFileHandle.read()
-    finally:
-        inputFileHandle.close()#always executes, probably
-
-
-    temporaryDict={}        #Dictionaries do not allow duplicates, so insert all entries into a dictionary first to de-duplicate entries, then read dictionary into first column (skip first line/row in target spreadsheet)
-    #thisdict.update({"x": "y"}) #add to/update dictionary
-    #thisdict["x"]="y"              #add to/update dictionary
-    #for x, y in thisdict.items():
-    #  print(x, y) 
-
-    temporaryString=None #set it to None (null) to initialize
-    currentParagraphLineCount=0
-    #while line is not empty (at least \n is present)
-    while inputFileContents != '' :
-        myLine=inputFileContents.partition('\n')[0] #returns first line of string to process in the current loop
-
-        #debug code
-        #print only if debug option specified
-        if debug == True:
-            print(myLine.encode(consoleEncoding)) #prints line that is currently being processed
-        #myLine[:1]#this gets only the first character of a string #what will this output if a line contains only whitespace or only a new line #answer: '' -an empty string for new lines, but probably the whitespace for lines with whitespace
-        if myLine[:1].strip() != '':#if the first character is not empty or filled with whitespace
-            if debug == True:
-                print(myLine[:1].encode(consoleEncoding))
-
-        thisLineIsValid=True
-        #if the line is empty, then always skip it. Regardless of paragraphDelimiter == emptyLine or newLine, empty lines signify a new paragraph start, or it would be too difficult to tell when one paragraph ends and another starts.
-        if myLine.strip()[:1] == '':
-            thisLineIsValid=False
-            #if paragraphDelimiter == 'emptyLine': #Old code.  if paragraphDelimiter='newLine', then this is the same as line-by-line mode, right?
-        #else the line is not empty or filled with only whitespace.
-        else:
-            #if the first character is an ignore character or if the first character is whitespace, then set thisLineIsValid=False
-            for i in ignoreLinesThatStartWith:
-                if myLine.strip()[:1] == i:   #This should strip whitespace first, and then compare because sometimes dialogue can be indented but still be valid. Valid syntax: myLine.strip()[:1] 
-                    #It is possible that this line is still valid if the first non-whitespace characters in the line are an entry from the charaname dictionary.
-                    #TODO. Need to check for this.
-                    #This will print the full string without returning an error. Use this logic to do a string comparison of myLine with the keys in characterDictionary.
-                    #x = 'pie2'
-                    #print(x[:9])
-                    thisLineIsValid=False
-
-
-                        #There is some code at the bottom of the main .py that will need to be integrated into this spot.
-
-
-
-        if thisLineIsValid == False: 
-            #then commit any currently working string to databaseDatastructure, add to temporary dictionary to be added later
-            if temporaryString != None:
-                #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
-                temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False'
-            #and start a new temporaryString
-            temporaryString=None
-            #and reset currentParagraphLineCount
-            currentParagraphLineCount=0
-        #while myLine[:1] != the first character is not an ignore character, #while the line is valid to feed in as input, then
-        elif thisLineIsValid != True:
-            #if the newLine after .strip() == '' #an empty string
-                #then end of paragraph reached. Commit any changes to temporaryString if there are any
-                #and break out of loop
-            #if temporaryString is not empty, then append \n to temporaryString, and
-            if temporaryString != None:
-                #then append \n first, and then add line to temporaryString
-                temporaryString=temporaryString+'\n'+myLine.strip()
-                #increment currentParagraphLineCount by 1
-                currentParagraphLineCount+=1
-            #else if temporaryString is currently empty
-            elif temporaryString == None:
-                #then just append to temporaryString without \n
-                temporaryString = myLine.strip()
-                #and increment counter
-                currentParagraphLineCount+=1
-            else:
-                sys.exit('Unspecified error.'.encode(consoleEncoding))
-            #if max paragraph limit has been reached
-            if (currentParagraphLineCount >= maximumNumberOfLinesPerParagraph) or (paragraphDelimiter == 'newLine'):  
-                #then commit currently working string to databaseDatastructure, #add to temporary dictionary to be added later
-                #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
-                temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False'
-                #and start a new temporaryString
-                temporaryString=None
-                #and reset counter
-                currentParagraphLineCount=0
-        else:
-            sys.exit('Unspecified error.'.encode(consoleEncoding))
-
-        #remove the current line from inputFileContents, in preparating for reading the next line of inputFileContents
-        inputFileContents=inputFileContents.partition('\n')[2] #removes first line from string
-        #continue processing file onto next line normally without database insertion code until file is fully processed and dictionary is filled
-        #Once inputFileContents == '', the loop will end and the dictionary can then be fed into the main database.
-
-    #debug code
-    if inputFileContents == '' :
-        print('inputFileContents is now empty of everything including new lines.'.encode(consoleEncoding))
-        #feed temporaryDictionary into spreadsheet #Edit: return dictionary instead.
-        return temporaryDict
-
-
 
 def getCurrentMonthFromNumbers(x):
     x = str(x)
@@ -324,6 +213,26 @@ if (verbose == True) or (debug == True):
 
 
 
+def importDictionaryFromFile(myFile,myFileEncoding=None):
+    if checkIfThisFileExists(myFile) != True:
+        return None
+    #else it exists, so find the extension and call the appropriate import function for that fileType
+    myFileNameOnly, myFileExtensionOnly = os.path.splitext(myFile)
+    if myFileExtensionOnly == None:
+        return None
+    if myFileExtensionOnly == '':
+        return None
+    elif myFileExtensionOnly == '.csv':
+        return importDictionaryFromCSV(myFile,myFileEncoding,ignoreWhitespace=False)
+    elif myFileExtensionOnly == '.xlsx':
+        return importDictionaryFromXLSX(myFile,myFileEncoding)
+    elif myFileExtensionOnly == '.xls':
+        return importDictionaryFromXLS(myFile,myFileEncoding)
+    elif myFileExtensionOnly == '.ods':
+        return importDictionaryFromODS(myFile,myFileEncoding)
+    else:
+        print( ('Warning: Unrecognized extension for file: '+str(myFile)).encode(consoleEncoding) )
+        return None
 
 
 
@@ -356,6 +265,8 @@ def importDictionaryFromCSV(myFile, myFileEncoding,ignoreWhitespace=False):
                 if ignoreWhitespace == True:
                     for i in range(len(line)):
                         line[i]=line[i].strip()
+                if line[1] == '':
+                    line[1] = None
                 tempDict[line[0]]=line[1]
  
 #                 for i in range(len(line)):
@@ -383,7 +294,7 @@ def importDictionaryFromXLSX(myFile, myFileEncoding):
 def importDictionaryFromXLS(myFile, myFileEncoding):
     print('Hello World'.encode(consoleEncoding))
 
-def importDictionaryFromXLS(myFile, myFileEncoding):
+def importDictionaryFromODS(myFile, myFileEncoding):
     print('Hello World'.encode(consoleEncoding))
 
 

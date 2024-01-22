@@ -1,11 +1,21 @@
+# Lines starting with # are comments.  
 # This file establishes the definitions for the built in parser and file writer to use with KAG3 kirkikri game engine scripts (.ks).
-# Lines starting with # are comments.  The order is:
-#   - characterNamesDictionary.csv
-#   - Settings related to pasing dialogue as specified in this file.
-#   - preTranslationDictionary.csv
-#   - postTranslationDictionary.csv
-#   - Settings related to word wrap and outputing the translation into files as specified in this file.
-#   - postWritingToFileDictionary.csv
+# The exact order is:
+#   - characterNamesDictionary.csv is considered for which lines not to ignore in creating paragraphs from the raw text.ks file.
+#   - Settings related to pasing dialogue as specified in this parsing template are considered.
+#   - The dialogue line is written to the first column of the mainSpreadsheet.
+#   - mainSpreadsheet is submitted for translation for a particular translation engine.
+#   - characterNamesDictionary.csv is considered.
+#   - preTranslationDictionary.csv is considered.
+#   - The line is translated.
+#   - characterNamesDictionary.csv is considered to revert certain changes made.
+#   - The untranslated line and the translated line are added to the cache.csv file.
+#   - postTranslationDictionary.csv is considered.
+#   - The translated line is written in the row for the line and the column of the translation engine currently in use.
+#   - Periodically as entries are translated, a backup.xlsx is made under backups/[date]/.
+#   - Settings in this parsing template are considered as they relate to word wrap and outputing the translation into text.ks files.
+#   - The right-most entry in each row is written to a copy of the text.ks file.
+#   - postWritingToFileDictionary.csv is considered.
 
 # If a line begins with one of the following characters, then do not process it for dialogue. Separate each character with a space.
 # Groups of characters are not currently supported. Set to 'None' (without quotes) to parse every line. This setting is to help isolate

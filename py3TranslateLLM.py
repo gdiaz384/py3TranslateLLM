@@ -8,37 +8,41 @@ For usage, see py3TranslateLLM.py -h', README.md, and the source code below.
 License:
 - For the various libraries used, see the Readme for their licenses and project pages.
 - This .py file and the libraries under resources/ are C* gdiaz384 and licensed as GNU Affero GPL v3.
-- Feel free to use it, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
+- Feel free to use this program, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
 - The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
 
 """
 #import various libraries that py3TranslateLLM depends on
 import argparse                           #Used to add command line options.
 import os, os.path                        #Extract extension from filename, and test if file exists.
-from pathlib import Path              #Override file in file system with another and create subfolders.
+from pathlib import Path             #Override file in file system with another and create subfolders.
+#import pathlib.Path                    #Does not work. Why not? Maybe because Path is a class and not a Path.py file? So 'from' crawls into files? Maybe from "requires" it. Like Path must be a class inside of pathlib instead of a file named Path.py. 'import' does not seem to care whether it is importing files or classes. They are both made available. But 'from' might.
+#import pathlib                             #Works.   #dir(pathlib) does list 'Path'
 import sys                                     #End program on fail condition.
 import io                                        #Manipulate files (open/read/write/close).
 #from io import IOBase               #Test if variable is a file object (an "IOBase" object).
 #import datetime                          #Used to get current date and time.
 from collections import deque    #Used to hold rolling history of translated items to use as context for new translations.
 import requests                            #Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'
-import openpyxl                           #Used as the core internal data structure and also to read/write xlsx files. Must be installed using pip.
-import resources.openpyxlHelpers as openpyxlHelpers #A helper/wrapper library to aid in using openpyxl as a datastructure.
+#import openpyxl                           #Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
+import resources.chocolate as chocolate #A helper/wrapper library to aid in using openpyxl as a datastructure.
 import resources.dealWithEncoding as dealWithEncoding   #dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  #Moved most generic functions here to increase code readability and enforce function best practices.
-#from resources.py3TranslateLLMfunctions import * #Do not use this syntax. Ever. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
+#from resources.py3TranslateLLMfunctions import * #Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
 
 
 #set defaults and static variables
-versionString='v0.1 - 2024Jan21 pre-alpha'
+versionString='v0.1 - 2024Jan22 pre-alpha'
 
 defaultTextEncoding='utf-8'
 defaultTextEncodingForKSFiles='shift-jis'
 defaultConsoleEncodingType='utf-8'
 
 defaultLanguageCodesFile='resources/languageCodes.csv'
-defaultSourceLanguage='Japanese'
-defaultTargetLanguage='English'
+defaultSourceLanguage=None
+#defaultSourceLanguage='Japanese'
+defaultTargetLanguage=None
+#defaultTargetLanguage='English'
 #Valid options are 'English (American)' or 'English (British)'
 defaultEnglishLanguage='English (American)'
 #Valid options are 'Chinese (simplified)' or 'Chinese (traditional)'
@@ -50,7 +54,16 @@ defaultKoboldCppPort=5001
 defaultSugoiPort=14366
 #defaultSugoiPort=14467
 defaultInputEncodingErrorHandler='strict'
-defaultOutputEncodingErrorHandler='namereplace'
+#defaultOutputEncodingErrorHandler='namereplace'
+#Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
+sysVersion=int(sys.version_info[1])
+if sysVersion >= 5:
+    defaultOutputEncodingErrorHandler='namereplace'
+elif sysVersion < 5:
+    defaultOutputEncodingErrorHandler='backslashreplace'    
+else:
+    sys.exit('Unspecified error.'.encode(defaultConsoleEncodingType))
+
 
 defaultLinesThatBeginWithThisAreComments='#'
 defaultAssignmentOperatorInSettingsFile='='
@@ -67,11 +80,11 @@ usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mo
 
 
 # So, py3translateLLM.py also supports reading program settings from py3translateLLM.ini in addition to the command prompt.
-#Rule is that settings from the command line take #1 precedence
-#Then #2) entries from .ini
-#Then #3) settings hardcoded in .py
-#So, initialize all non-boolean CLI settings to None. Then, only change them using settings.ini or defaultSettings if they are still None after reading from CLI. Any settings that are not None were set using the CLI, so leave them alone.
-#For boolean values, they are all False by default. Only change to True if the scriptSettingsDictionary set them to True. Well, that means any CLI settings as intended to be default of 'False' will be overriden to True. Well, that is a user error. Let them deal with it since they were the ones that decided to change the default settings.
+# Rule is that settings from the command line take #1 precedence
+# Then #2) entries from .ini
+# Then #3) settings hardcoded in .py
+# So, initialize all non-boolean CLI settings to None. Then, only change them using settings.ini or defaultSettings if they are still None after reading from CLI. Any settings that are not None were set using the CLI, so leave them alone.
+# For boolean values, they are all False by default. Only change to True if the scriptSettingsDictionary set them to True. Well, that means any CLI settings as intended to be default of 'False' will be overriden to True. Well, that is a user error. Let them deal with it since they were the ones that decided to change the default settings.
 
 
 #add command line options
@@ -79,38 +92,41 @@ commandLineParser=argparse.ArgumentParser(description='Description: CLI wrapper 
 commandLineParser.add_argument('-mode', '--translationEngine', help='Specify translation engine to use, options='+translationEngines+'.',type=str)
 
 commandLineParser.add_argument('-f', '--fileToTranslate', help='Either the raw file to translate or the spreadsheet file to resume translating from, including path.',default=None,type=str)
-commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+str(defaultTextEncoding),default=None,type=str)
 commandLineParser.add_argument('-o', '--outputFile', help='The file to insert translations into, including path. Default is same as input file.',default=None,type=str)
 commandLineParser.add_argument('-ofe', '--outputFileEncoding', help='The encoding of the output file. Default is same as input file.',default=None,type=str)
 commandLineParser.add_argument('-pfile', '--parsingSettingsFile', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None,type=str)
-commandLineParser.add_argument('-pfe', '--parsingSettingsFileEncoding', help='Specify encoding for parsing definitions file, default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-pfe', '--parsingSettingsFileEncoding', help='Specify encoding for parsing definitions file, default='+str(defaultTextEncoding),default=None,type=str)
 commandLineParser.add_argument('-p', '--promptFile', help='This file has the prompt for the LLM.', default=None,type=str)
-commandLineParser.add_argument('-pe', '--promptFileEncoding', help='Specify encoding for prompt file, default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-pe', '--promptFileEncoding', help='Specify encoding for prompt file, default='+str(defaultTextEncoding),default=None,type=str)
 
-commandLineParser.add_argument('-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\''+defaultLanguageCodesFile+'\'.',default=None,type=str)
-commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv, default='+defaultTextEncoding,default=None,type=str)
-commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+defaultSourceLanguage,default=None,type=str)
-commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+defaultTargetLanguage,default=None,type=str)
+commandLineParser.add_argument('-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\''+str(defaultLanguageCodesFile)+'\'.',default=None,type=str)
+commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv. Default='+str(defaultTextEncoding),default=None,type=str)
+commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+str(defaultSourceLanguage),default=None,type=str)
+commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+str(defaultTargetLanguage),default=None,type=str)
 
 commandLineParser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv',default=None,type=str)
-commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv, Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv. Default='+str(defaultTextEncoding),default=None,type=str)
 commandLineParser.add_argument('-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv',default=None,type=str)
-commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+str(defaultTextEncoding),default=None,type=str)
 commandLineParser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.',default=None,type=str)
-commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default='+str(defaultTextEncoding),default=None,type=str)
 commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.',default=None,type=str)
-commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+defaultTextEncoding,default=None,type=str)
+commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+str(defaultTextEncoding),default=None,type=str)
 
 commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.',action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.',action='store_true')
+commandLineParser.add_argument('-nc', '--noCache', help='Disables using or updating the cache file. Default=Use the cache file to fill in previously translated entries.',action='store_true')
+commandLineParser.add_argument('-oc', '--overrideWithCache', help='Do not retranslate lines, but override any already translated lines in the spreadsheet with results in the cache. Default=Do not override already translated lines.',action='store_true')
+commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use cache to fill in previously translated lines.',action='store_true')
 
 commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100',default=None,type=str)
 commandLineParser.add_argument('--port', help='Specify the port for the NMT/LLM server. Example: 5001',default=None,type=str)
 
-commandLineParser.add_argument('-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\''+defaultInputEncodingErrorHandler+'\'.',default=None,type=str)
-commandLineParser.add_argument('-eh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\''+defaultOutputEncodingErrorHandler+'\'.',default=None,type=str)
+commandLineParser.add_argument('-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\''+str(defaultInputEncodingErrorHandler)+'\'.',default=None,type=str)
+commandLineParser.add_argument('-eh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\''+str(defaultOutputEncodingErrorHandler)+'\'.',default=None,type=str)
 
-commandLineParser.add_argument('-ce', '--consoleEncoding', help='Specify encoding for standard output. Default='+defaultConsoleEncodingType,default=None,type=str)
+commandLineParser.add_argument('-ce', '--consoleEncoding', help='Specify encoding for standard output. Default='+str(defaultConsoleEncodingType),default=None,type=str)
 
 commandLineParser.add_argument('-vb', '--verbose', help='Print more information.',action='store_true')
 commandLineParser.add_argument('-d', '--debug', help='Print too much information.',action='store_true')
@@ -180,14 +196,15 @@ postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictio
 # Settings specified at the command prompt take precedence, but py3translateLLM.ini still needs to be pased.
 # This function parses that file and places the settings discovered into a dictionary. That dictionary can then be used along with
 # the command line options to determine the program settings (prior to validation of those settings).
-
-
 #This function reads program settings from text files using a predetermined list of rules.
 #The text file uses the syntax: setting=value, # are comments, empty/whitespace lines ignored.
 #This function builds a dictionary and then returns it to the caller.
+
 #def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding=defaultConsoleEncodingType, errorHandlingType=defaultInputEncodingErrorHandler,debug=debug):
 #Usage: readSettingsFromTextFile(myfile, myfileEncoding)
 
+
+# In order to read from settings.ini, the name of the current script must first be determined.
 currentScriptName = __file__
 #currentScriptName = os.path.basename(__file__)  #Returns only the filename of the current script.
 #print('file='+__file__) #Returns filename and also the path sometimes.
@@ -241,7 +258,13 @@ if scriptSettingsDictionary != None:
                 if (verbose == True) or (debug == True):
                     print( ('Updating variable: '+str(x)+' to \''+str(y)+'\'').encode(tempConsoleEncoding) )
                 tempDict[x] = y
-
+        # The boolean values will never be updated by the above loop since the base value is always False instead of None. So check for that.
+        elif tempDict[x] == False:
+            #If the new value is false, or anything else, ignore it, but if the user set it to 'True', then set the variable to True.
+            if str(y).lower() == 'true':
+                if (verbose == True) or (debug == True):
+                    print( ('Updating variable: '+str(x)+' to \'True\'').encode(tempConsoleEncoding) )
+                tempDict[x] = True
 
 # if consoleEncoding is still None after reading both the CLI and the settings.ini, then just set it to the default value.
 if consoleEncoding == None:
@@ -270,15 +293,17 @@ postWritingToFileDictionaryFileName=postWritingToFileDictionary
 
 
 # Now that command line options and .ini have been parsed, update settings for imported libraries.
+#The libraries must be imported using the syntax: import resources.libraryName as libraryName . Otherwise, if using the 'from libraryName import...' syntax, a copy is made which makes it (near?) impossible to update these variables.
 dealWithEncoding.verbose=verbose
 dealWithEncoding.debug=debug
 dealWithEncoding.consoleEncoding=consoleEncoding
 
-openpyxlHelpers.verbose=verbose
-openpyxlHelpers.debug=debug
-openpyxlHelpers.consoleEncoding=consoleEncoding
-openpyxlHelpers.inputErrorHandling=inputErrorHandling
-openpyxlHelpers.outputErrorHandling=outputErrorHandling
+chocolate.verbose=verbose
+chocolate.debug=debug
+chocolate.consoleEncoding=consoleEncoding
+chocolate.inputErrorHandling=inputErrorHandling
+chocolate.outputErrorHandling=outputErrorHandling
+chocolate.metadataDelimiter=defaultMetadataDelimiter
 
 py3TranslateLLMfunctions.verbose=verbose
 py3TranslateLLMfunctions.debug=debug
@@ -287,7 +312,6 @@ py3TranslateLLMfunctions.inputErrorHandling=inputErrorHandling
 py3TranslateLLMfunctions.outputErrorHandling=outputErrorHandling
 py3TranslateLLMfunctions.linesThatBeginWithThisAreComments=defaultLinesThatBeginWithThisAreComments
 py3TranslateLLMfunctions.assignmentOperatorInSettingsFile=defaultAssignmentOperatorInSettingsFile
-py3TranslateLLMfunctions.metadataDelimiter=defaultMetadataDelimiter
 
 
 
@@ -324,7 +348,7 @@ else:
 
 print(('Mode is set to: \''+str(mode)+'\'').encode(consoleEncoding))
 if implemented == False:
-    sys.exit(('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding))
+    sys.exit( ('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding) )
 
 
 # Certain files must always exist, like fileToTranslateFileName and languageCodesFileName.
@@ -355,6 +379,17 @@ py3TranslateLLMfunctions.verifyThisFileExists(languageCodesFileName,'languageCod
 
 
 fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
+if fileToTranslateFileNameExtensionOnly == '.csv':
+    fileToTranslateIsASpreadsheet=True
+elif fileToTranslateFileNameExtensionOnly == '.xlsx':
+    fileToTranslateIsASpreadsheet=True
+elif fileToTranslateFileNameExtensionOnly == '.xls':
+    fileToTranslateIsASpreadsheet=True
+elif fileToTranslateFileNameExtensionOnly == '.ods':
+    fileToTranslateIsASpreadsheet=True
+else:
+    fileToTranslateIsASpreadsheet=False
+#fileToTranslateFileName does not need to have an extension. If it has no extension, then it is assumed to be a text file and will thus require a parsefile.
 
 
 #if using parseOnly, a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist. 
@@ -370,7 +405,7 @@ if mode == 'parseOnly':
 #    else:
 #        sys.exit(' Unspecified error.')
     #check to make sure parseOnly was not called with a spreadsheet extension, as those are invalid combinations
-    if (fileToTranslateFileNameExtensionOnly == '.csv') or (fileToTranslateFileNameExtensionOnly == '.xlsx') or (fileToTranslateFileNameExtensionOnly == '.xls') or (fileToTranslateFileNameExtensionOnly == '.ods'):
+    if fileToTranslateIsASpreadsheet == True:
         sys.exit( ('parseOnly is only valid with text files. It is not valid with spreadsheets: '+str(fileToTranslateFileName)).encode(consoleEncoding) )
 
 
@@ -453,6 +488,9 @@ if (mode == 'sugoi'):
     mode='fairseq'
 
 
+# if the input file is not a spreadsheet, then a parse file is required. If it is a spreadsheed, then it will not have a parse file.
+if fileToTranslateIsASpreadsheet == False:
+    py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName,'parseSettingsFileName')
 
 
 if sourceLanguageRaw == None:
@@ -460,20 +498,25 @@ if sourceLanguageRaw == None:
 if targetLanguageRaw == None:
     targetLanguageRaw = defaultTargetLanguage
 
-#Substitute a few language entries to certain defaults due to collisions and aliases.
-if sourceLanguageRaw.lower() == 'english':
-    sourceLanguageRaw = 'English (American)'
-elif sourceLanguageRaw.lower() == 'castilian':
-    sourceLanguageRaw = 'Spanish'
-elif sourceLanguageRaw.lower() == 'chinese':
-    sourceLanguageRaw = 'Chinese (simplified)'
-elif sourceLanguageRaw.lower() == 'portuguese':
-    sourceLanguageRaw = 'Portuguese (European)'
+#The target language is required to be present, but source language can be optional for LLMs and DeepL.
+if sourceLanguageRaw != None:
+    #Substitute a few language entries to certain defaults due to collisions and aliases.
+    if sourceLanguageRaw.lower() == 'english':
+        sourceLanguageRaw = 'English (American)'
+    elif sourceLanguageRaw.lower() == 'castilian':
+        sourceLanguageRaw = 'Spanish'
+    elif sourceLanguageRaw.lower() == 'chinese':
+        sourceLanguageRaw = 'Chinese (simplified)'
+    elif sourceLanguageRaw.lower() == 'portuguese':
+        sourceLanguageRaw = 'Portuguese (European)'
 
-if targetLanguageRaw.lower() == 'english':
-    targetLanguageRaw = 'English (American)'
-elif targetLanguageRaw.lower() == 'castilian':
-    targetLanguageRaw='Spanish'
+if (targetLanguageRaw == None) and (mode != 'parseOnly'):
+    sys.exit('Error: A target language must be specified if not using parseOnly mode.')
+elif (targetLanguageRaw != None):
+    if targetLanguageRaw.lower() == 'english':
+        targetLanguageRaw = 'English (American)'
+    elif targetLanguageRaw.lower() == 'castilian':
+        targetLanguageRaw='Spanish'
 
 
 #Set encodings Last
@@ -529,38 +572,16 @@ postDictionaryEncoding = dealWithEncoding.ofThisFile(postDictionaryFileName, pos
 postWritingToFileDictionaryEncoding = dealWithEncoding.ofThisFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding, defaultTextEncoding)
 
 
-#Now that input validation is /finally/ done, define functions.
+#Now that input validation is /finally/ done, define functions. #Edit: Moved functions to resources.py3TranslateLLMfunctions.py to improve code readability.
 ###### Define various helper functions ###### 
 
-
-
-
-
-#TODO:
-#This function processes raw data (.ks, .txt. .ts) using a parse file. The extracted data is meant to be loaded into the main workbook data structure for further processing.
-def importFromRawTextFile(fileNameWithPath, fileNameEncoding, parseFile, parseFileEncoding):
-    #print('Hello World'.encode(consoleEncoding))
-    global mainSpreadsheet
-    #fileNameWithPath does not need an extension check because it is already clear
-    #Check to make sure fileNameWithPath exists.
-    #Check to make sure parseFile exists.
-
-
-
 ##### End Functions list #####
-
-
-#read in parseFile which returns as a dictionary. Parse file is usually needed because it has both parse settings (start of processing) and wordWrap settings (end of processing). However, neither parsing nor wordWrap are always needed since user can specify a seperate outfile which just dumps mainSpreadsheet with the translated values.
-parseSettings=None
-if parseSettingsFileName != None:
-    parseSettings=py3TranslateLLMfunctions.readSettingsFromTextFile(parseSettingsFileName,parseSettingsFileEncoding,consoleEncoding=consoleEncoding,errorHandlingType=inputErrorHandling,debug=debug)
-
 
 if (verbose == True) or (debug == True):
     print( ('verbose='+str(verbose)).encode(consoleEncoding) )
     print( ('debug='+str(debug)).encode(consoleEncoding) )
-    print( sourceLanguageRaw.encode(consoleEncoding) )
-    print( targetLanguageRaw.encode(consoleEncoding) )
+    print( ('sourceLanguageRaw='+str(sourceLanguageRaw)).encode(consoleEncoding) )
+    print( ('targetLanguageRaw='+str(targetLanguageRaw)).encode(consoleEncoding) )
 
 #Instantiate basket of Strawberries. Start with languageCodes.csv Edit: Use Python dictionaries instead for the dictionary.csv files.
 #languageCodes.csv could also be a dictionary or multidimension array, but then searching through it would be annoying, so leave as a Strawberry.
@@ -582,56 +603,119 @@ if (verbose == True) or (debug == True):
 #Examples for 5-7: English, EN, ENG; Portuguese, PT-PT, POR
 #Each row/entry is/has eight columns total.
 
-#languageCodesWorkbook = openpyxlHelpers.importFromCSV(languageCodesFileName)
+#languageCodesWorkbook = chocolate.importFromCSV(languageCodesFileName)
 #languageCodesSpreadsheet = languageCodesWorkbook.active
 
-languageCodesSpreadsheet=openpyxlHelpers.Strawberry(languageCodesFileName,languageCodesEncoding,ignoreWhitespaceForCSV=True)
+languageCodesSpreadsheet=chocolate.Strawberry(languageCodesFileName,languageCodesEncoding,ignoreWhitespaceForCSV=True)
 
-#replace this code with dedicated search functions from openpyxlHelpers
-#use....openpyxlHelpers.searchColumnsCaseInsensitive(spreadsheet, searchTerm)
+#replace this code with dedicated search functions from chocolate
+#use....chocolate.searchColumnsCaseInsensitive(spreadsheet, searchTerm)
 #languageCodesSpreadsheet
 
-#sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('lav')
-#sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('japanese')
-sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(sourceLanguageRaw)
+#Source language is optional.
+if sourceLanguageRaw != None:
+    #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('lav')
+    #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('japanese')
+    sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(sourceLanguageRaw)
 
-if (sourceLanguageCellRow == None) or (sourceLanguageCellColumn == None):
-    sys.exit( ('Error: Unable to find source language \''+str(sourceLanguageRaw)+'\' in file: '+ str(languageCodesFileName)).encode(consoleEncoding) )
+    if (sourceLanguageCellRow == None) or (sourceLanguageCellColumn == None):
+        sys.exit( ('Error: Unable to find source language \''+str(sourceLanguageRaw)+'\' in file: '+ str(languageCodesFileName)).encode(consoleEncoding) )
 
-print( ('Using sourceLanguage \''+sourceLanguageRaw+'\' found at \''+str(sourceLanguageCellColumn)+str(sourceLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
+    print( ('Using sourceLanguage \''+sourceLanguageRaw+'\' found at \''+str(sourceLanguageCellColumn)+str(sourceLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
 
 
-sourceLanguageFullRow = languageCodesSpreadsheet.getRow(sourceLanguageCellRow)
+    sourceLanguageFullRow = languageCodesSpreadsheet.getRow(sourceLanguageCellRow)
+    if debug == True:
+        print( str(sourceLanguageFullRow).encode(consoleEncoding) )
+
+    internalSourceLanguageName=sourceLanguageFullRow[0]
+    internalSourceLanguageTwoCode=sourceLanguageFullRow[1]
+    internalSourceLanguageThreeCode=sourceLanguageFullRow[2]
+    if debug == True:
+        print( ('internalSourceLanguageName='+internalSourceLanguageName).encode(consoleEncoding) )
+        print( ('internalSourceLanguageTwoCode='+internalSourceLanguageTwoCode).encode(consoleEncoding) )
+        print( ('internalSourceLanguageThreeCode='+internalSourceLanguageThreeCode).encode(consoleEncoding) )
+
+#Target language is optional when using parseOnly mode.
+if targetLanguageRaw != None:
+    #targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('pie')
+    targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(targetLanguageRaw)
+    if (targetLanguageCellRow == None) or (targetLanguageCellColumn == None):
+        sys.exit( ('Error: Unable to find target language \''+targetLanguageRaw+'\' in file: '+ languageCodesFileName).encode(consoleEncoding) )
+
+    print( ('Using targetLanguage \''+targetLanguageRaw+'\' found at \''+str(targetLanguageCellColumn)+str(targetLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
+
+    targetLanguageFullRow = languageCodesSpreadsheet.getRow(targetLanguageCellRow)
+    if debug == True:
+        print( str(targetLanguageFullRow).encode(consoleEncoding) )
+
+    internalDestinationLanguageName=targetLanguageFullRow[0]
+    internalDestinationLanguageTwoCode=targetLanguageFullRow[1]
+    internalDestinationLanguageThreeCode=targetLanguageFullRow[2]
+    if debug == True:
+        print( ('internalDestinationLanguageName='+internalDestinationLanguageName).encode(consoleEncoding) )
+        print( ('internalDestinationLanguageTwoCode='+internalDestinationLanguageTwoCode).encode(consoleEncoding) )
+        print( ('internalDestinationLanguageThreeCode='+internalDestinationLanguageThreeCode).encode(consoleEncoding) )
+
+
+# Read in all dictionaries.
+# charaNamesDictionaryFileName, preDictionaryFileName, postDictionaryFileName, postWritingToFileDictionaryFileName
+
+# read in character dictionary
+# This will either be 'None' if there was some sort of input error, like if the user did not specify one, or it will be a dictionary containing the charaName=value or other data that should be reverted after translation.
+#The value entry in key=value in the charaNamesDictionary can be '' or None. Basically, this signifies that key contains a string that, if at the start of a line, means that line should not be ignored for paragraph consideration, but that it also should not be altered when submitting text for translation.
+charaNamesDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(charaNamesDictionaryFileName, charaNamesDictionaryEncoding)
 if debug == True:
-    print( str(sourceLanguageFullRow).encode(consoleEncoding) )
+    print( ('charaNamesDictionary='+str(charaNamesDictionary)).encode(consoleEncoding) )
 
-internalSourceLanguageName=sourceLanguageFullRow[0]
-internalSourceLanguageTwoCode=sourceLanguageFullRow[1]
-internalSourceLanguageThreeCode=sourceLanguageFullRow[2]
+#read in pre dictionary
+preDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(preDictionaryFileName, preDictionaryEncoding)
 if debug == True:
-    print( ('internalSourceLanguageName='+internalSourceLanguageName).encode(consoleEncoding) )
-    print( ('internalSourceLanguageTwoCode='+internalSourceLanguageTwoCode).encode(consoleEncoding) )
-    print( ('internalSourceLanguageThreeCode='+internalSourceLanguageThreeCode).encode(consoleEncoding) )
+    print( ('preDictionary='+str(preDictionary)).encode(consoleEncoding) )
 
-
-#targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('pie')
-targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(targetLanguageRaw)
-if (targetLanguageCellRow == None) or (targetLanguageCellColumn == None):
-    sys.exit( ('Error: Unable to find target language \''+targetLanguageRaw+'\' in file: '+ languageCodesFileName).encode(consoleEncoding) )
-
-print( ('Using targetLanguage \''+targetLanguageRaw+'\' found at \''+str(targetLanguageCellColumn)+str(targetLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
-
-targetLanguageFullRow = languageCodesSpreadsheet.getRow(targetLanguageCellRow)
+#read in post dictionary
+postDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(postDictionaryFileName, postDictionaryEncoding)
 if debug == True:
-    print( str(targetLanguageFullRow).encode(consoleEncoding) )
+    print( ('postDictionary='+str(postDictionary)).encode(consoleEncoding) )
 
-internalDestinationLanguageName=targetLanguageFullRow[0]
-internalDestinationLanguageTwoCode=targetLanguageFullRow[1]
-internalDestinationLanguageThreeCode=targetLanguageFullRow[2]
+#read in afterWritingToFile dictionary
+postWritingToFileDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding)
 if debug == True:
-    print( ('internalDestinationLanguageName='+internalDestinationLanguageName).encode(consoleEncoding) )
-    print( ('internalDestinationLanguageTwoCode='+internalDestinationLanguageTwoCode).encode(consoleEncoding) )
-    print( ('internalDestinationLanguageThreeCode='+internalDestinationLanguageThreeCode).encode(consoleEncoding) )
+    print( ('postWritingToFileDictionary='+str(postWritingToFileDictionary)).encode(consoleEncoding) )
+
+    
+#if debug == True:
+#    print( ('parseSettingsDictionary='+str(parseSettingsDictionary)).encode(consoleEncoding) )
+
+
+# Next turn the main inputFile into a data structure.
+# if the main file is a .txt, .ks or .ts file, then it will have a parse file. Otherwise, if it is a spreadsheet, then it will not have a parse file.
+# if it is a spreadsheet file, then read it in as a datastructure natively.
+if fileToTranslateIsASpreadsheet == True:
+    #then create data structure using that spreadsheet file.
+    mainSpreadsheet=chocolate.Strawberry(fileToTranslateFileName, fileToTranslateEncoding)
+elif fileToTranslateIsASpreadsheet != True:
+    #This must have a parse file, so turn it into a dictionary.
+    #read in parseFile which returns as a dictionary. Parse file is usually needed because it has both parse settings (start of processing) and wordWrap settings (end of processing). However, neither parsing nor wordWrap are always needed since user can specify a seperate outfile which just dumps mainSpreadsheet with the translated values.
+
+    parseSettingsDictionary = py3TranslateLLMfunctions.readSettingsFromTextFile(parseSettingsFileName, parseSettingsFileEncoding)
+
+    #And then use that dictionary to create a Strawberry()
+
+    mainSpreadsheet = chocolate.Strawberry(fileToTranslateFileName, fileToTranslateEncoding, parseSettingsDict = parseSettingsDictionary, charaNamesDict = charaNamesDictionary)
+
+    #then create data structure seperately from reading the file
+    #This returns a very special dictionary where the value in key=value is a special list and then add data row by row using the dictionary values #Edit, moved to chocolate.py so as to not have to do that. All spreadsheets that require a parseFile will therefore always be Strawberries from the chocolate library.
+# Strawberry is a wrapper class for the workbook class with additional methods.
+# The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class.
+# mainSpreadsheet=Strawberry()
+#py3TranslateLLMfunctions.parseRawInputTextFile
+
+
+
+
+
+
 
 
 
@@ -639,8 +723,6 @@ if debug == True:
 
 
 sys.exit('end reached')
-
-
 """
 #if debug == True:
 #    print('')
@@ -758,20 +840,6 @@ internalLanguageDestinationThreeCode=languageCodesSpreadsheet['C'+targetLanguage
 #    print(str(internalLanguageDestinationThreeCode).encode(consoleEncoding))
 """
 
-#Read in all dictionaries.
-#read in character dictionary
-
-
-#read in pre dictionary
-
-
-#read in post dictionary
-
-
-#read in afterWritingToFile dictionary
-
-
-
 
 
 
@@ -818,28 +886,39 @@ wordWrapMode='dynamic'
 #mainDatabaseWorkbook = Workbook()
 #mainDatabaseSpreadsheet = mainDatabaseWorkbook.active
 
-#Strawberry is a wrapper class for the workbook class with additional methods.
-#The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class.
-mainSpreadsheet=Strawberry()
 
 
 #This will hold raw untranslated text, number of lines each entry was derived from, and columns containing maybe translated data. Maximum columns supported = 9[?]. Columns 0 and 1 are reserved for Raw untranslated text and [1] is reserved for the number of lines that column 0 represents, even if it is always 1 because line-by-line parsing (lineByLineMode) is specified.
 #Alternatively, lineByLineMode can instead specify to feed each line into the translator but the paragraphDelimiter=emptyLine can support multiple lines in the main data structure. That might be more flexible, or make things worse. Leave it to user to decide on a case-by-case basis by allowing for this possibility.
 #class Database:
 #    def __init__(self):
-#This data structure must somehow hold:
-#0) each paragraph.raw.text (with \n's inside of it)
-#1) The speaker of the line, if any.
-#2) metadata (# of lines #1 was taken from, and possibly the line number of the entry, possibly multiple entries metadata, possibly arbitary data to be decided later like booleans or whether the line has been translated or not), maybe a list?
-#Translated or not decision should be computed dynamically and on a line-by-line basis (raw + chosen translator engine determined from header) in order to support resume operations, do not add to metadata
-#For now use the following string:  'numberOfSourceLines!WasADictionaryUsedTrueOrFalse' ex. '2!False!'
-#3) all translations, each with its own entry and an associated header for which type it is (Kobold+model;
+
+#The mainSpreadsheet data structure should hold:
+#Column 1) each paragraph.raw.text (with \n's inside of it)
+#Column 2) Reserved for the speaker of the line (if any) as this singular piece of metadata is very important and should also be user editable. Leave as empty if None.
+#Column 3) metadata possibilities:
+    #The # of lines #1 was taken from? This can be computed dynamically since the untranslated text is being stored verbetum. Metadata could say... 3 lines, from line #'s 23, 24, 25
+    #The line number the first entry for the paragraph was sourced from. When replacing lines, the line numbers will change if the entries are not 1:1 so this might be less useful than it seems. It could be a hint as to approximately where the untranslated lines are from however, but how is that useful?
+    #maybe the last line as well
+    # possibly whether the line has been translated or not? It might be hard to figure out otherwise, but this is also more of an efficiency thing than actually needed. Can figure it out easily enough by knowing the current translation engine or getting a list of the available translation engines and checking the cell contents returned in getRow(7) for the None value of the appropriate columns.
+    #other arbitary data to be decided later like booleans
+    #Has the file been processed with characterDictionary? It is not *entirely* invalid to have a toggle for this and to put the post characterDictionary untranslated text in column 1. But it is a better idea not to have this and instead just output any post charaDictionary text into another column so that both are available. The text to submit to the translation engine still needs to be computed dynamically anyway. However, without it and without outputting to another column, then py3stringReplace should be updated to support .csv files already.
+
+#Metadata problems:
+    #Metadata can also just be overtly missing in the case of imported spreadsheet files, so it is also just fundamentally unreliable.
+    #Translated or not decision should be computed dynamically and on a line-by-line basis (raw + chosen translator engine determined from header) in order to support resume operations, do not add to metadata.
+    #The number of lines in the source cell can also be determined dynamically by counting line breaks.
+    #Which lines to replace in the destination can be determined dynamically.
+
+
+#For now use the following string:  'numberOfSourceLines_WasADictionaryUsedTrueOrFalse' ex. '2_False_'
+#Column 4) all translations, each with its own entry and an associated header for which type it is (Kobold+model;
 #for DeepL, DeepL API Free/Pro and DeepL Web should all be the same right? Free, Pro, and Web versions all support dictionaries, but doing dictionary + document translation requires pro. Documents will be parsed prior to using the API, so this limitation does not apply here, thus all DeepL translations should be the same. DeepL's native dictionary system is also unlikely to be implemented here especially considering they are hard to work with (not mutable).
 #4) potentially, koboldcpp LLM could return different models. Use the returned model header name. All data should be put in that column. Determine correct header as in: DeepL, or koboldcpp/model in a case sensitive way. More examples:
 #headers=['rawText', 'metadata', 'DeepL', 'koboldcpp/Mixtral-13B.Q8_0','Google']
 
 #Add headers
-initialHeaders=['rawText','metadata']
+initialHeaders=['rawText','speaker','metadata']
 mainDatabaseSpreadsheet.append(initialHeaders)
 
 #printAllTheThings(mainDatabaseSpreadsheet)
@@ -915,41 +994,5 @@ Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #The input file must be either a raw file (.ks, .txt, .ts) or a spreadsheet file (.csv, .xlsx, .xls, .ods), so the encoding for the spreadsheets... is that always utf-8?
 #Raw files can be spreadsheets with one column, but spreadsheet files cannot be raw files. So include a switch that signifies to process text files as psudo .csv spreadsheets? No. Just have user convert them to .csv manually instead. Then no special handling is needed for 'special' \n deliminated .csv's. This feature can be added later if requested.
 #However, when using files exported from other programs. There will be no metadata. Instead of adding a cli flag, fallback to line-by-line mode instead and warn user about it. Fallback to line by line mode should also occur if the metadata is corrupted. Is that really necessary? Lines count can be found based upon column 1 entries, and word wrap settings only need the parsedefintions file. That is sperate from translating, which can still be done using previously obtained paragraphs. Speaker will be missing.
-
-
-
-
-ignoreLinesThatStartWith=['[','*',';','【','・']
-myDict={'[＠クロエ]':'Chloe'}
-
-print('myDict='+str(myDict))
-longString=' '+'[＠クロエ]'+',dawd j3 a!@$%(^&  '
-shortString=' [＠ab '
-print(longString)
-print(shortString+'\n')
-
-#this will print the full string without returning an error
-x = 'pie2'
-print(x[:9])
-
-thisLineIsValid=True
-#How to check if dictionaryEntry is at the start of both short and longString?
-for i in ignoreLinesThatStartWith:
-    if longString.strip()[:1] == i:
-        print('matching Value: \''+i+'\'')
-        thisLineIsValid=False
-        for j,k in myDict.items():
-            if j[:1] == i:
-               #Then it might match if the first character matches.
-               #print('pie')
-               #if the dictionary entry is the same as the start of the line
-               print('dictionaryKeyEntry='+j)
-               print( 'rawLine=\''+longString+'\'')
-               print( 'cleanedUpLine='+longString.strip()[:len(j)] )
-               if j == longString.strip()[:len(j)]:
-                   print('pie3')
-                   thisLineIsValid=True
-
-print('\nthisLineIsValid='+str(thisLineIsValid))
 
 
