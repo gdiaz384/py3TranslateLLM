@@ -189,24 +189,49 @@ def getCurrentMonthFromNumbers(x):
     else:
           sys.exit('Unspecified error.'.encode(consoleEncoding))
 
+
 ##TODO: Update this into functions so it returns the current day, time, and full (day+time)
-#print(datetime.today().strftime('%Y-%m-%d'))
-today=datetime.datetime.today()
-#print(today.strftime("%d/%m/%Y %H:%M:%S"))
-currentYear=today.strftime('%Y')
-currentMonth=getCurrentMonthFromNumbers(today.strftime('%m'))
-currentDay=today.strftime('%d')
-currentDateFull=currentYear+currentMonth+currentDay
+def getYearMonthAndDay():
+    today = datetime.datetime.today()
 
-currentHour=today.strftime('%H')
-currentMinutes=today.strftime('%M')
-currentSeconds=today.strftime('%S')
-currentTimeFull=currentHour+'-'+currentMinutes+'-'+currentSeconds
+    #debug code
+    #print(datetime.today().strftime('%Y-%m-%d'))
+    #print(today.strftime("%d/%m/%Y %H:%M:%S"))
 
-currentDateAndTimeFull=currentDateFull+'-'+currentTimeFull
+    currentYear = today.strftime('%Y')
+    currentMonth = getCurrentMonthFromNumbers(today.strftime('%m'))
+    currentDay = today.strftime('%d')
+    return( currentYear + currentMonth + currentDay )
 
-if (verbose == True) or (debug == True):
-    print(currentDateAndTimeFull.encode(consoleEncoding))
+
+def getYesterdaysDate():
+    yesterday = datetime.datetime.today() - datetime.timedelta(1)
+
+    #debug code
+    #print(datetime.yesterday().strftime('%Y-%m-%d'))
+    #print(yesterday.strftime("%d/%m/%Y %H:%M:%S"))
+
+    currentYear = yesterday.strftime('%Y')
+    currentMonth = getCurrentMonthFromNumbers(yesterday.strftime('%m'))
+    currentDay = yesterday.strftime('%d')
+    return( currentYear + currentMonth + currentDay )
+
+
+def getCurrentTime():
+    today = datetime.datetime.today()
+
+    currentHour=today.strftime('%H')
+    currentMinutes=today.strftime('%M')
+    currentSeconds=today.strftime('%S')
+    return( currentHour + '-' + currentMinutes + '-' + currentSeconds )
+
+
+def getDateAndTimeFull():
+    #currentDateAndTimeFull=currentDateFull+'-'+currentTimeFull
+    return getYearMonthAndDay() + '-' + getCurrentTime()
+
+#if (verbose == True) or (debug == True):
+#    print(currentDateAndTimeFull.encode(consoleEncoding))
 
 
 

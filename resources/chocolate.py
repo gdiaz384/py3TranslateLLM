@@ -70,7 +70,10 @@ class Strawberry:
             #Check to make sure file exists.
             #If file does not exist, then crash.
             if os.path.isfile(myFileName) != True:
-                sys.exit(('Warning: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))
+                sys.exit(('Error: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))
+            else:
+                #add headers to spreadsheet.
+                self.appendRow(['rawText', 'speaker', 'metadata'])
             #If extension = .csv, then call importFromCSV(myFileName)
             if myFileExtensionOnly == '.csv':
                 self.importFromCSV(myFileName, myFileNameEncoding, ignoreWhitespaceForCSV)
@@ -93,7 +96,7 @@ class Strawberry:
         #maybe return the headers from the spreadsheet?
         #return str(spreadsheet[1])
         #return 'pie'
-        return str(getRow(1))
+        return str(self.getRow(1))
 
     #expects a python list
     def appendRow(self,newRow):
@@ -223,19 +226,20 @@ class Strawberry:
     #Example: replaceColumn(newColumn,7)
 
 
-    #Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
-    #Aside: To determine the row, the column, or both from the raw cell address, call self.getRowAndColumnFromRawCellString(rawCellAddress)
+    # Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
+    # Aside: To determine the row, the column, or both from the raw cell address, call self.getRowAndColumnFromRawCellString(rawCellAddress)
     def searchHeaders(self, searchTerm):
         cellFound=None
         for row in self.spreadsheet[1]:
             for i in row:
                 if i.value == searchTerm:
                     cellFound=i
+                    break
             #if cellFound != None:
             #    print('found')
             #else:
             #    print('notfound')
-            break #stop searching after first row
+            break #stop searching after first row  #Hummmmmm.
         if cellFound == None:
             return None
         #Slower.
@@ -251,6 +255,22 @@ class Strawberry:
     #    print('was not found')
     #else:
     #    print('searchTerm:\"'+searchTerm+'" was found at:'+str(isFound))
+
+
+    # This searches the first column for the searchTerm and returns None if not found or the row number if it found it. 
+    # Case and whitespace sensitive search.
+    def searchFirstColumn(self, searchTerm):
+        print('Hello, World!'.encode(consoleEncoding))
+        cellFound=None
+        for column in self.spreadsheet[A]:  #does this work? TODO: Test this.
+            for i in column:
+                if i.value == searchTerm:
+                    cellFound=i
+                    break
+            break #stop searching after first column #Hummmm.
+        if cellFound == None:
+            return None
+        return self.getRowAndColumnFromRawCellString(cellFound)[0]
 
 
     #This returns either [None, None] if there is no cell with the search term, or a list containing the [row, column] (the address). Case and whitespace sensitive.
@@ -296,61 +316,90 @@ class Strawberry:
     #mySpreadsheet.printAllTheThings()
 
 
-
-
-    #TODO:
     #This function processes raw data (.ks, .txt. .ts) using a parse file. The extracted data is meant to be loaded into the main workbook data structure for further processing.
-    #def importFromRawTextFile(fileNameWithPath, fileNameEncoding, parseFile, parseFileEncoding):
-        #print('Hello World'.encode(consoleEncoding))
-        #global mainSpreadsheet
-        #fileNameWithPath does not need an extension check because it is already clear
-        #Check to make sure fileNameWithPath exists.
-        #Check to make sure parseFile exists.
-
     #parseRawInputTextFile() accepts an (input file name, the encoding for that text file, parseFileDictionary as a Python dictionary, the character dictionary as a Python dictionary) and creates a dictionary where the key is the dialogue, and the value is a list. The first value in the list is the character name, (or None for no chara name), and the second is metadata as a string using the specified delimiter.
     #This could also be a multidimension array, such as a list full of list pairs [ [ [],[ [][][] ] ] , [ [],[ [][][] ] ] ] because the output is highly regular, but that would allow duplicates. Executive decision was made to disallow duplicates for files since that is correct almost always. However, it does mess with the metadata sometimes by having the speaker be potentially incorrect.
     #This method then updates the spreadsheet with the first column as the dialogue, the second as the speaker, and the third column as a string containing metadata (number of lines column 1 represents, and what else?) Cache... should always be added. Potentially that creates a situation where cache is not valid when going from one title to another, but that is fine.
     #self.importFromTextFile(myFileName,myFileNameEncoding,parseSettingsDict,charaNamesDict)
-
-    def importFromTextFile(self, fileNameWithPath,myFileNameEncoding,parseSettingsDict,charaNamesDict):
-
     #def parseRawInputTextFile(self,inputFile,inputFileEncoding,characterDictionary):
+    #def importFromRawTextFile(fileNameWithPath, fileNameEncoding, parseFile, parseFileEncoding):
 
+    def importFromTextFile(self, fileNameWithPath,myFileNameEncoding,parseSettingsDict,charaNamesDict=None):
+
+    #parseSettingsDict must exist, and that has already been checked, but charaNamesDict may or may not exist, be == None
         #The file has already been checked to exist and the encoding correctly determined, so just open it and read contents into a string. Then use that epicly long string for processing.
         with open(fileNameWithPath, encoding=myFileNameEncoding, errors=inputErrorHandling) as myFileHandle:
             inputFileContents = myFileHandle.read()
 
-
-        temporaryDict={}        #Dictionaries do not allow duplicates, so insert all entries into a dictionary first to de-duplicate entries, then read dictionary into first column (skip first line/row in target spreadsheet)
+        temporaryDict={}        #Dictionaries do not allow duplicates, so insert all entries into a dictionary first to de-duplicate entries, then read dictionary into first column (skip first line/row in target spreadsheet) Syntax:
         #thisdict.update({"x": "y"}) #add to/update dictionary
         #thisdict["x"]="y"              #add to/update dictionary
         #for x, y in thisdict.items():
-        #  print(x, y) 
+        #  print(x, y)
 
-        temporaryString=None #set it to None (null) to initialize
+        temporaryString=None     #set it to None (null) to initialize
         currentParagraphLineCount=0
+        characterName=None
+
+        #previousLine2=None
+        #previousLine1=None
+        #currentLineLastTime=None
+        lastThreeLines=[None,None,None]
+        startDelimiterForCharaName=str(parseSettingsDict['theCharacterNameAlwaysBeginsWith']).strip()
+        endDelimiterForCharaName=str(parseSettingsDict['theCharacterNameAlwaysEndsWith']).strip()
+
         #while line is not empty (at least \n is present)
-        while inputFileContents != '' :
+        while inputFileContents != '':
             myLine=inputFileContents.partition('\n')[0] #returns first line of string to process in the current loop
+
+            #Update previous lines.
+            lastThreeLines[2]=lastThreeLines[1] #move the previous line up by one
+            lastThreeLines[1]=lastThreeLines[0] #move the line that was the current line last time, to previousLine1
+            lastThreeLines[0]=myLine
+            #TODO update lines with subsequent lines to handle situation of the character name appearing 'after' the dialogue lines.
+            #TODO update handling of character names to include 'within' scenario.
+
+            #It is annoying to search multiple times, so just dump them into an array/list and search the array
+            #lastThreeLines=[currentLineLastTime,previousLine1,previousLine2]
+
+            #try to find character name if name has not been found already and if character name handling is not disabled.
+            if (characterName == None) and (parseSettingsDict['characterNamesAppearBeforeOrAfterDialogue'] != None):
+                for entry in lastThreeLines:
+                    #Try to determine character using first line.
+                    if (str(entry).strip() != '') and ( len( str(entry).strip() ) >=3 ) and ( str(entry).strip() != 'None' ):
+                        #entry.find() returns -1 if it did not find the string in the line
+                        if ( entry.find(startDelimiterForCharaName ) != -1 ) and ( entry.find(endDelimiterForCharaName) != -1 ) and ( entry.find(startDelimiterForCharaName) < entry.find(endDelimiterForCharaName) ):
+                            characterName=entry[ entry.find(startDelimiterForCharaName)+len(startDelimiterForCharaName) : entry.find(endDelimiterForCharaName) ]
+                            if debug == True:
+                                print( ('characterName=' + characterName).encode(consoleEncoding) )
+                                print( ( str(entry.find(startDelimiterForCharaName)+len(startDelimiterForCharaName)) + ',' + str( entry.find(endDelimiterForCharaName)) ).encode(consoleEncoding)  )
+                            #print( entry.encode(consoleEncoding) )
+                            #print( entry[entry.find(startDelimiterForCharaName)+len(startDelimiterForCharaName)] ) )
+                            break
+
+
+
 
             #debug code
             #print only if debug option specified
             if debug == True:
                 print(myLine.encode(consoleEncoding)) #prints line that is currently being processed
             #myLine[:1]#this gets only the first character of a string #what will this output if a line contains only whitespace or only a new line #answer: '' -an empty string for new lines, but probably the whitespace for lines with whitespace
-            if myLine[:1].strip() != '':#if the first character is not empty or filled with whitespace
-                if debug == True:
-                    print(myLine[:1].encode(consoleEncoding))
+            #if myLine[:1].strip() != '':#if the first character is not empty or filled with whitespace
+            #    if debug == True:
+            #        print(myLine[:1].encode(consoleEncoding))
 
             thisLineIsValid=True
-            #if the line is empty, then always skip it. Regardless of paragraphDelimiter == emptyLine or newLine, empty lines signify a new paragraph start, or it would be too difficult to tell when one paragraph ends and another starts.
+            # if the line is empty, then always skip it regardless of paragraphDelimiter == emptyLine or newLine
+            # Empty lines signify a new paragraph start, or it would be too difficult to tell when one paragraph ends and another starts.
             if myLine.strip()[:1] == '':
                 thisLineIsValid=False
                 #if paragraphDelimiter == 'emptyLine': #Old code.  if paragraphDelimiter='newLine', then this is the same as line-by-line mode, right?
             #else the line is not empty or filled with only whitespace.
             else:
-                #if the first character is an ignore character or if the first character is whitespace, then set thisLineIsValid=False
-                for i in ignoreLinesThatStartWith:
+                # if the first character is an ignore character or if the first character is whitespace, then set thisLineIsValid=False
+                # ignoreLinesThatStartWith is part of the settings dictionary
+                for i in parseSettingsDict['ignoreLinesThatStartWith']:
                     if myLine.strip()[:1] == i:   #This should strip whitespace first, and then compare because sometimes dialogue can be indented but still be valid. Valid syntax: myLine.strip()[:1] 
                         #It is possible that this line is still valid if the first non-whitespace characters in the line are an entry from the charaname dictionary.
                         #TODO. Need to check for this.
@@ -359,6 +408,26 @@ class Strawberry:
                         #print(x[:9])
                         thisLineIsValid=False
 
+#                for i in ignoreLinesThatStartWith:
+#                    if myLine.strip()[:1] == i:
+#                        print('matching Value: \''+i+'\'')
+#                        thisLineIsValid=False
+
+                        if charaNamesDict != None:
+                            #myDict={'[＠クロエ]':'Chloe'}
+                            for j,k in charaNamesDict.items():
+                                if j[:1] == i:
+                                   #Then it might match if the first character matches.
+                                   #print('pie')
+                                   #if the dictionary entry is the same as the start of the line
+                                   #print( 'dictionaryKeyEntry=' + j )
+                                   #print( 'rawLine=\'' + myLine + '\'')
+                                   #print( 'cleanedUpLine=' + myLine.strip()[ :len(j) ] )
+                                   if j == myLine.strip()[ :len( j ) ]:
+                                        #print('pie3')
+                                        if debug == True:
+                                            print( ('Re-adding line: '+myLine.strip() ).encode(consoleEncoding) )
+                                        thisLineIsValid=True
 
                             #There is some code at the bottom of the main .py that will need to be integrated into this spot.
 
@@ -367,14 +436,18 @@ class Strawberry:
             if thisLineIsValid == False: 
                 #then commit any currently working string to databaseDatastructure, add to temporary dictionary to be added later
                 if temporaryString != None:
-                    #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
-                    temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False'
+                    #temporaryDict[temporaryString] = str(currentParagraphLineCount)+'!+'False' #old. Not currently using metadata
+                    temporaryDict[temporaryString] = [characterName,str(currentParagraphLineCount)]
                 #and start a new temporaryString
-                temporaryString=None
+                temporaryString = None
                 #and reset currentParagraphLineCount
-                currentParagraphLineCount=0
+                currentParagraphLineCount = 0
+                #and reset characterName
+                characterName = None
+
             #while myLine[:1] != the first character is not an ignore character, #while the line is valid to feed in as input, then
-            elif thisLineIsValid != True:
+            elif thisLineIsValid == True:
+
                 #if the newLine after .strip() == '' #an empty string
                     #then end of paragraph reached. Commit any changes to temporaryString if there are any
                     #and break out of loop
@@ -383,25 +456,33 @@ class Strawberry:
                     #then append \n first, and then add line to temporaryString
                     temporaryString=temporaryString+'\n'+myLine.strip()
                     #increment currentParagraphLineCount by 1
-                    currentParagraphLineCount+=1
+                    currentParagraphLineCount += 1
                 #else if temporaryString is currently empty
+
                 elif temporaryString == None:
                     #then just append to temporaryString without \n
                     temporaryString = myLine.strip()
                     #and increment counter
-                    currentParagraphLineCount+=1
+                    currentParagraphLineCount += 1
                 else:
+                    #print('pie')
                     sys.exit('Unspecified error.'.encode(consoleEncoding))
                 #if max paragraph limit has been reached
-                if (currentParagraphLineCount >= maximumNumberOfLinesPerParagraph) or (paragraphDelimiter == 'newLine'):  
+
+                if (currentParagraphLineCount >= int( parseSettingsDict['maximumNumberOfLinesPerParagraph'] ) ) or (parseSettingsDict['paragraphDelimiter'] == 'newLine'):  
                     #then commit currently working string to databaseDatastructure, #add to temporary dictionary to be added later
                     #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
-                    temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False'
+                    #temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False' #Old
+                    temporaryDict[temporaryString] = [characterName,str(currentParagraphLineCount)]
+
                     #and start a new temporaryString
                     temporaryString=None
                     #and reset counter
                     currentParagraphLineCount=0
+                    #and reset characterName
+                    characterName = None
             else:
+                #print('pie2')
                 sys.exit('Unspecified error.'.encode(consoleEncoding))
 
             #remove the current line from inputFileContents, in preparating for reading the next line of inputFileContents
@@ -409,20 +490,24 @@ class Strawberry:
             #continue processing file onto next line normally without database insertion code until file is fully processed and dictionary is filled
             #Once inputFileContents == '', the loop will end and the dictionary can then be fed into the main database.
 
-        #debug code
         if inputFileContents == '' :
+            #TODO: Update this to say the file whatever has finished processing.
             print('inputFileContents is now empty of everything including new lines.'.encode(consoleEncoding))
             #feed temporaryDictionary into spreadsheet #Edit: return dictionary instead.
-            return temporaryDict
+            #return temporaryDict
+            for dialogue, metadata in temporaryDict.items():
+                #print(x, y)
+                self.appendRow([dialogue,metadata[0],metadata[1]])
+            if debug == True:
+                self.printAllTheThings()
 
 
-
-
-
-
-
-
-
+    #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
+    #if columnToExport == None: then dynamically calculate what should be exported. Only the translated line furthest to the right is valid to export, along with any untranslated lines.
+    #Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines of there is no translated line for that row.
+    def exportToTextFile(self, fileNameWithPath,columnToExport=None):
+        print('Hello World'.encode(consoleEncoding))
+        #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
 
@@ -470,32 +555,33 @@ class Strawberry:
         if debug == True:
             self.printAllTheThings()
 
-    def exportToCSV(self, fileNameWithPath, myFileNameEncoding):
+    def exportToCSV(self, fileNameWithPath, myFileNameEncoding=None):
         print('Hello World'.encode(consoleEncoding))
 
 
-    def importFromXLSX(self, fileNameWithPath, myFileNameEncoding):
+    def importFromXLSX(self, fileNameWithPath, myFileNameEncoding=None):
         print('Hello World'.encode(consoleEncoding))
         #return workbook
-    def exportToXLSX(self, fileNameWithPath, myFileNameEncoding):
-        print('Hello World'.encode(consoleEncoding))
+    def exportToXLSX(self, fileNameWithPath, myFileNameEncoding=None):
+        #print('Hello World'.encode(consoleEncoding))
         #theWorkbook.save(filename="myAwesomeSpreadsheet.xlsx")
-        workBook.save(filename=fileNameWithPath)
+        self.workbook.save(filename=fileNameWithPath)
+        print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-    def importFromXLS(self, fileNameWithPath, myFileNameEncoding):
+    def importFromXLS(self, fileNameWithPath, myFileNameEncoding=None):
         print('Hello World'.encode(consoleEncoding))
         #return workbook
-    def exportToXLS(self, fileNameWithPath, myFileNameEncoding):
+    def exportToXLS(self, fileNameWithPath, myFileNameEncoding=None):
         print('Hello World'.encode(consoleEncoding))
+        #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
-
-    def importFromODS(self, fileNameWithPath, myFileNameEncoding):
+    def importFromODS(self, fileNameWithPath, myFileNameEncoding=None):
         print('Hello World'.encode(consoleEncoding))
         #return workbook
-    def exportToODS(self, fileNameWithPath, myFileNameEncoding):
+    def exportToODS(self, fileNameWithPath, myFileNameEncoding=None):
         print('Hello World'.encode(consoleEncoding))
-
+        #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
 

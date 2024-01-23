@@ -59,7 +59,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan22 pre-alpha`
+`Current version: 0.1 - 2024Jan23 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented and the project has entered 'beta' development.
 
@@ -190,7 +190,7 @@ Variable name | Description | Examples
         - Paragraph spacing will not be preserved in the output cell, but will instead be regenerated dynamically when writting to the output files based upon the configurable word wrap settings.
             - This behavior can be disabled by setting paragraphDelimiter=newLine or enabling --lineByLineMode (-lbl) mode at runtime.
     - The second column (2nd) is reserved for the character speaking if a character name can be determined from the raw dialogue.
-        - Feel free to adjust this.
+        - Feel free to add the speaker if a speaker could not be automatically determined.
         - Automatic character name detection is heavily dependent on the settings specified in the parsingSettings.txt file.
     - The third column (3rd) is reserved for metadata used by py3TranslateLLM.
         - Do not modify the metadata column.
@@ -257,6 +257,27 @@ Variable name | Description | Examples
             1. Specifying an entry in the `postTranslation.csv` dictionary to revert back the translated text to the original placeholder text used by the game engine: `Chloe` -> `[＠クロエ]`.
         - At this time, it is not clear which approach is 'better' because the 'problems' with the `chararacterNames.csv` dictionary approach are entirely hypothetical and so might be non-existant for a particular translation engine.
         - Regardless, being able to say 'do not include this line usually but make an exception if starts with this string' is very powerful for automation, so this functionality will be retained even if `characterNames.csv` gets removed or renamed later.
+-  There are a lot of dictionary.csv files involved. Understanding the overall flow of the program should clarify how to use them:
+    1. All input files besides `fileToTranslate` are read and parsed.
+    1. The data structure that holds both the untranslated and translated text while the program is working is called `mainSpreadsheet`. How it is created is handled differently depending upon if `fileToTranslate` is a spreadsheet or a text file. For spreadsheets:
+        1. If `fileToTranslate` is a spreadsheet (.csv, .xlsx, .xls, .ods), it is converted to `mainSpreadsheet` as-is. See above for the formatting guidelines.
+    1. If `fileToTranslate` is a text file, the following occurs:
+        1. Settings related to parsing dialogue from `parsingSettingsFile` are considered.
+        1. If present, `characterNamesDictionary` is also considered for which lines not to ignore in creating paragraphs from `fileToTranslate`.
+        1. The untranslated dialogue paragraphs are then written to the first column of `mainSpreadsheet`.
+    1. The process to translate the rawText column in `mainSpreadsheet` using a particular translation engine begins. Examples: koboldcpp, deepl api/web, fairseq/sugoi.
+        1. If a paragraph is present in `cache.xlsx`, it is translated using the cache file and the translation process skips to step #7.
+        1. If present, `characterNamesDictionary` is considered and replacements are performed.
+        1. If present, `preTranslationDictionary` is considered and replacements are performed.
+        1. The paragraph is submitted to the translation engine.
+        1. If present, `characterNamesDictionary` is considered to revert certain changes.
+        1. The untranslated line and the translated line are added to the `cache.xlsx` file as a pair.
+        1. If present, `postTranslationDictionary` is considered to alter the translation further.
+        1. The translated paragraph is then written to `mainSpreadsheet` in the column specified by the current translation engine.
+        1. Periodically as entries are translated, a backup.xlsx is made under `backups/[date]/`.
+    1. Settings in this parsing template are considered as they relate to word wrap and outputing the translation into text.ks files.
+    1. The right most entry in each row is written to a copy of the text.ks file.
+    1. `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions since codec conversions are not lossless.
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
     - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
 
@@ -277,6 +298,8 @@ Variable name | Description | Examples
     - Historically, setting the Windows command prompt to ~utf-8 will reliably make it crash which makes having to deal with `cp437` and `cp1252` inevitable.
     - To print the currently active code page on Windows, open a command prompt and type `chcp`
         - To change the code page for that session type `chcp <codepage #>` as in: `chcp 1252`
+- For compatability reasons, everything gets converted to binary strings for stdout which can result in the console sometimes showing utf-8 hexadecimal (hex) encoded unicode characters, like `\xe3\x82\xaf\xe3\x83\xad\xe3\x82\xa8`, especially with `debug` enabled. To convert them back to non-ascii chararacters, like `クロエ`, dump them into a hex to unicode converter.
+    - Example: [www.coderstool.com/unicode-text-converter](//www.coderstool.com/unicode-text-converter)
 - Some character encodings cannot be converted to other encodings. When such errors occur, use the following error handling options:
     - [docs.python.org/3.7/library/codecs.html#error-handlers](//docs.python.org/3.7/library/codecs.html#error-handlers), and [More Examples](//www.w3schools.com/python/ref_string_encode.asp).
     - The default error handler for input files is `strict` which means 'crash the program if the encoding specified does not match the file perfectly'.
@@ -284,11 +307,11 @@ Variable name | Description | Examples
         - Makes it obvious that there were conversion errors.
         - Does not crash the program catastrophically.
         - Makes it easy to do ctrl+f replacements to fix any problems.
-            - Alternatively, use `postWritingToFileDictionary` to automate ctrl+f replacements.
+            - Alternatively, use `postWritingToFileDictionary` to automate these ctrl+f replacements.
     - If there are more than one or two such conversion errors per file, then the chosen file encoding settings are probably incorrect.
 - If the `chardet` library is available, it will be used to try to detect the character encoding of files via heuristics. While this imperfect solution is obviously very error prone, it is still better to have it than not.
     - To make it available: `pip install chardet`
-    - If it is not available, then everything is assumed to be `utf-8`.
+    - If it is not available, then everything is assumed to be `utf-8` unless otherwise specified.
 
 ### Notes about languages:
 
@@ -395,5 +418,5 @@ Libraries can also require other libraries.
     - Feel free to use it, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
     - The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
     - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.
-        - This assumes the licenses for projects used in the binary are compatible with one another. If the licenses used for a particular binary are not compatible with one another, then the resulting binary is not considered redistributable. Only lawyers can determine that, and also only lawyers need to worry about it.
+        - This assumes the licenses for libraries used in the binary are compatible with one another. If the licenses used for a particular binary are not compatible with one another, then the resulting binary is not considered redistributable. Only lawyers can determine that, and also only lawyers need to worry about it.
 

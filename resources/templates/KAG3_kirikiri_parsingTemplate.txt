@@ -1,21 +1,6 @@
-# Lines starting with # are comments.  
 # This file establishes the definitions for the built in parser and file writer to use with KAG3 kirkikri game engine scripts (.ks).
-# The exact order is:
-#   - characterNamesDictionary.csv is considered for which lines not to ignore in creating paragraphs from the raw text.ks file.
-#   - Settings related to pasing dialogue as specified in this parsing template are considered.
-#   - The dialogue line is written to the first column of the mainSpreadsheet.
-#   - mainSpreadsheet is submitted for translation for a particular translation engine.
-#   - characterNamesDictionary.csv is considered.
-#   - preTranslationDictionary.csv is considered.
-#   - The line is translated.
-#   - characterNamesDictionary.csv is considered to revert certain changes made.
-#   - The untranslated line and the translated line are added to the cache.csv file.
-#   - postTranslationDictionary.csv is considered.
-#   - The translated line is written in the row for the line and the column of the translation engine currently in use.
-#   - Periodically as entries are translated, a backup.xlsx is made under backups/[date]/.
-#   - Settings in this parsing template are considered as they relate to word wrap and outputing the translation into text.ks files.
-#   - The right-most entry in each row is written to a copy of the text.ks file.
-#   - postWritingToFileDictionary.csv is considered.
+# Lines starting with # are comments.
+# The key names in key=value are case sensitive.
 
 # If a line begins with one of the following characters, then do not process it for dialogue. Separate each character with a space.
 # Groups of characters are not currently supported. Set to 'None' (without quotes) to parse every line. This setting is to help isolate
@@ -62,6 +47,10 @@ wordWrapMode=dynamic
 #characterNamesAppearBeforeOrAfterDialogue=None
 characterNamesAppearBeforeOrAfterDialogue=before
 
+# If 'within' was specified above, then valid character names must be specified to differentiate them from lines of dialogue.
+# Separate character names with commas , Character names are case sensitive.
+characterNameIsWithinValidOptions=Chloe, Israel, Orlando
+
 # If the character name is not part of the main text, then how should it be detected? Valid values are 'None', a single character, or
 # a group of characters. Grouped characters will be treated as a single entity. Both BeginsWith and EndsWith must match
 # exactly for a character name to be detected. The character name must be within two lines of the associated dialogue line.
@@ -73,8 +62,8 @@ theCharacterNameAlwaysEndsWith=】
 #theCharacterNameAlwaysEndsWith=None
 
 # By default, [codes] inside of square brackets are not sent to the translation engine, even if they are present in paragraphs,
-# but are moved to the end of the post-translated text. The following alterations will honor the word wrap setting above, and
-# since word wrap is calculated dynamically, these will only be used if text is written back to the original file.
+# but are moved to the end of the post-translated text when writing back to the original file. The following alterations will honor
+# the word wrap setting above.
 # Important: Setting *any* of these settings to a value different than 'None' will disable reinsertion of [codes] after translation.
 alwaysDeleteTheseBeforeTranslation=None
 #alwaysDeleteTheseBeforeTranslation=[r] [repage]

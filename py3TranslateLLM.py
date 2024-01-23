@@ -22,17 +22,20 @@ import sys                                     #End program on fail condition.
 import io                                        #Manipulate files (open/read/write/close).
 #from io import IOBase               #Test if variable is a file object (an "IOBase" object).
 #import datetime                          #Used to get current date and time.
+
+#Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes.
 from collections import deque    #Used to hold rolling history of translated items to use as context for new translations.
-import requests                            #Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'
+import requests                            #Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'  
+
 #import openpyxl                           #Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
-import resources.chocolate as chocolate #A helper/wrapper library to aid in using openpyxl as a datastructure.
+import resources.chocolate as chocolate #Implements openpyxl. A helper/wrapper library to aid in using openpyxl as a datastructure.
 import resources.dealWithEncoding as dealWithEncoding   #dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  #Moved most generic functions here to increase code readability and enforce function best practices.
 #from resources.py3TranslateLLMfunctions import * #Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
 
 
 #set defaults and static variables
-versionString='v0.1 - 2024Jan22 pre-alpha'
+versionString='v0.1 - 2024Jan23 pre-alpha'
 
 defaultTextEncoding='utf-8'
 defaultTextEncodingForKSFiles='shift-jis'
@@ -50,6 +53,7 @@ defaultChineseLanguage='Chinese (simplified)'
 #Valid options are 'Portuguese (European)' or 'Portuguese (Brazilian)'
 defaultPortugueseLanguage='Portuguese (European)'
 
+defaultCacheFile='resources/cache.xlsx'
 defaultKoboldCppPort=5001
 defaultSugoiPort=14366
 #defaultSugoiPort=14467
@@ -114,11 +118,15 @@ commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding',
 commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.',default=None,type=str)
 commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+str(defaultTextEncoding),default=None,type=str)
 
+commandLineParser.add_argument('-c', '--cacheFile', help='The location of the cache file. Must be in .xlsx format. Default='+str(defaultCacheFile),default=None,type=str)
+commandLineParser.add_argument('-nc', '--noCache', help='Disables using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries.',action='store_true')
+commandLineParser.add_argument('-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.',action='store_true')
+commandLineParser.add_argument('-oc', '--overrideWithCache', help='Do not retranslate lines, but override any already translated lines in the spreadsheet with results in the cache. Default=Do not override already translated lines.',action='store_true')
+commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use the cache to fill in previously translated lines.',action='store_true')
+commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.',action='store_true')
+
 commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.',action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.',action='store_true')
-commandLineParser.add_argument('-nc', '--noCache', help='Disables using or updating the cache file. Default=Use the cache file to fill in previously translated entries.',action='store_true')
-commandLineParser.add_argument('-oc', '--overrideWithCache', help='Do not retranslate lines, but override any already translated lines in the spreadsheet with results in the cache. Default=Do not override already translated lines.',action='store_true')
-commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use cache to fill in previously translated lines.',action='store_true')
 
 commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100',default=None,type=str)
 commandLineParser.add_argument('--port', help='Specify the port for the NMT/LLM server. Example: 5001',default=None,type=str)
@@ -378,7 +386,9 @@ py3TranslateLLMfunctions.verifyThisFileExists(languageCodesFileName,'languageCod
 #    sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
 
 
-fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
+fileToTranslateFileNameWithPathNoExt, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
+fileToTranslateFileNameWithoutPathOrExt=Path(fileToTranslateFileName).stem
+
 if fileToTranslateFileNameExtensionOnly == '.csv':
     fileToTranslateIsASpreadsheet=True
 elif fileToTranslateFileNameExtensionOnly == '.xlsx':
@@ -492,6 +502,13 @@ if (mode == 'sugoi'):
 if fileToTranslateIsASpreadsheet == False:
     py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName,'parseSettingsFileName')
 
+if outputFileName == None:
+    #If no outputFileName was specified, then set it the same as the input file
+    outputFileName=fileToTranslateFileName
+    #print('pie')
+
+outputFileNameWithoutPathOrExt=Path(outputFileName).stem
+outputFileExtensionOnly=Path(outputFileName).suffix
 
 if sourceLanguageRaw == None:
     sourceLanguageRaw = defaultSourceLanguage
@@ -522,12 +539,13 @@ elif (targetLanguageRaw != None):
 #Set encodings Last
 ##Set Encodings for files using dealWithEncoding.py helper library as dealWithEncoding.ofThisFile(myfile). 
 
+#TODO: Clean this up. Very old code.
 #First one is a special case since the encoding must be changed to shift-jis in the case of .ks (file extension).
 #If an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change.
 #if an input file name was specified, then
 if fileToTranslateFileName != None:
-    #fileToTranslateFileNameOnly, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)#Moved further up, made global/module wide. #Edit, moved into a function that is always called. Also checks for == None condition and errors out the program if not specified.
-    #print(fileToTranslateFileNameOnly)
+    #fileToTranslateFileNameWithPathNoExt, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)#Moved further up, made global/module wide. #Edit, moved into a function that is always called. Also checks for == None condition and errors out the program if not specified.
+    #print(fileToTranslateFileNameWithPathNoExt)
     #print('Extension:'+fileToTranslateFileNameExtensionOnly)
     #if no encoding was specified, then...
     if commandLineArguments.fileToTranslateEncoding == None:
@@ -543,6 +561,7 @@ if fileToTranslateFileName != None:
 else:
     fileToTranslateEncoding=defaultTextEncoding#if an input file name was not specified, set encoding to default encoding
 
+#outputFileName
 #outputFileEncoding=
 #For the output file encoding:  
 #if the user specified an input file, use the input file's encoding for the output file
@@ -711,6 +730,96 @@ elif fileToTranslateIsASpreadsheet != True:
 # mainSpreadsheet=Strawberry()
 #py3TranslateLLMfunctions.parseRawInputTextFile
 
+#Before doing anything, just blindly create a backup.
+backupFolder='backups/' + py3TranslateLLMfunctions.getYearMonthAndDay()
+Path( backupFolder ).mkdir(parents=True, exist_ok=True)
+#mainDatabaseWorkbook.save('backups/'+py3TranslateLLMfunctions.getYearMonthAndDay()+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx')
+fullOutputPath=backupFolder + '/'+ fileToTranslateFileNameWithoutPathOrExt +'.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
+mainSpreadsheet.exportToXLSX( fullOutputPath )
+#print( ('Wrote backup to: '+fullOutputPath).encode(consoleEncoding) )
+
+if debug == True:
+    print('fileToTranslateFileNameWithoutPathOrExt='+fileToTranslateFileNameWithoutPathOrExt)
+    print( ( 'Today=' + py3TranslateLLMfunctions.getYearMonthAndDay() ).encode(consoleEncoding) )
+    print( ( 'Yesterday=' + py3TranslateLLMfunctions.getYesterdaysDate() ).encode(consoleEncoding) )
+    print( ( 'CurrentTime=' + py3TranslateLLMfunctions.getCurrentTime() ).encode(consoleEncoding) )
+    print( ( 'DateAndTime=' + py3TranslateLLMfunctions.getDateAndTimeFull() ).encode(consoleEncoding) )
+
+#Now that the main data structure has been created, the spreadsheet is ready to be translated.
+if mode == 'parseOnly':
+    #The outputFileName will match fileToTranslateFileName if an output file name was not specified. If one was specified, then assume it had an extension.
+    if outputFileName == fileToTranslateFileName:
+        mainSpreadsheet.exportToXLSX( outputFileName + '.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx' )
+    elif outputFileExtensionOnly == '.csv':
+        #Should probably try to handle the path in a sane way.
+        mainSpreadsheet.exportToCSV(outputFileName)
+    elif outputFileExtensionOnly == '.xlsx':
+        mainSpreadsheet.exportToXLSX(outputFileName)
+    elif outputFileExtensionOnly == '.xls':
+        mainSpreadsheet.exportToXLS(outputFileName)
+    elif outputFileExtensionOnly == '.ods':
+        mainSpreadsheet.exportToODS(outputFileName)
+    elif outputFileExtensionOnly == '.txt':
+        mainSpreadsheet.exportToTextFile(outputFileName,'rawText')
+    #work complete. Exit.
+    sys.exit( 'Work complete.'.encode(consoleEncoding) )
+
+#Now need to translate stuff.
+#Initialize cache.xlsx file under backups/
+    #Has same structure as mainSpreadsheet except for no speaker and no metadata. Multiple columns with each one.
+    #if present, Read in cache into a Strawberry()
+    #otherwise if does not exist yet, create it.
+
+#Implement KoboldAPI first, then DeepL, then Sugoi.
+#KoboldAPI must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
+    #if not exist model in main spreadsheet,
+    #then add it to headers and return current column for model.
+    #else, return current column for model.
+#check cache as well.
+    #if not exist model in cache,
+    #then add it to headers and return the cache's column for model.
+    #else, return the cache's column for model.
+
+#DeepL has already been imported, and it must have an API key. (already checked for)
+#check current engine. fairseq server must be reachable.
+
+#Now have two column letters for both currentModelColumn and currentCacheColumn.
+#currentCacheColumn can be None if cache is disabled. cache might also be set to read only mode.
+
+# Read in raw untranslated cell from column A in spearsheet.
+# create counter, currentRow=1
+# get column A, the untranslated column
+# for every cell in A, try to translate it.
+    # first check cache
+    # if cache enabled
+        # search column A in cache for raw untranslated there is a match
+        # if cache is normal, get cell back and check if that cell is not None
+        # if cache is any row, then return all rows in Strawberry() and check if any are not None. Select right-most cell as final value.
+        # if cache hit confirmed, then set this to postTranslatedText=
+        # check with postTranslationDictionary, a Python dictionary for possible updates
+        # and then write cache hit to mainSpreadsheet cell
+        # and move on to next cell
+    # if there is no match, then the fun begins
+        # remove all \n's in the line
+        # perform replacements specified by charaNamesDictionary
+        # perform replacements specified by preTranslationDictionary
+        # submit the line to the translation engine, along with the current dequeue #TODO: add options to specify history length of dequeue to the CLI
+        # once it is back check to make sure it is not None or another error value
+        # add it to the dequeue, murdering the oldest entry in the dequeue
+        # perform replacements specified by charaNamesDictionary, in reverse
+        # If cache enabled, add the untranslated line and the translated line as a pair to the cache file.
+            # The untranslated line belongs in a new row. Really? Always? Well it is not gurantted to be unique because the line may have been translated before but not using that particular translation engine. So the cache cell may need to be filled, but on a previous entry. So.... search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
+            #the translated line belongs in the column specified.
+        # s
+
+#when done processing text, currentRow+=1
+#How to check how much time has passed? To see if periodic output should be written. Could also do it programatically every twenty or so lines, but would be better if the minute did not match at least.
+
+
+
+
+
+
 
 
 
@@ -724,126 +833,6 @@ elif fileToTranslateIsASpreadsheet != True:
 
 sys.exit('end reached')
 """
-#if debug == True:
-#    print('')
-#    print(('The following has been read from ' + str(languageCodesFileName)).encode(consoleEncoding))
-#    printAllTheThings(languageCodesSpreadsheet)
-
-#Search for valid sourceLanguageRaw and targetLanguageRaw. Case insensitive.
-for column in languageCodesSpreadsheet.iter_cols():
-    for cell in column:
-        if isinstance(cell.value, str):
-            if cell.value.lower() == sourceLanguageRaw.lower():
-                sourceLanguageCell=cell
-                break
-            #else:
-                #cellVal=cell.value.lower()
-                #print(cellVal)
-                #srcLang=sourceLanguageRaw.lower()
-                #print(srcLang)
-                #print('"'+cellVal+'"!="'+srcLang+'"')
-
-if sourceLanguageCell == None:
-    sys.exit(('\n Error. The following language was not found in"' + languageCodesFileName + '":"' + sourceLanguageRaw+'"').encode(consoleEncoding))
-else:
-    print(('SourceLanguage:'+sourceLanguageRaw+':'+str(sourceLanguageCell)).encode(consoleEncoding))
-#Assume sourceLanguageCell has a valid value now.
-sourceLanguageRow, sourceLanguageColumn = getRowAndColumnFromCell(sourceLanguageCell)
-#print(languageCodesSpreadsheet['A'+sourceLanguageRow].value)
-
-if debug == True:
-    print((str(languageCodesSpreadsheet['A'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['B'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['C'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['D'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['E'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['F'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['G'+sourceLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['H'+sourceLanguageRow].value)).encode(consoleEncoding))
-
-if str(languageCodesSpreadsheet['E'+sourceLanguageRow].value) == 'False':
-    internalSourceLanguageName=languageCodesSpreadsheet['A'+sourceLanguageRow].value
-    internalSourceLanguageTwoCode=languageCodesSpreadsheet['B'+sourceLanguageRow].value
-    internalSourceLanguageThreeCode=languageCodesSpreadsheet['C'+sourceLanguageRow].value
-elif str(languageCodesSpreadsheet['E'+sourceLanguageRow].value) == 'True':
-    internalSourceLanguageName=languageCodesSpreadsheet['F'+sourceLanguageRow].value
-    internalSourceLanguageTwoCode=languageCodesSpreadsheet['G'+sourceLanguageRow].value
-    internalSourceLanguageThreeCode=languageCodesSpreadsheet['H'+sourceLanguageRow].value
-else:
-    print('')
-    print((languageCodesSpreadsheet['E'+sourceLanguageRow].value).encode())
-    sys.exit('Unspecified error.'.encode(consoleEncoding))
-
-if debug == True:
-    print(str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value)).encode())
-    print(internalSourceLanguageName.encode())
-    print(internalSourceLanguageTwoCode.encode())
-    print(internalSourceLanguageThreeCode.encode())
-
-targetLanguageCell=None
-#print(sourceLanguageRaw)
-
-#targetLanguageCell = searchSpreadsheet(languageCodesSpreadsheet,targetLanguageRaw) #case sensitive, do not use
-
-#Search for valid sourceLanguageRaw and targetLanguageRaw. Case insensitive.
-for column in languageCodesSpreadsheet.iter_cols():
-    for cell in column:
-        if isinstance(cell.value, str):
-            if cell.value.lower() == targetLanguageRaw.lower():
-                targetLanguageCell=cell
-                break
-            #else:  #debug code
-                #cellVal=cell.value.lower()
-                #print(cellVal)
-                #srcLang=targetLanguageRaw.lower()
-                #print(srcLang)
-                #print('"'+cellVal+'"!="'+srcLang+'"')
-
-if targetLanguageCell == None:
-    sys.exit(('\n Error. The following language was not found in"' + languageCodesFileName + '":"' + targetLanguageRaw+'"').encode(consoleEncoding))
-else:
-    print(('TargetLanguage:'+targetLanguageRaw+':'+str(targetLanguageCell)).encode(consoleEncoding))
-#Assume targetLanguageCell has a valid value now.
-targetLanguageRow, targetLanguageColumn = getRowAndColumnFromCell(targetLanguageCell)
-#print(languageCodesSpreadsheet['A'+targetLanguageRow].value)
-
-if debug == True:
-    print((str(languageCodesSpreadsheet['A'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['B'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['C'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['D'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['E'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['F'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['G'+targetLanguageRow].value)).encode(consoleEncoding))
-    print((str(languageCodesSpreadsheet['H'+targetLanguageRow].value)).encode(consoleEncoding))
-
-#if str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'False':
-
-#The destination language does not have its source language code modified, so just set the values unconditionally.
-internalLanguageDestinationName=languageCodesSpreadsheet['A'+targetLanguageRow].value
-internalLanguageDestinationTwoCode=languageCodesSpreadsheet['B'+targetLanguageRow].value
-internalLanguageDestinationThreeCode=languageCodesSpreadsheet['C'+targetLanguageRow].value
-
-#elif str(languageCodesSpreadsheet['E'+targetLanguageRow].value) == 'True':
-#    internalLanguageDestinationName=languageCodesSpreadsheet['F'+targetLanguageRow].value
-#    internalLanguageDestinationTwoCode=languageCodesSpreadsheet['G'+targetLanguageRow].value
-#    internalLanguageDestinationThreeCode=languageCodesSpreadsheet['H'+targetLanguageRow].value
-#else:
-#    print('')
-#    print(str(languageCodesSpreadsheet['E'+targetLanguageRow].value).encode(consoleEncoding))
-#    sys.exit('Unspecified error.'.encode(consoleEncoding))
-
-#if debug == True:
-#    print((str(bool(languageCodesSpreadsheet['E'+sourceLanguageRow].value))).encode(consoleEncoding))
-#    print(str(internalLanguageDestinationName).encode(consoleEncoding))
-#    print(str(internalLanguageDestinationTwoCode).encode(consoleEncoding))
-#    print(str(internalLanguageDestinationThreeCode).encode(consoleEncoding))
-"""
-
-
-
-
-
 
 
 
@@ -862,30 +851,9 @@ CharacterNames=['[＠クロエ]','Chloe']#change this to a dictionary
 #inputFileContents=inputFileContents.replace('[＠クロエ]','Chloe')
 
 
-#Import parse settings from parsingDefintionsFile, if parsing is required which is if....
-#if... parseOnly mode specified, resume has not specified (resume implies there is a file under backup/)
-#always parse regardless of mode if one is specified, and then import data from other sources as it becomes available. Keep track of whether or not main data structure exists, or is supposed to be created from resume data (backup/ folder, csv, xls/xlsx, ods).
-ignoreLinesThatStartWith=[ '[' , '*' , ';' , '【' ]     #this is a list of strings where each entry contains a character that marks a line to skip processing it, only one character is considered per entry
-paragraphDelimiter='emptyLine'         #Valid options: emptyLine, newLine  #Once input has started, when should it stop? Input will stop automatically regardless of this setting when maximumParagraphSize is reached.
-maximumNumberOfLinesPerParagraph=3        #Maximum number of lines per paragraph. A sane setting for this is 2-5 lines maximum per paragraph.
-#What is the maximum length for translated text before triggering word wrap? The correct setting for this depends on
-#the font used, which can sometimes be changed by the user at runtime, and the target language.
-#Sane values are 30-60. This setting strongly influences the number of calculated output lines.
-wordWrap=45
-#The number of untranslated input lines will not always match the number of translated output lines, especially with
-#different wordWrap amounts. How should this situation be handled? Valid values are: none, strict, dynamic.
-#none=Disable word wrapping and always dump all translated text onto one line. Replace subsequent untranslated lines with empty lines.
-#strict=If the number of input lines and translated lines match exactly, then replace as normal. Otherwise, do nothing.
-    #The lines with a mismatch will be placed into a 'mixmatch.xlsx' file, and it is the user's responsibility to sort through those lines.
-#dynamic=If there are fewer lines after translation, replace the extra untranslated lines with empty lines.
-    #If there are more lines after translation, then append the extra lines to the last untranslated line.
-wordWrapMode='dynamic'
-
-
 #initialize main data structure
 #mainDatabaseWorkbook = Workbook()
 #mainDatabaseSpreadsheet = mainDatabaseWorkbook.active
-
 
 
 #This will hold raw untranslated text, number of lines each entry was derived from, and columns containing maybe translated data. Maximum columns supported = 9[?]. Columns 0 and 1 are reserved for Raw untranslated text and [1] is reserved for the number of lines that column 0 represents, even if it is always 1 because line-by-line parsing (lineByLineMode) is specified.
@@ -893,44 +861,44 @@ wordWrapMode='dynamic'
 #class Database:
 #    def __init__(self):
 
-#The mainSpreadsheet data structure should hold:
-#Column 1) each paragraph.raw.text (with \n's inside of it)
-#Column 2) Reserved for the speaker of the line (if any) as this singular piece of metadata is very important and should also be user editable. Leave as empty if None.
-#Column 3) metadata possibilities:
+# The mainSpreadsheet data structure should hold:
+# Column 1) each paragraph.raw.text (with \n's inside of it)
+# Column 2) Reserved for the speaker of the line (if any) as this singular piece of metadata is very important and should also be user editable. Leave as empty if None.
+# Column 3) metadata possibilities:
     #The # of lines #1 was taken from? This can be computed dynamically since the untranslated text is being stored verbetum. Metadata could say... 3 lines, from line #'s 23, 24, 25
     #The line number the first entry for the paragraph was sourced from. When replacing lines, the line numbers will change if the entries are not 1:1 so this might be less useful than it seems. It could be a hint as to approximately where the untranslated lines are from however, but how is that useful?
     #maybe the last line as well
     # possibly whether the line has been translated or not? It might be hard to figure out otherwise, but this is also more of an efficiency thing than actually needed. Can figure it out easily enough by knowing the current translation engine or getting a list of the available translation engines and checking the cell contents returned in getRow(7) for the None value of the appropriate columns.
     #other arbitary data to be decided later like booleans
-    #Has the file been processed with characterDictionary? It is not *entirely* invalid to have a toggle for this and to put the post characterDictionary untranslated text in column 1. But it is a better idea not to have this and instead just output any post charaDictionary text into another column so that both are available. The text to submit to the translation engine still needs to be computed dynamically anyway. However, without it and without outputting to another column, then py3stringReplace should be updated to support .csv files already.
-
-#Metadata problems:
+    #Has the file been processed with characterDictionary? It is not *entirely* invalid to have a toggle for this and to put the post characterDictionary untranslated text in column 1. But it is a better idea not to have this and instead just output any post charaDictionary text into another column so that both are available if that is desired. The text to submit to the translation engine still needs to be computed dynamically anyway. However, without it and without outputting to another column, then py3stringReplace should be updated to support .csv files already.
+# Metadata problems:
     #Metadata can also just be overtly missing in the case of imported spreadsheet files, so it is also just fundamentally unreliable.
-    #Translated or not decision should be computed dynamically and on a line-by-line basis (raw + chosen translator engine determined from header) in order to support resume operations, do not add to metadata.
     #The number of lines in the source cell can also be determined dynamically by counting line breaks.
     #Which lines to replace in the destination can be determined dynamically.
+    #Already translated or not decision should be computed dynamically and on a line-by-line basis (raw + chosen translator engine determined from header to calculate target cell) in order to support resume operations and cache, so do not add this to metadata.
+# Metadata Decision: reserve column 3 for metadata for future use in case special processing or data is ever needed for certain types of source files, but do not use it yet since no information needs to be there to process file except for the character name and character name metadata is important enough to have its own column.
+# Old: For now use the following string:  'numberOfSourceLines_WasADictionaryUsedTrueOrFalse' ex. '2_False_'
+# New: for now use: dictionary[key]=[characterName,str(currentParagraphLineCount)]    So a dictionary containing a [list] filled with the character name and currentParagraphLineCount
+# Column 4) all translations, each with its own entry and an associated header for which type it is (Kobold+model; fairseq/sugoi)
+# Aside: For DeepL, DeepL API Free/Pro and DeepL Web should all be the same right? Free, Pro, and Web versions all support dictionaries, but doing dictionary + document translation requires pro. Documents will be parsed prior to using the API, so this limitation does not apply here, thus all DeepL translations should be the same. DeepL's native dictionary system is also unlikely to be implemented here especially considering they are hard to work with (not mutable). Edit: DeepL dictionaries might end up being implemented here after all to deal with certain special cases because that is the only way to tell the DeepL translation engine to always translate a particular string a certain way, and that is a very useful capability.
+# Potentially, koboldcpp LLM could return different models. Use the returned model header name. All data should be put in that column. Determine correct header as in: DeepL, or koboldcpp/model in a case sensitive way. More examples:
+# headers=['rawText', 'metadata', 'DeepL', 'koboldcpp/Mixtral-13B.Q8_0','Google']
 
-
-#For now use the following string:  'numberOfSourceLines_WasADictionaryUsedTrueOrFalse' ex. '2_False_'
-#Column 4) all translations, each with its own entry and an associated header for which type it is (Kobold+model;
-#for DeepL, DeepL API Free/Pro and DeepL Web should all be the same right? Free, Pro, and Web versions all support dictionaries, but doing dictionary + document translation requires pro. Documents will be parsed prior to using the API, so this limitation does not apply here, thus all DeepL translations should be the same. DeepL's native dictionary system is also unlikely to be implemented here especially considering they are hard to work with (not mutable).
-#4) potentially, koboldcpp LLM could return different models. Use the returned model header name. All data should be put in that column. Determine correct header as in: DeepL, or koboldcpp/model in a case sensitive way. More examples:
-#headers=['rawText', 'metadata', 'DeepL', 'koboldcpp/Mixtral-13B.Q8_0','Google']
 
 #Add headers
 initialHeaders=['rawText','speaker','metadata']
 mainDatabaseSpreadsheet.append(initialHeaders)
 
-#printAllTheThings(mainDatabaseSpreadsheet)
+# printAllTheThings(mainDatabaseSpreadsheet)
 
-#start parsing input file line by line
-#print(inputFileContents.encode(consoleEncoding))
-#print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
+# start parsing input file line by line
+# print(inputFileContents.encode(consoleEncoding))
+# print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
 
 
 
-#parseRawInputTextFile() accepts an (input file name, the encoding for that text file, parseFileDictionary as a Python dictionary, the character dictionary as a Python dictionary) and returns a dictionary where the key is the dialogue, and the value is a list. The first value in the list is the character name, (or None for no chara name), and the second is metadata as a string using the specified delimiter.
-#This could also be a multidimension array, such as a list full of list pairs [ [ [],[ [][][] ] ] , [ [],[ [][][] ] ] ]  because the output is highly regular, but that would allow duplicates.  Executive decision was made to disallow duplicates for files since that is correct almost always. However, it does mess with the metadata sometimes by having the speaker be potentially incorrect.
+# parseRawInputTextFile() accepts an (input file name, the encoding for that text file, parseFileDictionary as a Python dictionary, the character dictionary as a Python dictionary) and returns a dictionary where the key is the dialogue, and the value is a list. The first value in the list is the character name, (or None for no chara name), and the second is metadata as a string using the specified delimiter.
+# This could also be a multidimension array, such as a list full of list pairs [ [ [],[ [][][] ] ] , [ [],[ [][][] ] ] ]  because the output is highly regular, but that would allow duplicates.  Executive decision was made to disallow duplicates for files since that is correct almost always. However, it does mess with the metadata sometimes by having the speaker be potentially incorrect.
 temporaryDict=parseRawInputTextFile(inputFile,inputFileEncoding,parseFileDictionary, characterDictionary)
 
 temporaryDict={}        #Dictionaries do not allow duplicates, so insert all entries into a dictionary first to de-duplicate entries, then read dictionary into first column (skip first line/row in target spreadsheet)
@@ -963,20 +931,8 @@ Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #mainDatabaseWorkbook.save('backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx')
 #print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
 
-
-
-
-
-
 #once all lines are input into a dictionary, if specified, read the preDictionary.csv and perform replacements prior to submission to translation engine
-
-
 #Then run DeepL's special code to replace braces {{ }}  {{{ }}}  with special markers that the DeepL engine can escape before submission to the translation engine
-
-
-#
-
-
 
 
 #do in memory replacements for CharaNames
@@ -996,3 +952,4 @@ Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #However, when using files exported from other programs. There will be no metadata. Instead of adding a cli flag, fallback to line-by-line mode instead and warn user about it. Fallback to line by line mode should also occur if the metadata is corrupted. Is that really necessary? Lines count can be found based upon column 1 entries, and word wrap settings only need the parsedefintions file. That is sperate from translating, which can still be done using previously obtained paragraphs. Speaker will be missing.
 
 
+"""
