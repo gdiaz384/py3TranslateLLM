@@ -12,35 +12,15 @@ License:
 - The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
 
 """
-#import various libraries that py3TranslateLLM depends on
-import argparse                           #Used to add command line options.
-import os, os.path                        #Extract extension from filename, and test if file exists.
-from pathlib import Path             #Override file in file system with another and create subfolders.
-#import pathlib.Path                    #Does not work. Why not? Maybe because Path is a class and not a Path.py file? So 'from' crawls into files? Maybe from "requires" it. Like Path must be a class inside of pathlib instead of a file named Path.py. 'import' does not seem to care whether it is importing files or classes. They are both made available. But 'from' might.
-#import pathlib                             #Works.   #dir(pathlib) does list 'Path'
-import sys                                     #End program on fail condition.
-import io                                        #Manipulate files (open/read/write/close).
-#from io import IOBase               #Test if variable is a file object (an "IOBase" object).
-#import datetime                          #Used to get current date and time.
-
-#Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes.
-from collections import deque    #Used to hold rolling history of translated items to use as context for new translations.
-import requests                            #Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'  
-
-#import openpyxl                           #Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
-import resources.chocolate as chocolate #Implements openpyxl. A helper/wrapper library to aid in using openpyxl as a datastructure.
-import resources.dealWithEncoding as dealWithEncoding   #dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
-import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  #Moved most generic functions here to increase code readability and enforce function best practices.
-#from resources.py3TranslateLLMfunctions import * #Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
-
-
 #set defaults and static variables
-versionString='v0.1 - 2024Jan23 pre-alpha'
+versionString='v0.1 - 2024Jan24 pre-alpha'
 
+#Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding='utf-8'
 defaultTextEncodingForKSFiles='shift-jis'
 defaultConsoleEncodingType='utf-8'
 
+#These default paths are relative to the location of py3TranslateLLM.py, -not- relative to the current path of the command prompt.
 defaultLanguageCodesFile='resources/languageCodes.csv'
 defaultSourceLanguage=None
 #defaultSourceLanguage='Japanese'
@@ -53,21 +33,19 @@ defaultChineseLanguage='Chinese (simplified)'
 #Valid options are 'Portuguese (European)' or 'Portuguese (Brazilian)'
 defaultPortugueseLanguage='Portuguese (European)'
 
-defaultCacheFile='resources/cache.xlsx'
+defaultCacheFile='backups/cache.xlsx'
+defaultAddress='http://localhost'
 defaultKoboldCppPort=5001
 defaultSugoiPort=14366
 #defaultSugoiPort=14467
+minimumPortNumber=1
+maximumPortNumber=65535 #16 bit integer -1
+defaultPortForHTTP=80
+defaultPortForHTTPS=443
+
+defaultContextHistoryLength=4
 defaultInputEncodingErrorHandler='strict'
 #defaultOutputEncodingErrorHandler='namereplace'
-#Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
-sysVersion=int(sys.version_info[1])
-if sysVersion >= 5:
-    defaultOutputEncodingErrorHandler='namereplace'
-elif sysVersion < 5:
-    defaultOutputEncodingErrorHandler='backslashreplace'    
-else:
-    sys.exit('Unspecified error.'.encode(defaultConsoleEncodingType))
-
 
 defaultLinesThatBeginWithThisAreComments='#'
 defaultAssignmentOperatorInSettingsFile='='
@@ -81,6 +59,37 @@ translationEngines='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_w
 usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEngines+'.'
 
 
+#import various libraries that py3TranslateLLM depends on
+import argparse                           # Used to add command line options.
+import os, os.path                        # Extract extension from filename, and test if file exists.
+#from pathlib import Path           # Override file in file system with another and create subfolders.
+#import pathlib.Path                    # Does not work. Why not? Maybe because Path is a class and not a Path.py file? So 'from' crawls into files? Maybe from "requires" it. Like Path must be a class inside of pathlib instead of a file named Path.py. 'import' does not seem to care whether it is importing files or classes. They are both made available. But 'from' might.
+import pathlib                               # Works.   #dir(pathlib) does list 'Path', so just always use as pathlib.Path Constructor is Path(mystring). Remember to convert it back to a string if printing it out.
+import sys                                     # End program on fail condition.
+import io                                        # Manipulate files (open/read/write/close).
+#from io import IOBase               # Test if variable is a file object (an "IOBase" object).
+#import datetime                          # Used to get current date and time.
+
+#Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes.
+#from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
+import collections                         # Newer syntax.
+import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'  
+
+#import openpyxl                           # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
+import resources.chocolate as chocolate # Implements openpyxl. A helper/wrapper library to aid in using openpyxl as a datastructure.
+import resources.dealWithEncoding as dealWithEncoding   # dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
+import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  # Moved most generic functions here to increase code readability and enforce function best practices.
+#from resources.py3TranslateLLMfunctions import * # Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
+
+
+#Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
+sysVersion=int(sys.version_info[1])
+if sysVersion >= 5:
+    defaultOutputEncodingErrorHandler='namereplace'
+elif sysVersion < 5:
+    defaultOutputEncodingErrorHandler='backslashreplace'    
+else:
+    sys.exit('Unspecified error.'.encode(defaultConsoleEncodingType))
 
 
 # So, py3translateLLM.py also supports reading program settings from py3translateLLM.ini in addition to the command prompt.
@@ -125,6 +134,7 @@ commandLineParser.add_argument('-oc', '--overrideWithCache', help='Do not retran
 commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use the cache to fill in previously translated lines.',action='store_true')
 commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.',action='store_true')
 
+commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength),default=None,type=int)
 commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.',action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.',action='store_true')
 
@@ -160,8 +170,17 @@ preTranslationDictionary=commandLineArguments.preTranslationDictionary
 postTranslationDictionary=commandLineArguments.postTranslationDictionary
 postWritingToFileDictionary=commandLineArguments.postWritingToFileDictionary
 
+cacheFile=commandLineArguments.cacheFile
+noCache=commandLineArguments.noCache
+cacheAnyMatch=commandLineArguments.cacheAnyMatch
+overrideWithCache=commandLineArguments.overrideWithCache
+reTranslate=commandLineArguments.reTranslate
+readOnlyCache=commandLineArguments.readOnlyCache
+
+contextHistoryLength=commandLineArguments.contextHistoryLength
 lineByLineMode=commandLineArguments.lineByLineMode
 resume=commandLineArguments.resume
+
 address=commandLineArguments.address  #Must be reachable. How to test for that?
 port=commandLineArguments.port                #Port should be conditionaly guessed. If no port specified and an address was specified, then try to guess port as either 80, 443, or default settings depending upon protocol and translationEngine selected.
 
@@ -175,7 +194,7 @@ version=commandLineArguments.version
 
 
 # Basically, the final value of consoleEncoding is unclear because the settings.ini has not been read yet,
-# but it needs to be used immediately for '--version'. Add a temporary console encoding variable.
+# but it needs to be used immediately for '--version', so add a temporary console encoding variable: tempConsoleEncoding.
 # If the user specified one at the CLI, use that setting, otherwise use the hardcoded defaults.
 if commandLineArguments.consoleEncoding != None:
     tempConsoleEncoding=commandLineArguments.consoleEncoding
@@ -213,18 +232,38 @@ postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictio
 
 
 # In order to read from settings.ini, the name of the current script must first be determined.
-currentScriptName = __file__
+# Old code:
+#currentScriptName = __file__
 #currentScriptName = os.path.basename(__file__)  #Returns only the filename of the current script.
 #print('file='+__file__) #Returns filename and also the path sometimes.
 #This might error out if there is no extension, or maybe it will just return an empty string for the extension.
-currentScriptNameOnly, currentScriptExtensionOnly = os.path.splitext(currentScriptName)
-scriptSettingsFile=currentScriptNameOnly+defaultScriptSettingsFileExtension
+#currentScriptNameOnly, currentScriptExtensionOnly = os.path.splitext(currentScriptName)
+#scriptSettingsFileFullNameAndPath=currentScriptNameOnly+defaultScriptSettingsFileExtension
+
+# Newer code that focuses on using pathlib.Path() its methods:
+currentScriptPathObject = pathlib.Path( __file__ ).absolute()
+currentScriptPathOnly = str(currentScriptPathObject.parent)
+currentScriptNameWithoutPath = __file__
+currentScriptNameWithoutPathOrExt = currentScriptPathObject.stem
+currentScriptNameWithPathNoExt = currentScriptPathOnly + '/' + currentScriptNameWithoutPathOrExt
+
+backupsFolder=currentScriptPathOnly + '/backups'  #does not include last /
+scriptSettingsFileFullNameAndPath = currentScriptNameWithPathNoExt + defaultScriptSettingsFileExtension
+scriptSettingsFileNameOnly = pathlib.Path(scriptSettingsFileFullNameAndPath).name
+
+
+if (verbose == True) or (debug == True):
+    print( str(currentScriptPathObject).encode(tempConsoleEncoding) )
+    print( ('currentScriptPathOnly=' + str(currentScriptPathOnly)).encode(tempConsoleEncoding) )
+    print( ('currentScriptNameWithoutPath=' + str(currentScriptNameWithoutPath)).encode(tempConsoleEncoding) )
+    print( ('currentScriptNameWithoutPathOrExt=' + str(currentScriptNameWithoutPathOrExt)).encode(tempConsoleEncoding) )
+
 
 scriptSettingsDictionary=None
-#if exist scriptSettingsFile
-if os.path.isfile(scriptSettingsFile) == True:
-    print( ('Settings file found. Reading settings from: '+scriptSettingsFile).encode(tempConsoleEncoding) )
-    scriptSettingsDictionary=py3TranslateLLMfunctions.readSettingsFromTextFile(scriptSettingsFile,defaultTextEncoding, consoleEncoding=tempConsoleEncoding) #Other settings can be specified, but are basically completely unknown at this point, so just use hardcoded defaults instead.
+#if exist scriptSettingsFileFullNameAndPath
+if os.path.isfile(scriptSettingsFileFullNameAndPath) == True:
+    print( ('Settings file found. Reading settings from: '+scriptSettingsFileNameOnly).encode(tempConsoleEncoding) )
+    scriptSettingsDictionary=py3TranslateLLMfunctions.readSettingsFromTextFile(scriptSettingsFileFullNameAndPath,defaultTextEncoding, consoleEncoding=tempConsoleEncoding) #Other settings can be specified, but are basically completely unknown at this point, so just use hardcoded defaults instead.
 
 
 if scriptSettingsDictionary != None:
@@ -299,6 +338,7 @@ preDictionaryFileName=preTranslationDictionary
 postDictionaryFileName=postTranslationDictionary
 postWritingToFileDictionaryFileName=postWritingToFileDictionary
 
+cacheFileName=cacheFile
 
 # Now that command line options and .ini have been parsed, update settings for imported libraries.
 #The libraries must be imported using the syntax: import resources.libraryName as libraryName . Otherwise, if using the 'from libraryName import...' syntax, a copy is made which makes it (near?) impossible to update these variables.
@@ -321,6 +361,31 @@ py3TranslateLLMfunctions.outputErrorHandling=outputErrorHandling
 py3TranslateLLMfunctions.linesThatBeginWithThisAreComments=defaultLinesThatBeginWithThisAreComments
 py3TranslateLLMfunctions.assignmentOperatorInSettingsFile=defaultAssignmentOperatorInSettingsFile
 
+if fileToTranslateFileName == None:
+    sys.exit( ('Error: Please specify a --fileToTranslate (-f).').encode(consoleEncoding) )
+# Determine file paths. Will be useful later.
+fileToTranslatePathObject=pathlib.Path(fileToTranslateFileName).absolute()
+
+fileToTranslateFileExtensionOnly=fileToTranslatePathObject.suffix   # .txt  .ks  .ts .csv .xlsx .xls .ods
+fileToTranslatePathOnly=str(fileToTranslatePathObject.parent)  #does not include final /
+fileToTranslateFileNameWithoutPath=fileToTranslatePathObject.name
+fileToTranslateFileNameWithoutPathOrExt=fileToTranslatePathObject.stem
+fileToTranslateFileNameWithPathNoExt=fileToTranslatePathOnly + '/' + fileToTranslateFileNameWithoutPathOrExt
+
+#Old code:
+#fileToTranslateFileNameWithPathNoExt, fileToTranslateFileExtensionOnly = os.path.splitext(fileToTranslateFileName)
+#fileToTranslateFileNameWithPathNoExt=str(pathlib.Path(os.path.realpath(__file__)).parent)
+#fileToTranslateFileNameWithoutPathOrExt=pathlib.Path(fileToTranslateFileName).stem  #This returns a string, but Path().parent returns not-a-string.
+#currentScriptFullFileNameAndPath=os.path.realpath(__file__) #Returns a string and the full path of the currently running script including the name and extension.
+#currentScriptBasePath=str(pathlib.Path(currentScriptFullFileNameAndPath).parent) # Does not include / at the end. Path() does not mind mixing / and \ so always use /.
+
+if (verbose == True) or (debug == True):
+    print( str(fileToTranslatePathObject).encode(consoleEncoding) )
+    print( ('fileToTranslateFileExtensionOnly=' + fileToTranslateFileExtensionOnly).encode(consoleEncoding) )
+    print( ('fileToTranslatePathOnly=' + fileToTranslatePathOnly).encode(consoleEncoding) )
+    print( ('fileToTranslateFileNameWithoutPath=' + fileToTranslateFileNameWithoutPath).encode(consoleEncoding) )
+    print( ('fileToTranslateFileNameWithoutPathOrExt=' + fileToTranslateFileNameWithoutPathOrExt).encode(consoleEncoding) )
+    print( ('fileToTranslateFileNameWithPathNoExt=' + fileToTranslateFileNameWithPathNoExt).encode(consoleEncoding) )
 
 
 # Start to validate input settings and input combinations from parsed imported command line option values.
@@ -359,7 +424,7 @@ if implemented == False:
     sys.exit( ('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding) )
 
 
-# Certain files must always exist, like fileToTranslateFileName and languageCodesFileName.
+# Certain files must always exist, like fileToTranslateFileName, and usually languageCodesFileName.
 # parseSettingsFileName is only needed if read or writing to text files. Reading from text files is easy to check.
 # But how to check if writting to them? If output is .txt, .ks, .ts, then writting to text file. Output can also be based upon input. For output, parseOnly must not be specified, so this output text file check should not be checked with the parseOnly block. Alternatively: The only time parseSettingsFileName is not needed is when writting to output files.
 #Errors out if myFile does not exist.
@@ -370,38 +435,42 @@ py3TranslateLLMfunctions.verifyThisFileExists('myfile.csv','myfile.csv')
 py3TranslateLLMfunctions.verifyThisFileExists(myVar, 'myVar')
 """
 
+if languageCodesFileName == None:
+    languageCodesFileName = currentScriptPathOnly + '/' + defaultLanguageCodesFile
+
+if cacheFileName != None:
+    #if a cache file was specified, then verify the extension is .xlsx
+    if pathlib.Path(str(cacheFileName)).suffix != '.xlsx':
+        sys.exit( ('\n Error: cacheFileName must have a .xlsx extension: '+str(cacheFileName)).encode(consoleEncoding) )
+elif cacheFileName == None:
+    cacheFileName = currentScriptPathOnly + '/' + defaultCacheFile
+cachePathOnly=str(pathlib.Path(cacheFileName).parent)
+
+
 py3TranslateLLMfunctions.verifyThisFileExists(fileToTranslateFileName,'fileToTranslateFileName')
-py3TranslateLLMfunctions.verifyThisFileExists(languageCodesFileName,'languageCodesFileName')
+#Technically, languageCodesFileName only needs to be present if the mode is not parseOnly.
+if mode != 'parseOnly':
+    py3TranslateLLMfunctions.verifyThisFileExists(languageCodesFileName,'languageCodesFileName')
+    #The cache file does not need to exist. if it does not exist, it will be created dynamically when it is needed as a Strawberry().
 
 
-# Either a raw.unparsed.txt must be specified or a raw.untranslated.csv if selecting one of the other engines.
-
-# Check for NMT without address option. If NMT with address, then handle port assignment. Warn if defaulting to specific port.
-
-#Spreadsheet formats are not valid with parseOnly command, but some valid file must be specified.
-#Therefore, that file must always have an extension due to overloading of --inputFile. Not necessarily. parseOnly means the extension could be non-existant but input is still clarified as 100% a text file. Therefore, #split extension code should retun None to fileToTranslateFileNameExtensionOnly in those cases, and that not signify an error during parseOnly. Question: how does os.path.splitext(fileName) actually work? Answer: If the extension does not exist, then it returns an empty string '' object for the extension. A None comparison will not work, but...   if myFileExtOnly == '':   ... will return true and conditionally execute.
-
-#this top comparison, fileToTranslateFileName == None, should never trigger because fileToTranslateFileName is a required input for this program and the argparse library will exit() if it is not present #Edit: Changed to read program settings from .ini, so fileToTranslateFileName will now not always be specified at the command line. It might be None now. #Edit (again): moved this check to function verifyThisFileExists(myFile,nameOfFileToOutputInCaseOfError)
-#if fileToTranslateFileName == None:
-#    sys.exit(('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding))
+#sys.exit( ('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding) )
 
 
-fileToTranslateFileNameWithPathNoExt, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)
-fileToTranslateFileNameWithoutPathOrExt=Path(fileToTranslateFileName).stem
-
-if fileToTranslateFileNameExtensionOnly == '.csv':
+if fileToTranslateFileExtensionOnly == '.csv':
     fileToTranslateIsASpreadsheet=True
-elif fileToTranslateFileNameExtensionOnly == '.xlsx':
+elif fileToTranslateFileExtensionOnly == '.xlsx':
     fileToTranslateIsASpreadsheet=True
-elif fileToTranslateFileNameExtensionOnly == '.xls':
+elif fileToTranslateFileExtensionOnly == '.xls':
     fileToTranslateIsASpreadsheet=True
-elif fileToTranslateFileNameExtensionOnly == '.ods':
+elif fileToTranslateFileExtensionOnly == '.ods':
     fileToTranslateIsASpreadsheet=True
 else:
     fileToTranslateIsASpreadsheet=False
 #fileToTranslateFileName does not need to have an extension. If it has no extension, then it is assumed to be a text file and will thus require a parsefile.
 
 
+# Either a raw.unparsed.txt must be specified or a raw.untranslated.csv if selecting one of the other engines.
 #if using parseOnly, a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist. 
 if mode == 'parseOnly':
     #check if valid parsing definition file exists 'parseKirikiri.txt'
@@ -419,23 +488,31 @@ if mode == 'parseOnly':
         sys.exit( ('parseOnly is only valid with text files. It is not valid with spreadsheets: '+str(fileToTranslateFileName)).encode(consoleEncoding) )
 
 
+# Check for local LLMs/NMTs fairseq/sugoi without address option. If LLM/NMT with address, then handle port assignment. Warn if defaulting to specific port.
+
 # If using koboldcpp, an address must be specified,
 # and a prompt file must be specified when using LLMs.
 if mode == 'koboldcpp':
     if address == None:
-        sys.exit( ('An address must be specified if using koboldcpp.').encode(consoleEncoding) )
+        address=defaultAddress
+        print( ('Warning: No address was specified for: '+ mode +'. Defaulting to: '+defaultAddress+' This is probably incorrect.').encode(consoleEncoding) )
+        #sys.exit( ('An address must be specified if using koboldcpp.').encode(consoleEncoding) )
 # if port not specified, set port to kobold default port
     if port == None:
-        print( ('Warning: No port specified for koboldcpp. Using default port of'+str(defaultKoboldCppPort)).encode(consoleEncoding) )
+        print( ('Warning: No port specified for koboldcpp. Using default port of '+str(defaultKoboldCppPort)).encode(consoleEncoding) )
         port=defaultKoboldCppPort
     elif port != None:
+        #This port verification code should probably be merged to a function. Maybe the local address code too.
+        #But it is already written and working. Will worry about it later.
         try:
             port=int(port)
-            assert port > 0
-            assert port <= 65535
+            assert port >= minimumPortNumber #1
+            assert port <= maximumPortNumber #65535
         except:
-            sys.exit( ('Unable to verify port number: \''+str(port)+'\' Must be 1-65535.').encode(consoleEncoding) )
+            sys.exit( ('Unable to verify port number: \''+str(port)+'\' Must be '+ str(minimumPortNumber)+'-' + str(maximumPortNumber) + '.').encode(consoleEncoding) )
+    #print('pie')
     py3TranslateLLMfunctions.verifyThisFileExists(promptFileName, 'promptFileName')
+
 
 # if using deepl_api_free, pro
 if (mode == 'deepl_api_free') or (mode == 'deepl_api_pro'):
@@ -458,25 +535,28 @@ if (mode == 'deepl_api_free') or (mode == 'deepl_api_pro'):
 # if using fairseq, address must be specified
 if (mode == 'fairseq'):
     if address == None:
-        sys.exit( ('Error: Please specify address for fairseq translation engine. Example: http://localhost').encode(consoleEncoding) )
+        address=defaultAddress
+        print( ('Warning: No address was specified for: '+ mode +'. Defaulting to: '+defaultAddress+' This is probably incorrect.').encode(consoleEncoding) )
+        #sys.exit( ('Error: Please specify address for fairseq translation engine. Example: http://localhost').encode(consoleEncoding) )
     if port == None:
         # try to guess port from protocol and warn user
         #split address using : and return everything before:
         protocol=address.split(':')[0]
         if protocol.lower() == 'http':
-            port=80
+            port=defaultPortForHTTP
         elif protocol.lower() == 'https':
-            port=443
+            port=defaultPortForHTTPS
         else:
             sys.exit( ('Port not specified and unable to guess port from protocol \''+protocol+'\' of address \''+address+'\' Please specify a valid port number between 1-65535.').encode(consoleEncoding) )
         print( ('Warning: No port was specified. Defaulting to port \''+port+'\' based on protocol \''+protocol+'\'. This is probably incorrect.') )
     elif port != None:
+        #This port verification code should probably be merged to a function. Maybe the local address code too.
         try:
             port=int(port)
-            assert port > 0
-            assert port <= 65535
+            assert port >= minimumPortNumber #1
+            assert port <= maximumPortNumber #65535
         except:
-            sys.exit( ('Unable to verify port number: \''+str(port)+'\' Must be 1-65535.').encode(consoleEncoding) )
+            sys.exit( ('Unable to verify port number: \'' + str(port) + '\' Must be '+ str(minimumPortNumber)+'-' + str(maximumPortNumber) + '.').encode(consoleEncoding) )
 
 
 # if using sugoi, address must be specified.
@@ -484,17 +564,20 @@ if (mode == 'fairseq'):
 # Change mode to fairseq at the end.
 if (mode == 'sugoi'):
     if address == None:
-        sys.exit( ('Error: Please specify address for sugoi translation engine. Example: http://localhost').encode(consoleEncoding) )
+        address=defaultAddress
+        print( ('Warning: No address was specified for: '+ mode +'. Defaulting to: '+defaultAddress+' This is probably incorrect.').encode(consoleEncoding) )
+        #sys.exit( ('Error: Please specify address for sugoi translation engine. Example: http://localhost').encode(consoleEncoding) )
     if port == None:
-        print( ('Warning: No port specified for sugoi translation engine. Using default port of: '+str(defaultSugoiPort)).encode(consoleEncoding) )
+        print( ('Warning: No port specified for sugoi translation engine. Using default port of: ' + str(defaultSugoiPort)).encode(consoleEncoding) )
         port=defaultSugoiPort
     elif port != None:
+        #This port verification code should probably be merged to a function. Maybe the local address code too.
         try:
             port=int(port)
-            assert port > 0
-            assert port <= 65535
+            assert port >= minimumPortNumber #1
+            assert port <= maximumPortNumber #65535
         except:
-            sys.exit( ('Unable to verify port number: \''+str(port)+'\' Must be 1-65535.').encode(consoleEncoding) )
+            sys.exit( ('Unable to verify port number: \''+str(port)+'\' Must be '+ str(minimumPortNumber)+'-' + str(maximumPortNumber) + '.').encode(consoleEncoding) )
     mode='fairseq'
 
 
@@ -507,8 +590,8 @@ if outputFileName == None:
     outputFileName=fileToTranslateFileName
     #print('pie')
 
-outputFileNameWithoutPathOrExt=Path(outputFileName).stem
-outputFileExtensionOnly=Path(outputFileName).suffix
+outputFileNameWithoutPathOrExt=pathlib.Path(outputFileName).stem
+outputFileExtensionOnly=pathlib.Path(outputFileName).suffix
 
 if sourceLanguageRaw == None:
     sourceLanguageRaw = defaultSourceLanguage
@@ -536,6 +619,13 @@ elif (targetLanguageRaw != None):
         targetLanguageRaw='Spanish'
 
 
+if contextHistoryLength == None:
+    contextHistoryLength=defaultContextHistoryLength
+elif contextHistoryLength != None:
+    #if contextHistoryLength was specified, then assert that it is a number.
+    contextHistoryLength=int(contextHistoryLength)
+
+
 #Set encodings Last
 ##Set Encodings for files using dealWithEncoding.py helper library as dealWithEncoding.ofThisFile(myfile). 
 
@@ -544,12 +634,12 @@ elif (targetLanguageRaw != None):
 #If an encoding was not specified for inputFile, and the extension is .ks, then default to shift-jis encoding and warn user of change.
 #if an input file name was specified, then
 if fileToTranslateFileName != None:
-    #fileToTranslateFileNameWithPathNoExt, fileToTranslateFileNameExtensionOnly = os.path.splitext(fileToTranslateFileName)#Moved further up, made global/module wide. #Edit, moved into a function that is always called. Also checks for == None condition and errors out the program if not specified.
+    #fileToTranslateFileNameWithPathNoExt, fileToTranslateFileExtensionOnly = os.path.splitext(fileToTranslateFileName)#Moved further up, made global/module wide. #Edit, moved into a function that is always called. Also checks for == None condition and errors out the program if not specified.
     #print(fileToTranslateFileNameWithPathNoExt)
-    #print('Extension:'+fileToTranslateFileNameExtensionOnly)
+    #print('Extension:'+fileToTranslateFileExtensionOnly)
     #if no encoding was specified, then...
     if commandLineArguments.fileToTranslateEncoding == None:
-        if fileToTranslateFileNameExtensionOnly == '.ks':
+        if fileToTranslateFileExtensionOnly == '.ks':
             fileToTranslateEncoding=defaultTextEncodingForKSFiles #set encoding to shift-jis
             print(('Warning: KAG3 (.ks) input file specified, but no encoding was specified. Defaulting to '+defaultTextEncodingForKSFiles+' instead of '+defaultTextEncoding+'. If this behavior is not desired or produces corrupt input, please specify an encoding using --fileToTranslateEncoding (-fe) option instead.').encode(consoleEncoding))
         else:
@@ -591,10 +681,8 @@ postDictionaryEncoding = dealWithEncoding.ofThisFile(postDictionaryFileName, pos
 postWritingToFileDictionaryEncoding = dealWithEncoding.ofThisFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding, defaultTextEncoding)
 
 
-#Now that input validation is /finally/ done, define functions. #Edit: Moved functions to resources.py3TranslateLLMfunctions.py to improve code readability.
-###### Define various helper functions ###### 
+##### Input validation is /finally/ done  #####
 
-##### End Functions list #####
 
 if (verbose == True) or (debug == True):
     print( ('verbose='+str(verbose)).encode(consoleEncoding) )
@@ -602,7 +690,7 @@ if (verbose == True) or (debug == True):
     print( ('sourceLanguageRaw='+str(sourceLanguageRaw)).encode(consoleEncoding) )
     print( ('targetLanguageRaw='+str(targetLanguageRaw)).encode(consoleEncoding) )
 
-#Instantiate basket of Strawberries. Start with languageCodes.csv Edit: Use Python dictionaries instead for the dictionary.csv files.
+#Instantiate basket of Strawberries. Start with languageCodes.csv  #Edit: Only languageCodes.csv is a Strawberry(). For the various dictionary.csv files, use Python dictionaries instead.
 #languageCodes.csv could also be a dictionary or multidimension array, but then searching through it would be annoying, so leave as a Strawberry.
 #Read in and process languageCodes.csv
 #Format specificiation for languageCodes.csv
@@ -622,62 +710,64 @@ if (verbose == True) or (debug == True):
 #Examples for 5-7: English, EN, ENG; Portuguese, PT-PT, POR
 #Each row/entry is/has eight columns total.
 
+#Old code:
 #languageCodesWorkbook = chocolate.importFromCSV(languageCodesFileName)
 #languageCodesSpreadsheet = languageCodesWorkbook.active
 
-languageCodesSpreadsheet=chocolate.Strawberry(languageCodesFileName,languageCodesEncoding,ignoreWhitespaceForCSV=True)
+# skip reading languageCodesFileName if mode is parseOnly.
+if mode != 'parseOnly':
+    languageCodesSpreadsheet=chocolate.Strawberry(languageCodesFileName,languageCodesEncoding,ignoreWhitespaceForCSV=True)
 
-#replace this code with dedicated search functions from chocolate
-#use....chocolate.searchColumnsCaseInsensitive(spreadsheet, searchTerm)
-#languageCodesSpreadsheet
+    #replace this code with dedicated search functions from chocolate
+    #use....chocolate.searchColumnsCaseInsensitive(spreadsheet, searchTerm)
+    #languageCodesSpreadsheet
 
-#Source language is optional.
-if sourceLanguageRaw != None:
-    #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('lav')
-    #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('japanese')
-    sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(sourceLanguageRaw)
+    #Source language is optional.
+    if sourceLanguageRaw != None:
+        #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('lav')
+        #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('japanese')
+        sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(sourceLanguageRaw)
 
-    if (sourceLanguageCellRow == None) or (sourceLanguageCellColumn == None):
-        sys.exit( ('Error: Unable to find source language \''+str(sourceLanguageRaw)+'\' in file: '+ str(languageCodesFileName)).encode(consoleEncoding) )
+        if (sourceLanguageCellRow == None) or (sourceLanguageCellColumn == None):
+            sys.exit( ('Error: Unable to find source language \''+str(sourceLanguageRaw)+'\' in file: '+ str(languageCodesFileName)).encode(consoleEncoding) )
 
-    print( ('Using sourceLanguage \''+sourceLanguageRaw+'\' found at \''+str(sourceLanguageCellColumn)+str(sourceLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
+        print( ('Using sourceLanguage \''+sourceLanguageRaw+'\' found at \''+str(sourceLanguageCellColumn)+str(sourceLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
+
+        sourceLanguageFullRow = languageCodesSpreadsheet.getRow(sourceLanguageCellRow)
+        if debug == True:
+            print( str(sourceLanguageFullRow).encode(consoleEncoding) )
+
+        internalSourceLanguageName=sourceLanguageFullRow[0]
+        internalSourceLanguageTwoCode=sourceLanguageFullRow[1]
+        internalSourceLanguageThreeCode=sourceLanguageFullRow[2]
+        if debug == True:
+            print( ('internalSourceLanguageName='+internalSourceLanguageName).encode(consoleEncoding) )
+            print( ('internalSourceLanguageTwoCode='+internalSourceLanguageTwoCode).encode(consoleEncoding) )
+            print( ('internalSourceLanguageThreeCode='+internalSourceLanguageThreeCode).encode(consoleEncoding) )
+
+    #Target language is optional when using parseOnly mode.
+    if targetLanguageRaw != None:
+        #targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('pie')
+        targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(targetLanguageRaw)
+        if (targetLanguageCellRow == None) or (targetLanguageCellColumn == None):
+            sys.exit( ('Error: Unable to find target language \''+targetLanguageRaw+'\' in file: '+ languageCodesFileName).encode(consoleEncoding) )
+
+        print( ('Using targetLanguage \''+targetLanguageRaw+'\' found at \''+str(targetLanguageCellColumn)+str(targetLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
+
+        targetLanguageFullRow = languageCodesSpreadsheet.getRow(targetLanguageCellRow)
+        if debug == True:
+            print( str(targetLanguageFullRow).encode(consoleEncoding) )
+
+        internalDestinationLanguageName=targetLanguageFullRow[0]
+        internalDestinationLanguageTwoCode=targetLanguageFullRow[1]
+        internalDestinationLanguageThreeCode=targetLanguageFullRow[2]
+        if debug == True:
+            print( ('internalDestinationLanguageName='+internalDestinationLanguageName).encode(consoleEncoding) )
+            print( ('internalDestinationLanguageTwoCode='+internalDestinationLanguageTwoCode).encode(consoleEncoding) )
+            print( ('internalDestinationLanguageThreeCode='+internalDestinationLanguageThreeCode).encode(consoleEncoding) )
 
 
-    sourceLanguageFullRow = languageCodesSpreadsheet.getRow(sourceLanguageCellRow)
-    if debug == True:
-        print( str(sourceLanguageFullRow).encode(consoleEncoding) )
-
-    internalSourceLanguageName=sourceLanguageFullRow[0]
-    internalSourceLanguageTwoCode=sourceLanguageFullRow[1]
-    internalSourceLanguageThreeCode=sourceLanguageFullRow[2]
-    if debug == True:
-        print( ('internalSourceLanguageName='+internalSourceLanguageName).encode(consoleEncoding) )
-        print( ('internalSourceLanguageTwoCode='+internalSourceLanguageTwoCode).encode(consoleEncoding) )
-        print( ('internalSourceLanguageThreeCode='+internalSourceLanguageThreeCode).encode(consoleEncoding) )
-
-#Target language is optional when using parseOnly mode.
-if targetLanguageRaw != None:
-    #targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive('pie')
-    targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive(targetLanguageRaw)
-    if (targetLanguageCellRow == None) or (targetLanguageCellColumn == None):
-        sys.exit( ('Error: Unable to find target language \''+targetLanguageRaw+'\' in file: '+ languageCodesFileName).encode(consoleEncoding) )
-
-    print( ('Using targetLanguage \''+targetLanguageRaw+'\' found at \''+str(targetLanguageCellColumn)+str(targetLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
-
-    targetLanguageFullRow = languageCodesSpreadsheet.getRow(targetLanguageCellRow)
-    if debug == True:
-        print( str(targetLanguageFullRow).encode(consoleEncoding) )
-
-    internalDestinationLanguageName=targetLanguageFullRow[0]
-    internalDestinationLanguageTwoCode=targetLanguageFullRow[1]
-    internalDestinationLanguageThreeCode=targetLanguageFullRow[2]
-    if debug == True:
-        print( ('internalDestinationLanguageName='+internalDestinationLanguageName).encode(consoleEncoding) )
-        print( ('internalDestinationLanguageTwoCode='+internalDestinationLanguageTwoCode).encode(consoleEncoding) )
-        print( ('internalDestinationLanguageThreeCode='+internalDestinationLanguageThreeCode).encode(consoleEncoding) )
-
-
-# Read in all dictionaries.
+# Read in all other dictionaries.
 # charaNamesDictionaryFileName, preDictionaryFileName, postDictionaryFileName, postWritingToFileDictionaryFileName
 
 # read in character dictionary
@@ -702,7 +792,7 @@ postWritingToFileDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(
 if debug == True:
     print( ('postWritingToFileDictionary='+str(postWritingToFileDictionary)).encode(consoleEncoding) )
 
-    
+
 #if debug == True:
 #    print( ('parseSettingsDictionary='+str(parseSettingsDictionary)).encode(consoleEncoding) )
 
@@ -731,15 +821,16 @@ elif fileToTranslateIsASpreadsheet != True:
 #py3TranslateLLMfunctions.parseRawInputTextFile
 
 #Before doing anything, just blindly create a backup.
-backupFolder='backups/' + py3TranslateLLMfunctions.getYearMonthAndDay()
-Path( backupFolder ).mkdir(parents=True, exist_ok=True)
-#mainDatabaseWorkbook.save('backups/'+py3TranslateLLMfunctions.getYearMonthAndDay()+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx')
-fullOutputPath=backupFolder + '/'+ fileToTranslateFileNameWithoutPathOrExt +'.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
-mainSpreadsheet.exportToXLSX( fullOutputPath )
-#print( ('Wrote backup to: '+fullOutputPath).encode(consoleEncoding) )
+#backupsFolder does not have / at the end
+backupsFolderWithDate=backupsFolder + '/' + py3TranslateLLMfunctions.getYearMonthAndDay()
+pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
+#mainDatabaseWorkbook.save( 'backups/' + py3TranslateLLMfunctions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
+backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFileNameWithoutPathOrExt +'.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
+mainSpreadsheet.exportToXLSX( backupsFilePathWithNameAndDate )
+#print( ('Wrote backup to: ' + backupsFilePathWithNameAndDate).encode(consoleEncoding) )
 
 if debug == True:
-    print('fileToTranslateFileNameWithoutPathOrExt='+fileToTranslateFileNameWithoutPathOrExt)
+    print( ('fileToTranslateFileNameWithoutPathOrExt=' + fileToTranslateFileNameWithoutPathOrExt).encode(consoleEncoding) )
     print( ( 'Today=' + py3TranslateLLMfunctions.getYearMonthAndDay() ).encode(consoleEncoding) )
     print( ( 'Yesterday=' + py3TranslateLLMfunctions.getYesterdaysDate() ).encode(consoleEncoding) )
     print( ( 'CurrentTime=' + py3TranslateLLMfunctions.getCurrentTime() ).encode(consoleEncoding) )
@@ -765,23 +856,43 @@ if mode == 'parseOnly':
     sys.exit( 'Work complete.'.encode(consoleEncoding) )
 
 #Now need to translate stuff.
-#Initialize cache.xlsx file under backups/
-    #Has same structure as mainSpreadsheet except for no speaker and no metadata. Multiple columns with each one.
-    #if present, Read in cache into a Strawberry()
-    #otherwise if does not exist yet, create it.
 
-#Implement KoboldAPI first, then DeepL, then Sugoi.
-#KoboldAPI must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
+#First, initialize cache.xlsx file under backups/
+#Has same structure as mainSpreadsheet except for no speaker and no metadata. Multiple columns with each one.
+#if the path for cache does not exist, then create it.
+pathlib.Path( cachePathOnly ).mkdir( parents = True, exist_ok = True )
+
+if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == True:
+    #if present, read cache file into a Strawberry()
+    cache=chocolate.Strawberry(myFileName=cacheFileName, myFileNameEncoding=defaultTextEncoding, createNew=False)
+if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == False:
+    #otherwise if does not exist yet, create it.
+     #Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
+    cache=chocolate.Strawberry(myFileName=cacheFileName,myFileNameEncoding=defaultTextEncoding,createNew=True)
+    #Since the Strawberry is brand new, add header row.
+    cache.appendRow(['rawText'])
+    cache.exportToXLSX(cacheFileName)
+
+if (verbose == True) or (debug == True):
+    cache.printAllTheThings()
+
+#mainSpreadsheet=chocolate.Strawberry(fileToTranslateFileName, fileToTranslateEncoding)   cacheFileName
+
+# Implement KoboldAPI first, then DeepL, then Sugoi.
+# KoboldAPI must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
     #if not exist model in main spreadsheet,
     #then add it to headers and return current column for model.
     #else, return current column for model.
-#check cache as well.
+# Check cache as well.
     #if not exist model in cache,
     #then add it to headers and return the cache's column for model.
     #else, return the cache's column for model.
 
-#DeepL has already been imported, and it must have an API key. (already checked for)
-#check current engine. fairseq server must be reachable.
+# DeepL has already been imported, and it must have an API key. (already checked for)
+    #Must have internet access then. How to check?
+
+# Check current engine. fairseq server must be reachable.
+    #
 
 #Now have two column letters for both currentModelColumn and currentCacheColumn.
 #currentCacheColumn can be None if cache is disabled. cache might also be set to read only mode.
@@ -834,13 +945,6 @@ if mode == 'parseOnly':
 sys.exit('end reached')
 """
 
-
-
-#debug code
-#print(inputFileHandle.read().encode(consoleEncoding))
-#inputFileHandle.close()  #tidy up
-
-
 #CharaNamesDictionary time to shine
 CharacterNames=['[＠クロエ]','Chloe']#change this to a dictionary
 #If an ignored line starts with a character name, that could create problems, so swap names first, then parse lines into main database.
@@ -854,7 +958,6 @@ CharacterNames=['[＠クロエ]','Chloe']#change this to a dictionary
 #initialize main data structure
 #mainDatabaseWorkbook = Workbook()
 #mainDatabaseSpreadsheet = mainDatabaseWorkbook.active
-
 
 #This will hold raw untranslated text, number of lines each entry was derived from, and columns containing maybe translated data. Maximum columns supported = 9[?]. Columns 0 and 1 are reserved for Raw untranslated text and [1] is reserved for the number of lines that column 0 represents, even if it is always 1 because line-by-line parsing (lineByLineMode) is specified.
 #Alternatively, lineByLineMode can instead specify to feed each line into the translator but the paragraphDelimiter=emptyLine can support multiple lines in the main data structure. That might be more flexible, or make things worse. Leave it to user to decide on a case-by-case basis by allowing for this possibility.
@@ -927,7 +1030,7 @@ if debug == True:
 print('')
 #print(('creating backup at: backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx').encode(consoleEncoding))
 print('')
-Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
+pathlib.Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #mainDatabaseWorkbook.save('backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx')
 #print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
 

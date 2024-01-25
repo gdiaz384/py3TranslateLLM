@@ -21,6 +21,9 @@ assignmentOperatorInSettingsFile='='
 inputErrorHandling='strict'
 #outputErrorHandling='namereplace'
 
+translationEngines='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, fairseq, sugoi'
+usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+ translationEngines + '.'
+
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os, os.path                      #Extract extension from filename, and test if file exists.
@@ -57,6 +60,7 @@ else:
     sys.exit('Unspecified error.'.encode(defaultConsoleEncodingType))
 
 
+#Question: how does os.path.splitext(fileName) actually work? Answer: If the extension does not exist, then it returns an empty string '' object for the extension. A None comparison will not work, but...   if myFileExtOnly == '':   ... will return true and conditionally execute.
 #Returns True or False depending upon if file exists or not.
 def checkIfThisFileExists(myFile):
     #Check if name of file was never set.
@@ -74,10 +78,14 @@ def checkIfThisFileExists(myFile):
 #Errors out if myFile does not exist.
 def verifyThisFileExists(myFile,nameOfFileToOutputInCaseOfError=None):
     #Check if name of file was never set.
+    #print('pie')
+    #print(myFile)
     if myFile == None:
-        sys.exit(('\n Error: Please specify a valid file for: '+str(nameOfFileToOutputInCaseOfError) + usageHelp).encode(consoleEncoding))
+        #print('pie')
+        sys.exit( ('Error: Please specify a valid file for: ' + str(nameOfFileToOutputInCaseOfError) + usageHelp).encode(consoleEncoding))
     #Check if file exists. Example: 'scratchpad/ks_testFiles/A01.ks'
     if os.path.isfile(myFile) != True:
+        #print('pie')
         sys.exit( (' Error: Unable to find file \'' + str(nameOfFileToOutputInCaseOfError) + '\' ' + usageHelp).encode(consoleEncoding) )
 #Usage:
 #verifyThisFileExists('myfile.csv','myfile.csv')

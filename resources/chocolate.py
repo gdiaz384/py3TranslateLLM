@@ -55,42 +55,52 @@ else:
 
 #wrapper class for spreadsheet data structure
 class Strawberry:
-    def __init__(self, myFileName=None, myFileNameEncoding=None, ignoreWhitespaceForCSV=False,parseSettingsDict=None,charaNamesDict=None): #self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. Quirk: It can be different string/word for each method and they all still refer to the same object.
+    #self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
+    #Quirk: It can be different string/word for each method and they all still refer to the same object.
+    def __init__(self, myFileName=None, myFileNameEncoding=None, ignoreWhitespaceForCSV=False,parseSettingsDict=None,charaNamesDict=None,createNew=False): 
         self.workbook = openpyxl.Workbook()
         self.spreadsheet = self.workbook.active
+
         if myFileName != None:
             if myFileNameEncoding == None:
-                #Actually, the encoding might be None for the binary files. No. Then they should have their encodings specified at the command prompt or settings.ini file.
+                #Actually, the encoding might be None for the binary spreadhsset files. No. Then they should have their encodings specified at the command prompt or settings.ini file or get set to the default value.
                 sys.exit( ('Please specify an encoding for: '+myFileName).encode(consoleEncoding) )
+
             #Then find the extension of the file.
             myFileNameOnly, myFileExtensionOnly = os.path.splitext(myFileName)
+
             #If there is no extension, then crash.
             if myFileExtensionOnly == '':
                 sys.exit(   ('Warning: Cannot instantiate class using a file that lacks an extension. Reference:\''+myFileName+'\'').encode(consoleEncoding)   )
-            #Check to make sure file exists.
-            #If file does not exist, then crash.
-            if os.path.isfile(myFileName) != True:
-                sys.exit(('Error: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))
-            else:
-                #add headers to spreadsheet.
-                self.appendRow(['rawText', 'speaker', 'metadata'])
-            #If extension = .csv, then call importFromCSV(myFileName)
-            if myFileExtensionOnly == '.csv':
-                self.importFromCSV(myFileName, myFileNameEncoding, ignoreWhitespaceForCSV)
-            #if extension = .xlsx, then call importFromXLSX(myFileName)
-            elif myFileExtensionOnly == '.xlsx':
-                self.importFromXLSX(myFileName, myFileNameEncoding)
-            elif myFileExtensionOnly == '.xls':
-                self.importFromXLS(myFileName, myFileNameEncoding)
-            elif myFileExtensionOnly == '.ods':
-                self.importFromODS(myFileName, myFileNameEncoding)
-            else:
-                #Else the file must be a text file to instantiate a class with. However, a parse file is required for that.
-                if parseSettingsDict == None:
-                    sys.exit(('Warning: Cannot instantiate class using file with unknown extension:'+myFileExtensionOnly+' and no parseSettingsDictionary. Reference:\''+myFileName+'\'').encode(consoleEncoding))
+
+            #createNew=True means that the Strawberry() will be created in memory instead of from a file, so do not try to import the contents from a file.
+            #createNew == False means import the base contents for Strawberry() from a file.
+            if createNew == False:
+                #Check to make sure file exists.
+                #If file does not exist, then crash.
+                if os.path.isfile(myFileName) != True:
+                    sys.exit(('Error: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))   
+
+                #If extension = .csv, then call importFromCSV(myFileName)
+                if myFileExtensionOnly == '.csv':
+                    self.importFromCSV(myFileName, myFileNameEncoding, ignoreWhitespaceForCSV)
+                #if extension = .xlsx, then call importFromXLSX(myFileName)
+                elif myFileExtensionOnly == '.xlsx':
+                    self.importFromXLSX(myFileName, myFileNameEncoding)
+                elif myFileExtensionOnly == '.xls':
+                    self.importFromXLS(myFileName, myFileNameEncoding)
+                elif myFileExtensionOnly == '.ods':
+                    self.importFromODS(myFileName, myFileNameEncoding)
                 else:
-                    #print('pie')
-                    self.importFromTextFile(myFileName,myFileNameEncoding,parseSettingsDict,charaNamesDict)
+                    #Else the file must be a text file to instantiate a class with. However, a parse file is required for that.
+                    if parseSettingsDict == None:
+                        sys.exit(('Warning: Cannot instantiate class using file with unknown extension:'+myFileExtensionOnly+' and no parseSettingsDictionary. Reference:\''+myFileName+'\'').encode(consoleEncoding))
+                    else:
+                        #print('pie')
+                        #Since the Strawberry is being initalized from raw text data, add header row.
+                        #Strawberries imported from external sources or from spreadsheets have the first row reserved for headers, so it should already be present
+                        self.appendRow(['rawText', 'speaker', 'metadata'])
+                        self.importFromTextFile(myFileName,myFileNameEncoding,parseSettingsDict,charaNamesDict)
 
     def __str__(self):
         #maybe return the headers from the spreadsheet?
@@ -308,7 +318,7 @@ class Strawberry:
             temp=''
             for cell in row:
                 temp=temp+','+str(cell)
-            print(temp[1:].encode(consoleEncoding))#ignore first , in output
+            print(str(temp[1:]).encode(consoleEncoding))#ignore first , in output
 
     #Old example: printAllTheThings(mySpreadsheet)
     #New syntax: 
@@ -392,6 +402,9 @@ class Strawberry:
             thisLineIsValid=True
             # if the line is empty, then always skip it regardless of paragraphDelimiter == emptyLine or newLine
             # Empty lines signify a new paragraph start, or it would be too difficult to tell when one paragraph ends and another starts.
+            #if the newLine after .strip() == '' #an empty string
+                #then end of paragraph reached. Commit any changes to temporaryString if there are any
+                #and continue to next line of loop
             if myLine.strip()[:1] == '':
                 thisLineIsValid=False
                 #if paragraphDelimiter == 'emptyLine': #Old code.  if paragraphDelimiter='newLine', then this is the same as line-by-line mode, right?
@@ -401,18 +414,12 @@ class Strawberry:
                 # ignoreLinesThatStartWith is part of the settings dictionary
                 for i in parseSettingsDict['ignoreLinesThatStartWith']:
                     if myLine.strip()[:1] == i:   #This should strip whitespace first, and then compare because sometimes dialogue can be indented but still be valid. Valid syntax: myLine.strip()[:1] 
+                        thisLineIsValid=False
                         #It is possible that this line is still valid if the first non-whitespace characters in the line are an entry from the charaname dictionary.
-                        #TODO. Need to check for this.
+
                         #This will print the full string without returning an error. Use this logic to do a string comparison of myLine with the keys in characterDictionary.
                         #x = 'pie2'
                         #print(x[:9])
-                        thisLineIsValid=False
-
-#                for i in ignoreLinesThatStartWith:
-#                    if myLine.strip()[:1] == i:
-#                        print('matching Value: \''+i+'\'')
-#                        thisLineIsValid=False
-
                         if charaNamesDict != None:
                             #myDict={'[＠クロエ]':'Chloe'}
                             for j,k in charaNamesDict.items():
@@ -429,10 +436,6 @@ class Strawberry:
                                             print( ('Re-adding line: '+myLine.strip() ).encode(consoleEncoding) )
                                         thisLineIsValid=True
 
-                            #There is some code at the bottom of the main .py that will need to be integrated into this spot.
-
-
-
             if thisLineIsValid == False: 
                 #then commit any currently working string to databaseDatastructure, add to temporary dictionary to be added later
                 if temporaryString != None:
@@ -448,17 +451,14 @@ class Strawberry:
             #while myLine[:1] != the first character is not an ignore character, #while the line is valid to feed in as input, then
             elif thisLineIsValid == True:
 
-                #if the newLine after .strip() == '' #an empty string
-                    #then end of paragraph reached. Commit any changes to temporaryString if there are any
-                    #and break out of loop
-                #if temporaryString is not empty, then append \n to temporaryString, and
+                #if temporaryString is not empty, then append \n to temporaryString, and myLine
                 if temporaryString != None:
-                    #then append \n first, and then add line to temporaryString
+                    # append \n first, and then add line to temporaryString
                     temporaryString=temporaryString+'\n'+myLine.strip()
                     #increment currentParagraphLineCount by 1
                     currentParagraphLineCount += 1
-                #else if temporaryString is currently empty
 
+                #else if temporaryString is currently empty
                 elif temporaryString == None:
                     #then just append to temporaryString without \n
                     temporaryString = myLine.strip()
@@ -467,8 +467,8 @@ class Strawberry:
                 else:
                     #print('pie')
                     sys.exit('Unspecified error.'.encode(consoleEncoding))
-                #if max paragraph limit has been reached
 
+                #if max paragraph limit has been reached
                 if (currentParagraphLineCount >= int( parseSettingsDict['maximumNumberOfLinesPerParagraph'] ) ) or (parseSettingsDict['paragraphDelimiter'] == 'newLine'):  
                     #then commit currently working string to databaseDatastructure, #add to temporary dictionary to be added later
                     #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
@@ -504,7 +504,8 @@ class Strawberry:
 
     #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
     #if columnToExport == None: then dynamically calculate what should be exported. Only the translated line furthest to the right is valid to export, along with any untranslated lines.
-    #Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines of there is no translated line for that row.
+    #Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output then? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines of there is no translated line for that row.
+    #When is this useful? What is the use case?
     def exportToTextFile(self, fileNameWithPath,columnToExport=None):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
@@ -564,6 +565,7 @@ class Strawberry:
         #return workbook
     def exportToXLSX(self, fileNameWithPath, myFileNameEncoding=None):
         #print('Hello World'.encode(consoleEncoding))
+        #Syntax: 
         #theWorkbook.save(filename="myAwesomeSpreadsheet.xlsx")
         self.workbook.save(filename=fileNameWithPath)
         print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )

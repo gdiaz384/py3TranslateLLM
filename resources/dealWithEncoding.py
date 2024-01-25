@@ -11,7 +11,7 @@ License: See main program.
 
 """
 #set defaults
-version = '0.1 2024Jan21'
+version = '0.1 2024Jan24'
 printStuff=True
 verbose=False
 debug=False
@@ -20,7 +20,6 @@ consoleEncoding='utf-8'
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os.path                                   #Test if file exists.
-from pathlib import Path                  #It is not clear how this is useful here, but it might be required. IDK.
 import sys                                         #End program on fail condition.
 try:
     import chardet                              #Detect character encoding from files using heuristics.
@@ -28,6 +27,9 @@ try:
 except:
     chardetLibraryAvailable=False
 
+
+#Returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down.
+#detectEncoding() is never really used, so it should probably just be deleted.
 def detectEncoding(myFileName):
     #import chardet
     detector=chardet.UniversalDetector()
@@ -43,10 +45,7 @@ def detectEncoding(myFileName):
             print((myFileName+':'+str(detector.result)).encode(consoleEncoding))
     return temp
 
-#Returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down.
-#detectEncoding() is never really used, so it should probably just be deleted.
-#if (no encoding specified) and (automaticallyDetectEncoding == True): 
-#v0: def handleDeterminingFileEncoding(myFileName, rawCommandLineOption, defaultEncoding):
+
 def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
     #elif (encoding was specified):
     if rawCommandLineOption != None:
@@ -68,6 +67,7 @@ def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
             return fallbackEncoding
 
         #Assume file exists now.
+
         #So, binary spreadsheet files (.xlsx, .xls, .ods) do not have an associated encoding that can be read by charadet because they are binary files. If the user specified option from the command line/.ini has not been used to return already, then return fallbackEncoding for binary files.
         myFile_NameOnly, myFile_ExtensionOnly = os.path.splitext(myFileName)
         #binaryFile=False
@@ -76,6 +76,7 @@ def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
             return fallbackEncoding
 
         #chardetLibraryAvailable=False   #debug code
+        #if (no encoding specified) and (automaticallyDetectEncoding == True): 
         #if automaticallyDetectEncoding library is available:
         if chardetLibraryAvailable == True:
 
@@ -88,17 +89,18 @@ def ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
                     if detector.done == True:
                         openFile.close()
                         break
+
             temp=detector.result['encoding']
-            if printStuff == True:
+            #So sometimes, like when detecting an ascii only file or a utf-8 file filled with only ascii, the chardet library will return with a confidence of 0.0 and the result will be None. When that happens, try to catch it and change the result from None to the default encoding. The assumption is that this also happens if the confidence value is below some threshold like <0.2 or <0.5.
+            if temp == None:
+                if (printStuff == True):# and (debug == True):
+                    print(('Warning: Unable to detect encoding of file \''+myFileName+'\' with high confidence. Using the following fallback encoding:\''+fallbackEncoding+'\'').encode(consoleEncoding))
+                temp=fallbackEncoding
+            else:
                 if debug == True:
                     print((myFileName+':'+str(detector.result)).encode(consoleEncoding))
                 print(('Warning: Using automatic encoding detection for file:\"'+str(myFileName)+'" as:\"'+str(temp)+'"').encode(consoleEncoding))
             #temp=detectEncoding(myFileName)
-            #So sometimes, like when detecting an ascii only file or a utf-8 file filled with only ascii, the chardet library will return with a confidence of 0.0 and the result will be None. When that happens, try to catch it and change the result from None to the default encoding. The assumption is that this also happens if the confidence value is below some threshold like <0.2 or <0.5.
-            if temp == None:
-                if (printStuff == True) and (debug == True):
-                    print(('Warning: Unable to detect encoding of file \''+myFileName+'\' with high confidence. Using the following fallback encoding:\''+fallbackEncoding+'\'').encode(consoleEncoding))
-                temp=fallbackEncoding
             return temp
 
         elif chardetLibraryAvailable == False:
