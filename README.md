@@ -109,9 +109,6 @@ Install/configure these other projects as needed:
     - To install and use fairseq outside of Jpn->Eng translation, refer to fairseq's [documentation](//fairseq.readthedocs.io/en/latest) and obtain an appropriately trained model.
 - Sugoi NMT, a wrapper for fairseq that only does Jpn->Eng translation, requires Sugoi Translator which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
     - DL: [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Translator+Toolkit).
-    - Reccomended: Update the base [model](//www.kecl.ntt.co.jp/icl/lirg/jparacrawl).
-        - Download -> NMT Models (based on v3.0) -> Direction -> Japanese-to-English -> big -> Download
-        - Move `big.pretrain.pt`, `dict.en.txt`, and `dict.ja.txt` to: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
     - Reccomended: Remove some of the included spyware.
         - Open: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\main.js`
         - Comment out `/*  */` or delete the analytics.
