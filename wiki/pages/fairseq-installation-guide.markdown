@@ -45,15 +45,15 @@ Hardware (CPU/GPU)
             - Make sure to "Add to Path" is selected during installation.
 - [pytorch](//pytorch.org) contains is a table showing the official installation commands.
     - Getting started with fairseq and PyTorch GPU processing:
-        - Can be very error prone in the real world due different hardware, operating systems, driver versions, and CUDA library versions.
+        - Can be very error prone in the real world due different hardware, operating systems, driver versions, Python versions, and CUDA library versions.
+        - Requires very large downloads, 2.4GB+ possibly multiple times if any debugging is required.
+        - The only benefit is faster processing. CPU processing is slower, but it still works.
         - PyTorch has CUDA but not OpenCL support, so it really only works reliably with Nvidia GPUs as of 2024 January.
             - Newer versions of PyTorch do support [ROCm](//rocm.docs.amd.com/en/latest/what-is-rocm.html) on [Linux](//rocm.docs.amd.com/projects/install-on-linux/en/latest/reference/system-requirements.html) for use with AMD GPUs, but very few AMD GPUs are currently compatible in that exact configuration.
             - The [Windows](//rocm.docs.amd.com/projects/install-on-windows/en/latest/reference/system-requirements.html) versions of ROCm support more GPUs but there are no PyTorch builds for Windows that use it.
-            - In addition, fairseq needs to be updated to enable using PyTorch's ROCm support in contrast to CPU and CUDA which are already supported.
-            - Support for AMD GPUs and Windows may improve in the future.
-        - Requires very large downloads, 2.4GB+ possibly multiple times if any debugging is required.
-        - The only benefit is faster processing. CPU processing is slower, but it still works.
-    - For those reasons, it is strongly recommended to install the CPU version of torch first in order to verify fairseq actually works in the local environment. Once the software stack has been verified to work with PyTorch (CPU), it is a (relatively) simple matter to switch it to PyTorch (GPU) later.
+            - In addition, fairseq needs to be updated to enable using PyTorch's ROCm support in contrast to CPU and CUDA which are already supported in fairseq.
+            - Support for AMD GPUs may improve in the future, but for now only Nvidia GPUs work with fairseq, especially if using Windows.
+    - For those reasons, it is strongly recommended to install the CPU version of PyTorch first in order to verify fairseq actually works in the local environment. Once the software stack has been verified to work with PyTorch CPU, it is a relatively simple matter to switch it to PyTorch GPU later.
     - Please refer to the official installation table, but here are some examples:
         - Latest stable PyTorch CPU:
             - `pip install torch torchvision torchaudio`
@@ -63,7 +63,7 @@ Hardware (CPU/GPU)
             - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
         - Latest stable PyTorch Windows/Linux GPU for CUDA 12.1 Syntax:
             - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`
-        - Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions)
+        - Previous versions, CPU + GPU: [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions)
         - Aside: [download.pytorch.org/whl/](//download.pytorch.org/whl/) is an interesting place. Very educational, especially the [torch/](//download.pytorch.org/whl/torch/) subdirectory.
 - Install additional fairseq dependencies
     - `pip install bitarray hydra-core omegaconf sacrebleu scikit-learn sentencepiece tqdm`
@@ -72,14 +72,15 @@ Hardware (CPU/GPU)
 ### Install fairseq
 
 - Now that the dependencies are installed, fairseq can finally be installed.
-    - Download the release.zip from the [releases page].
+    - Download the release.zip from the [releases page](//github.com/facebookresearch/fairseq/releases).
     - Download the main.zip from the central project page.
-        - Green thing. TODO: Put stuff here.
+        - Click on the green `<> Code` button at the top -> Download Zip
     - Alternatively: `git clone https://github.com/facebookresearch/fairseq`
 - If needed, extract the contents.
 - Start a command prompt.
+- Enter the following:
 ```
-cd fairseq
+cd fairseq     #Change this to the location of the fairseq project directory.
 pip install --editable ./
 python setup.py build_ext --inplace
 ```
@@ -95,7 +96,7 @@ python setup.py build_ext --inplace
         - Download the associated Sentencepiece models:
             - Download -> NMT Models (based on v3.0) -> Sentencepiece models -> Download
     - fairseq's [list of pretrained models](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md#pre-trained-models).
-    - [nepali-translator](//github.com/sharad461/nepali-translator), a Nepali-English language pair model.
+    - Sharad Duwal's [nepali-translator](//github.com/sharad461/nepali-translator), a Nepali-English language pair model. [Demo](//translation.ilprl.ku.edu.np/nep-eng/default).
     - It is also possible to fine tune the output of existing models. Example: [jparacrawl-finetune](//github.com/MorinoseiMorizo/jparacrawl-finetune).
 - Extract the model and the vocabulary to fairseq/model. Create the folder if it does not exist.
     - Move `big.pretrain.pt`, `dict.en.txt`, and `dict.ja.txt` to fairseql/model
@@ -105,8 +106,15 @@ python setup.py build_ext --inplace
 ### Verify the model works
 
 - Interactive mode
+    - TODO: Put stuff here.
 - Server mode
+    - TODO: Put stuff here.
 
 ### Other Notes:
 
 - BPE stands for 'Byte Pair Encoding' vocabulary.
+- Additional resources:
+    - phontron's [Japanese translation data](https://www.phontron.com/japanese-translation-data.php).
+    - Stanford's [Japanese-English Subtitle Corpus](//nlp.stanford.edu/projects/jesc) (JESC).
+    - [NLPL](http://nlpl.eu)'s [open parallel corpus](//opus.nlpl.eu) (OPUS) project.
+

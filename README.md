@@ -45,8 +45,13 @@ Undetermined if:
     - If so, which ones that can be used for translation are expected to be long lived and have unlimited use APIs?
     - Or is web hooking any of them worthwhile?
 - py3TranslateLLM should (unofficially) work on older Python versions like 3.4.
-    - Older than 3.4 might be tricky because `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4. In addition, 3.4 already requires using an older `openpyxl` version, and it is unlikely any `deepl-python` version that supports 3.4 still works with their modern API.
-    - The `chardet` library requires 3.7+, but that library is optional and text encodings should always be in utf-8 or manually specified anyway.
+    - Older than 3.4 might be tricky because
+        - `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4.
+        - Same with `pip`.
+        - 3.4 already requires using an older `openpyxl` version. Using even older versions might incorporate already fixed bugs.
+        - It is unlikely any `deepl-python` version that supports 3.4 still works with their modern API.
+        - Minor: The `chardet` library requires 3.7+.
+            - Minor because that library is optional and text encodings should always be in utf-8 or manually specified anyway.
 
 ## What are the best LLM models available?
 
@@ -108,7 +113,7 @@ Install/configure these other projects as needed:
     - Sugoi NMT is a wrapper for fairseq that comes preconfigured with a Japanese->English dictionary.
     - To install and use fairseq outside of Jpn->Eng translation, refer to fairseq's [documentation](//fairseq.readthedocs.io/en/latest) and obtain an appropriately trained model.
 - Sugoi NMT, a wrapper for fairseq that only does Jpn->Eng translation, requires Sugoi Translator which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
-    - DL: [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Translator+Toolkit).
+    - DL: [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Toolkit).
     - Reccomended: Remove some of the included spyware.
         - Open: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\main.js`
         - Comment out `/*  */` or delete the analytics.
@@ -144,7 +149,6 @@ Parameter | Description | Example(s)
 `-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `fairseq`, `sugoi`
 `-a`, `--address` | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`, `-a=http://localhost`
 `--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
-
 
 ### The following files are required:
 
@@ -394,23 +398,7 @@ Libraries can also require other libraries.
 
 ###  Guide: Installing and managing Python library versions with `pip`:
 
-- `python --version` #Find out what major Python version is installed. 3.5, 3.6, 3.7, etc and where it is located.
-    - `where python` #Windows.
-    - `which python` #Linux.
-        - If `python` is a symlink, as is the norm, then follow it to the target:
-        - `ls -la /usr/bin/python` #Use the path specified in the previous command.
-- `python -m pip install --upgrade pip` #Update pip.
-- `pip --version`
-- `pip install -r requirements.txt` #Use this syntax to install a predefined list of libraries from a file. Alternatively:
-- `pip install <libraryName>` #Examples:
-    - `pip install openpyxl`
-- `pip index versions <libraryName>`  #Use this syntax to list available versions for a library. Requires `pip >= 21.2`. Examples:
-    - `pip index versions openpyxl`
-    - `pip index versions deepl`
-- `pip install <libraryName>=1.3` #Use this syntax to install a specific library version. Examples:
-    - `pip install deepl==1.16.1`
-    - `pip install openpyxl==3.1.2`
-- `pip install --help`      #For additional confusion.
+- [pip Basic Usage] - Wiki.
 
 ## Licenses:
 
