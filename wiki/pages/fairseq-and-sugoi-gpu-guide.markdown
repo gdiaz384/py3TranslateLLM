@@ -91,7 +91,7 @@ CUDA 12.x | >=525.60.13 | >=527.41
 
 - Sugoi Offline Translator 4.0 comes prepackaged with Python 3.9, an old version of PyTorch CPU, and other associated libraries.
 - These instructions to get Sugoi working with CUDA via PyTorch attempt to work with the prepackaged Python version distributed with Sugoi, but that means the paths can become impossible to read.
-- The commands entered in **Installing PyTorch GPU for fairseq** and ** Installing PyTorch GPU for Sugoi** are exactly the same, but the binaries used to process those commands are not.
+- The commands entered in **Installing PyTorch GPU for fairseq** and **Installing PyTorch GPU for Sugoi** are exactly the same, but the binaries used to process those commands are not.
 
 ### Determine and set the correct paths
 
@@ -117,7 +117,10 @@ set pythonExe=
         - Right-click the title bar on the command prompt Window.
         - Make sure "Insert Mode" and "QuickEdit Mode" are both checked.
         - OK
-        - Right-click in the main command prompt window. That should paste the text.
+        - Right-click in the main command prompt window. That should paste the text. Example:
+```
+set pythonExe="D:\Sugoi-Toolkit-V7.0_New_Year\Sugoi_Translator_Toolkit_V7\Code\Power-Source\Python39\python.exe"
+```
 - Press Enter.
 - The `pythonExe` variable can be invoked by surrounding it with `%`. Example: `%pythonExe%`
     - In Batch, the native Windows scripting language, the case does not matter.
@@ -128,7 +131,10 @@ set pythonExe=
 ```
 set pipExe=
 ```
-- Paste the location of pip into the command prompt window after the `=` and and press Enter.
+- Paste the location of pip into the command prompt window after the `=` and and press Enter. Example:
+```
+set pipExe="D:\Sugoi-Toolkit-V7.0_New_Year\Sugoi_Translator_Toolkit_V7\Code\Power-Source\Python39\Scripts\pip.exe"
+```
 - Python and pip can be invoked together to use the correct paths by entering one executable after the other. Example: `python.exe pip.exe`
 - Since they are both variables, the syntax is: `%pythonExe% %pipExe%`
 - To get the current version of pip and confirm it is working with the embedded environment, enter: 
@@ -153,14 +159,18 @@ Then the paths are not correct. Troubleshoot before proceding further.
 - If the CPU version of PyTorch is currently installed, uninstall it:
     - `%pythonExe% %pipExe% uninstall torch torchvision torchaudio`
 - [pytorch.org](//pytorch.org) has a table showing the official installation commands based upon the selected cells.
-- Replace their `pip3` syntax with the updated syntax of `%pythonExe% %pipExe%` that uses the local Sugoi environment.
+    - Replace their `pip3` syntax with the updated syntax of `%pythonExe% %pipExe%` that uses the local Sugoi environment.
     - The commands should otherwise be the same.
 - Please refer to the official installation table, but here are some examples:
     - Latest stable PyTorch Windows/Linux GPU for CUDA 11.8 Syntax:
-        - `%pythonExe% %pipExe% install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
-    - Latest stable PyTorch Windows/Linux GPU for CUDA 12.1 Syntax:
-        - `%pythonExe% %pipExe% install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`
-    - Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions)
+```
+%pythonExe% %pipExe% install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+- Latest stable PyTorch Windows/Linux GPU for CUDA 12.1 Syntax:
+```
+%pythonExe% %pipExe% install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+- Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions)
 
 ## Verify that CUDA is available in PyTorch:
 
@@ -171,8 +181,8 @@ Launch a command prompt and launch the Python interpreter:
 ```
 python
 ```
-- If using Sugoi, then launch python using `%pythonExe%` instead.
-- Next, enter the following
+- If using Sugoi, then launch Python using `%pythonExe%` instead.
+- Next, enter the following:
 ```
 import torch
 torch.cuda.is_available()
@@ -199,7 +209,7 @@ if torch.cuda.is_available() == True:
     print( ' torch.version.cuda=' + str(torch.version.cuda) )
 ```
 - Then run it as: `python testTorch.py`
-- If using Sugoi, then launch python using `%pythonExe% testTorch.py` instead.
+    - If using Sugoi, then launch python using `%pythonExe% testTorch.py` instead.
 - If everything is working, it should print out something like:
 ```
 torch.version=2.1.2+cu118
@@ -217,8 +227,7 @@ Or:
 torch library is not available
 #And then crashes.
 ```
-Then something went wrong installing torch or CUDA.
-
+Then something went wrong installing torch or CUDA. Troubleshoot as as needed.
 
 ## Updating fairseq to use GPU
 
@@ -241,7 +250,7 @@ model = TransformerModel.from_pretrained(
 model.cuda()
 ```
 
-The assigned handle, `model` in the above example, is going to be different depending on the code used to invoke the model but it will always be a variable with the constructor `TransformerModel.from_pretrained()`.
+The assigned handle, `model` in the above example, is going to be different depending on the code used to invoke the model but it will always be a variable with the constructor `TransformerModel.from_pretrained()`. Adjust the handle as needed.
 
 ### For Sugoi:
 
@@ -264,7 +273,7 @@ ja2en = TransformerModel.from_pretrained(
 
 # ja2en.cuda()
 ```
-Remove the two `#`. In Python, `#` means 'comment out the rest of the line'. Change it to:
+Remove the last `#`. In Python, `#` means 'comment out the rest of the line'. Change it to:
 ```
 ja2en = TransformerModel.from_pretrained(
     './japaneseModel/',
@@ -273,7 +282,7 @@ ja2en = TransformerModel.from_pretrained(
     target_lang = "en",
     bpe='sentencepiece',
     sentencepiece_model='./fairseq/spmModels/spm.ja.nopretok.model',
-    is_gpu=True
+    # is_gpu=True
 )
 
 ja2en.cuda()

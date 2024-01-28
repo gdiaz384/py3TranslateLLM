@@ -4,31 +4,30 @@
 - Releases: [py3TranslateLLM/releases](//github.com/gdiaz384/py3TranslateLLM/releases)
 - TODO: [Translating kirikiri games](//github.com/gdiaz384/py3TranslateLLM/wiki/Translating-kirikiri-games)
 - TODO: [Importing and exporting from Translator++](//github.com/gdiaz384/py3TranslateLLM/wiki/Importing-and-exporting-from-Translator--)
-- TODO: Working with dictionaries
+- TODO: [Working with dictionaries](//github.com/gdiaz384/py3TranslateLLM/wiki/Working-with-dictionaries)
 
 ## Other Resources
 
 ### Python
 
-- TODO: Python basics
-- [pip Usage Guide]
+- TODO: [Python Resources](//github.com/gdiaz384/py3TranslateLLM/wiki/Python-Resources)
+- [pip Usage Guide](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide)
 
 ### KoboldCPP
 
-- TODO: KoboldCPP resources
+- TODO: [KoboldCPP Resources](//github.com/gdiaz384/py3TranslateLLM/wiki/KoboldCPP-Resources)
 
 ### DeepL
 
-- TODO: DeepL resources
-- TODO: Working with DeepL dictionaries
+- TODO: [DeepL Resources](//github.com/gdiaz384/py3TranslateLLM/wiki/DeepL-Resources)
+- TODO: [Working with DeepL dictionaries](//github.com/gdiaz384/py3TranslateLLM/wiki/Working-with-DeepL-dictionaries)
 
 ### fairseq
 
 - [fairseq installation guide](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-Installation-Guide)
-- TODO: Sugoi Translator installation guide (+ integration with translator++)
-- [fairseq and Sugoi GPU guide](://github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-and-Sugoi-GPU-Guide)
-- TODO: fairseq resources
-- TODO: Sugoi resources
+- TODO: [Sugoi Translator Integration](//github.com/gdiaz384/py3TranslateLLM/wiki/Sugoi-Translator-Integration)
+- [fairseq and Sugoi GPU guide](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-and-Sugoi-GPU-Guide)
+- TODO: [fairseq Resources](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-Resources)
 
 ### Uncategorized
 
@@ -36,7 +35,7 @@
 
 ## Theory
 
-- AIs, NMT, Language Models, and LLMs
-- Command Line Interfaces (CLI)
-- Text encoding
-- Licensing
+- [Translation Technologies - NMT, Language Models, LLMs, and AI](//github.com/gdiaz384/py3TranslateLLM/wiki/Translation-Technologies-%E2%80%90-NMT,-Language-Models,-LLMs,-and-AI)
+- [Command Line Interfaces (CLI) Resources](//github.com/gdiaz384/py3TranslateLLM/wiki/Command-Line-Interfaces-(CLI)-Resources)
+- [Text Encoding](//github.com/gdiaz384/py3TranslateLLM/wiki/Text-Encoding)
+- [Licensing]
