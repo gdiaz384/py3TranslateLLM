@@ -4,6 +4,8 @@
 
 Sugoi Translator is a wrapper for [fairseq](//github.com/facebookresearch/fairseq) that comes preconfigured to support JPN->ENG translation. When this guide refers to 'Sugoi', it refers to 'Sugoi Offline Translator 4.0' which comes bundled with 'Sugoi Toolkit' versions 6.0/7.0.
 
+fairseq itself relies on PyTorch as the backend engine for many of its services. PyTorch is an open-source tensor library designed for deep learning that has both CPU and GPU modes (CUDA, ROCm). There is also a Windows plugin for DirectML.
+
 fairseq, and thus Sugoi, uses [PyTorch](//pytorch.org), a Machine Learning framework, as its main engine for data processing. In other words, getting fairseq and Sugoi to support GPU processing really just means getting PyTorch to work work as intended. As long as PyTorch is configured properly to use the GPU for processing, it can expose that capability to fairseq/Sugoi for much faster inferencing.
 
 ```
@@ -70,6 +72,9 @@ CUDA 10.2 | >= 440.33 | >=441.22
 CUDA 11.x | >= 450.80.02 | >=452.39
 CUDA 12.x | >=525.60.13 | >=527.41
 
+- CUDA 12 might be better for GeForce RTX 4000 Series cards, and CUDA 11 might be better for earlier generations.
+- For optimal performance, test each CUDA version the local system and compare the results.
+
 ## Installing PyTorch GPU for fairseq (Not for Sugoi)
 
 - **Important**: fairseq CPU should already be working. If it is not, then please follow [this guide](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-Installation-Guide) before continuing further.
@@ -81,9 +86,8 @@ CUDA 12.x | >=525.60.13 | >=527.41
         - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
     - Latest stable PyTorch Windows/Linux GPU for CUDA 12.1 Syntax:
         - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`
-    - Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions)
+    - Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions).
 - `pip install tensorboardX`
-
 
 ## Installing PyTorch GPU for Sugoi
 
@@ -300,7 +304,6 @@ With some caveats, CUDA supports compatibility between minor versions transparen
 - The last WHQL driver for Windows 7 is 474.11 released on 2022Dec20 and supports up to CUDA 11.4.
 - CUDA 11.4 was added on Windows with Nvidia driver version 465.
 - Thus, if using a driver version older than 465, update it to the last WHQL driver available for Windows 7/8: 474.11.
-- If using a driver version older than 465, update it from here: 
     - [www.nvidia.com/download/find.aspx](//www.nvidia.com/download/find.aspx)
     - Use the WHQL drivers. Game Ready Drivers do not support Windows 7/8.x.
 
@@ -346,4 +349,31 @@ The installation order starts roughly the same as above:
     - https://rocm.docs.amd.com/projects/install-on-windows/en/latest/reference/system-requirements.html
     - https://rocm.docs.amd.com/projects/install-on-windows/en/latest/reference/component-support.html
     - https://rocm.docs.amd.com/projects/radeon/en/latest/docs/compatibility.html
+
+### Microsoft DirectML
+
+- One alternative is to use Microsoft's DirectML implementation.
+- DirectML provides GPU acceleration for machine learning based on the DirectX 12 API, which means it is a Windows only machine learning framework.
+- Requirements:
+    - Windows 1703/1903.
+    - DirectX 12 capable GPU (Nvidia, AMD, Intel, Qualcomm).
+    - PyTorch 1.3.0
+```
+Data Collection Notice
+The software may collect information about you and your use of the software and send it to Microsoft. Microsoft may use this information to provide services and improve our products and services. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with a copy of Microsoft's privacy statement. Our privacy statement is located at https://go.microsoft.com/fwlink/?LinkID=824704. You can learn more about data collection and use in the help documentation and our privacy statement. Your use of the software operates as your consent to these practices.
+
+Specifically, in torch-directml, we are collecting the GPU device info and operators that fall back to CPU for improving operator coverage.
+```
+- Currently, in "Public Preview" and has a lot of bugs.
+- Documentation:
+    - https://pypi.org/project/torch-directml
+    - https://github.com/microsoft/DirectML
+    - https://github.com/microsoft/DirectML/tree/master/PyTorch
+    - Conflicting licenses: [Microsoft.AI.DirectML 1.13.0](//www.nuget.org/packages/Microsoft.AI.DirectML/1.13.0/License) vs [MIT](//github.com/microsoft/DirectML/blob/master/LICENSE)
+- Installation:
+    - `pip install torch-directml`
+    - Add the following import statment near the top of the server.py file: `import torch_directml`
+    - Update the handle of `TransformerModel.from_pretrained` with the following:
+        - `myHandle.to( torch_directml.device() )`
+        - replace `myHandle` with the actual handle used in the server.py file code.
 
