@@ -242,7 +242,7 @@ postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictio
 
 # Newer code that focuses on using pathlib.Path() its methods:
 currentScriptPathObject = pathlib.Path( __file__ ).absolute()
-currentScriptPathOnly = str(currentScriptPathObject.parent)
+currentScriptPathOnly = str(currentScriptPathObject.parent) #Does not include last / and this will return one subfolder up if it is called on a folder.
 currentScriptNameWithoutPath = __file__
 currentScriptNameWithoutPathOrExt = currentScriptPathObject.stem
 currentScriptNameWithPathNoExt = currentScriptPathOnly + '/' + currentScriptNameWithoutPathOrExt
@@ -367,7 +367,7 @@ if fileToTranslateFileName == None:
 fileToTranslatePathObject=pathlib.Path(fileToTranslateFileName).absolute()
 
 fileToTranslateFileExtensionOnly=fileToTranslatePathObject.suffix   # .txt  .ks  .ts .csv .xlsx .xls .ods
-fileToTranslatePathOnly=str(fileToTranslatePathObject.parent)  #does not include final /
+fileToTranslatePathOnly=str(fileToTranslatePathObject.parent)  # Does not include final / and will return one subfolder up if it is called on a folder.
 fileToTranslateFileNameWithoutPath=fileToTranslatePathObject.name
 fileToTranslateFileNameWithoutPathOrExt=fileToTranslatePathObject.stem
 fileToTranslateFileNameWithPathNoExt=fileToTranslatePathOnly + '/' + fileToTranslateFileNameWithoutPathOrExt

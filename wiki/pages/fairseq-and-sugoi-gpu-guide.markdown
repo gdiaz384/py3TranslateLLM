@@ -73,7 +73,7 @@ CUDA 11.x | >= 450.80.02 | >=452.39
 CUDA 12.x | >=525.60.13 | >=527.41
 
 - CUDA 12 might be better for GeForce RTX 4000 Series cards, and CUDA 11 might be better for earlier generations.
-- For optimal performance, test each CUDA version the local system and compare the results.
+- For optimal performance, test each CUDA version on the local system and compare the results.
 
 ## Installing PyTorch GPU for fairseq (Not for Sugoi)
 
@@ -231,7 +231,7 @@ Or:
 torch library is not available
 #And then crashes.
 ```
-Then something went wrong installing torch or CUDA. Troubleshoot as as needed.
+Then something went wrong installing torch or CUDA. Troubleshoot as needed.
 
 ## Updating fairseq to use GPU
 
@@ -291,7 +291,6 @@ ja2en = TransformerModel.from_pretrained(
 
 ja2en.cuda()
 ```
-
 - Save the file.
 - Relaunch Sugoi.
 - Test Sugoi.

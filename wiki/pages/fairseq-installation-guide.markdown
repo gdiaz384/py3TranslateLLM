@@ -2,9 +2,11 @@
 
 [fairseq](//github.com/facebookresearch/fairseq) is a project originally used by Meta/Facebook for data training.
 
+- "Fairseq(-py) is a sequence modeling toolkit that allows researchers and developers to train custom models for translation, summarization, language modeling and other text generation tasks." -Meta/Facebook's description of fairseq on [PyPi.org](//pypi.org/project/fairseq)
 - fairseq can also be configured to process pretrained models for use with language translation.
-- For JPN->ENG translation, consider Sugoi translator, a preconfigured wrapper for fairseq.
-- fairseq itself relies on PyTorch as the backend engine for many of its services, and PyTorch supports both CPU and GPU modes.
+    - For JPN->ENG translation, consider Sugoi translator, a preconfigured wrapper for fairseq.
+- fairseq itself relies on PyTorch as the backend engine for many of its services.
+- PyTorch supports both CPU and GPU modes.
 
 ```
 --top of stack--
@@ -20,12 +22,57 @@ Hardware (CPU/GPU)
 - [Source code](//github.com/facebookresearch/fairseq) and [license](//github.com/facebookresearch/fairseq/blob/main/LICENSE).
 - fairseq's [guide on translation](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md).
 
+## Last Stable Build VS Building From Source
+
+- Machine learning is an area of active development, so using more recent versions for fairseq and pyTorch may be advisable.
+- If the version of available using pip is not very recent, then consider building from source instead.
+- To check the available library versions using pip check [this guide](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide). Summary:
+    - `pip index versions <libraryname>`
+    - `pip index versions fairseq`
+- Compare the available version on pip with the most recent version:
+    - Open [github.com/facebookresearch/fairseq/releases](//github.com/facebookresearch/fairseq/releases).
+    - Click on the most recent pip release, like v0.12.2.
+    - It should list the number of commits to the main branch since the release.
+    - Check the [main branch](//github.com/facebookresearch/fairseq)'s [commit history](//github.com/facebookresearch/fairseq/commits/main/).
+        - Click on 'commit history' above or the total number number of commits right below the green `<> Code` button.
+- If the total number of commits is very high and there are a lot of recent commits, then it might be worth building from source.
+
 ## Installing fairseq
 
-### Install Dependencies
+## Install fairseq From Last Stable Version
 
+### Install Python
+- Python 3.8+.
+    - Check if Python is already installed:
+        - Open a command prompt or terminal. Enter 
+        - `python --version`
+            - OSX users should use `python3 --version`.
+        - If it lists a version, then is already installed.
+    - The latest versions of PyTorch and fairseq require Python 3.8+ as of 2024 January.
+    - Python versions older than 3.8+ will have to use older versions of fairseq and PyTorch (not recommended).
+    - If using Windows, PyTorch on Windows only supports Python 3.8-3.11 as of 2024 January.
+        - Do not use Python 3.12 until PyTorch starts to support it.
+    - If Python is not already installed, [download Python](//www.python.org/downloads). For Windows 7, download from [here](//github.com/adang1345/PythonWin7).
+        - Python 3.11 or is the safest modern option, otherwise use Python 3.10 if concerned about compatibility.
+        - Make sure to "Add to Path" is selected during installation.
+
+### Install fairseq Using pip
+
+- Download the latest version from [PyPi](//pypi.org/project/fairseq) using pip:
+    - `pip install fairseq`
+    - Requires:
+        - Python 3.6+
+        - PyTorch 1.5.0+
+- `pip` will install various dependencies automatically if using a last stable version. 
+- More information: https://pypi.org/project/fairseq/
+
+## Install fairseq From Source
+
+### Install Dependencies:
+
+- Python 3.8+. See above.
 - (Optional) Download and install `git`: https://git-scm.com/download/
-    - It is possible to download fairseq as a release or a main repository archive.
+    - It is possible to download fairseq as a release, a main repository archive, or last stable version using pip.
     - `git` is not needed but still nice to have.
 - Download the [Ninja](//ninja-build.org) build system and put the binary somewhere in %path%: [github.com/ninja-build/ninja/releases](//github.com/ninja-build/ninja/releases)
     - To check for locations to place the Ninja binary file, open a command prompt (`cmd.exe`) or terminal and type the following:
@@ -33,16 +80,10 @@ Hardware (CPU/GPU)
         - Linux: `echo $PATH`
     - Alternatively, `choco install ninja`
         - [Chocolatey](//chocolatey.org) is a package manager for Windows. It tends to be very good for programs that do not need any special options set during installation, like Ninja, and unlike Python and Git.
-- Python 3.8+.
-    - Check if Python is already installed:
-        - Open a command prompt or terminal and enter `python--version`
-        - If it lists a version, then is already installed.
-    - If Python is not already installed, [download Python](//www.python.org/downloads). For Windows 7, download from [here](//github.com/adang1345/PythonWin7).
-        - PyTorch and fairseq require Python 3.8+.
-        - If using Windows, PyTorch on Windows only supports Python 3.8-3.11 as of 2024 January.
-            - Do not use Python 3.12 until PyTorch starts to support it.
-            - Python 3.11 or is the safest modern option, otherwise use Python 3.10 if concerned about compatibility.
-            - Make sure to "Add to Path" is selected during installation.
+- On Windows, building from source requires [Visual Studio C++ build tools](//stackoverflow.com/questions/40504552/how-to-install-visual-c-build-tools),  [direct](//visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16) in addition to the requirements below.
+    - Windows 10 users may need to select 'Windows 10 SDK' to install the build tools.
+    - On older versions of Windows, do not select anything. Click on install for only the build tools without extra SDKs.
+- On Linux, TODO: Put stuff here.
 - [pytorch](//pytorch.org) contains is a table showing the official installation commands.
     - Getting started with fairseq and PyTorch GPU processing:
         - Can be very error prone in the real world due different hardware, operating systems, driver versions, Python versions, and CUDA library versions.
@@ -67,25 +108,36 @@ Hardware (CPU/GPU)
         - Aside: [download.pytorch.org/whl/](//download.pytorch.org/whl/) is an interesting place. Very educational, especially the [torch/](//download.pytorch.org/whl/torch/) subdirectory.
 - Install additional fairseq dependencies
     - `pip install bitarray hydra-core omegaconf sacrebleu scikit-learn sentencepiece tqdm`
-    - `pip install flask tensorboardX regex requests` #These are optional. Optional means they will very likely be needed later, but not yet.
+    - `pip install tensorboardX regex requests` #These are optional. Optional means they will very likely be needed very soon, but not yet.
 
-### Install fairseq
+### Build fairseq from source:
 
 - Now that the dependencies are installed, fairseq can finally be installed.
-    - Download the release.zip from the [releases page](//github.com/facebookresearch/fairseq/releases).
     - Download the main.zip from the central project page.
         - Click on the green `<> Code` button at the top -> Download Zip
     - Alternatively: `git clone https://github.com/facebookresearch/fairseq`
-- If needed, extract the contents.
+    - For a slightly older version, download a release.zip from the [releases page](//github.com/facebookresearch/fairseq/releases).
+- Extract the contents.
 - Start a command prompt.
 - Enter the following:
 ```
-cd fairseq     #Change this to the location of the fairseq project directory.
+pushd fairseq     #Change this to the location of the fairseq project directory.
 pip install --editable ./
 python setup.py build_ext --inplace
 ```
+- Check the above build process for errors and troubleshoot appropriately.
 
-### Download models
+### Add the fairseq directory to path.
+
+- Now that it has been built, Python needs to be made aware of it in order for Python programs to `import fairseq`.
+- This can be done by adding the main fairseq directory to the environmental variable PYTHONPATH.
+    - Windows: System->Advanced system settings->Advanced->Environmental Variables...-> User variables for [account]
+        - New -> Variable name: `PYTHONPATH` and Variable value: `C:\my\path\to\fairseq` -> OK -> OK
+        - Edit...-> Append `;C:\my\path\to\fairseq` including the first `;` -> OK -> OK
+    - Linux: `export PYTHONPATH="${PYTHONPATH}:/my/path/to/fairseq"`
+    - Adjust the path to the fairseq directory as appropriate.
+
+## Download Models
 
 - Now that `fairseq` has been installed, it is time to download a model for a language pair and the related vocabulary list. Examples:
     - One of the [JParaCrawl models](http://www.kecl.ntt.co.jp/icl/lirg/jparacrawl) for a Japanese-English language pair. .
@@ -98,23 +150,24 @@ python setup.py build_ext --inplace
     - fairseq's [list of pretrained models](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md#pre-trained-models).
     - Sharad Duwal's [nepali-translator](//github.com/sharad461/nepali-translator), a Nepali-English language pair model. [Demo](//translation.ilprl.ku.edu.np/nep-eng/default).
     - It is also possible to fine tune the output of existing models. Example: [jparacrawl-finetune](//github.com/MorinoseiMorizo/jparacrawl-finetune).
-- Extract the model and the vocabulary to fairseq/model. Create the folder if it does not exist.
+- Extract the pretrained model and the vocabulary to fairseq/model. Create the folder if it does not exist.
     - Move `big.pretrain.pt`, `dict.en.txt`, and `dict.ja.txt` to fairseql/model
     - Move the extracted sentence pair model and vocabulary to the same folder.
-    - If using Sugoi Offline Translator 4.0, move the updated model to: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
+    - If using Sugoi Offline Translator 4.0, move the model to: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
 
-### Verify the model works
+## Verify the model works with fairseq
 
-- Interactive mode
-    - TODO: Put stuff here.
-- Server mode
-    - TODO: Put stuff here.
+- Interactive mode:
+    - See: [Interactive translation via PyTorch Hub](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md#example-usage-torchhub)
+- Server mode:
+    - Use with [py3fairseqTranslationServer](//github.com/gdiaz384/py3fairseqTranslationServer)
 
-### Other Notes:
+## Other Notes:
 
 - BPE stands for 'Byte Pair Encoding' vocabulary.
 - Additional resources:
     - phontron's [Japanese translation data](https://www.phontron.com/japanese-translation-data.php).
     - Stanford's [Japanese-English Subtitle Corpus](//nlp.stanford.edu/projects/jesc) (JESC).
     - [NLPL](http://nlpl.eu)'s [open parallel corpus](//opus.nlpl.eu) (OPUS) project.
+- https://github.com/facebookresearch/fairseq2
 

@@ -14,11 +14,16 @@
 - `python -m pip install --upgrade pip` 
 - `pip --version`
 
-### Managing library versions
+### Install libraries
 
 - `pip install -r requirements.txt` #Use this syntax to install a predefined list of libraries from a file. Alternatively:
-- `pip install <libraryName>` #Examples:
+- `pip install <libraryName>` #Example:
     - `pip install openpyxl`
+    - `pip install fairseq`
+    - `pip install tornado`
+
+### Managing library versions
+
 - `pip index versions <libraryName>`  #Use this syntax to list available versions for a library. Requires `pip >= 21.2`. Examples:
     - `pip index versions openpyxl`
     - `pip index versions deepl`
