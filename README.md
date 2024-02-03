@@ -298,9 +298,25 @@ Variable name | Description | Examples
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
     - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
 
-### Notes about encodings:
+### Text Encoding and py3TranslateLLM:
 
 - Read [this] - Wiki.
+- After reading the above wiki entry, the rest of this section should make more sense.
+- Tip: Use `py3TranslateLLM.ini` to specify the encoding for text files used with `py3TranslateLLM.py` .
+- For compatability reasons, everything gets converted to binary strings for stdout which can result in the console sometimes showing utf-8 hexadecimal (hex) encoded unicode characters, like `\xe3\x82\xaf\xe3\x83\xad\xe3\x82\xa8`, especially with `debug` enabled. To convert them back to non-ascii chararacters, like `クロエ`, dump them into a hex to unicode converter.
+    - Example: [www.coderstool.com/unicode-text-converter](//www.coderstool.com/unicode-text-converter)
+- Some character encodings cannot be converted to other encodings. When such errors occur, use the following error handling options:
+    - [docs.python.org/3.7/library/codecs.html#error-handlers](//docs.python.org/3.7/library/codecs.html#error-handlers), and [More Examples](//www.w3schools.com/python/ref_string_encode.asp) -> Run example.
+    - The default error handler for input files is `strict` which means 'crash the program if the encoding specified does not match the file perfectly'.
+    - On Python >= 3.5, the default error handler for the output file is `namereplace`.  This obnoxious error handler:
+        - Makes it obvious that there were conversion errors.
+        - Does not crash the program catastrophically.
+        - Makes it easy to do ctrl+f replacements to fix any problems.
+            - Tip: Use `postWritingToFileDictionary` or [py3stringReplace](//github.com/gdiaz384/py3stringReplace) to automate these ctrl+f replacements.
+    - If there are more than one or two such conversion errors per file, then the chosen file encoding settings are probably incorrect.
+- If the `chardet` library is available, it will be used to try to detect the character encoding of files via heuristics. While this imperfect solution is obviously very error prone, it is still better to have it than not.
+    - To make it available: `pip install chardet`
+    - If it is not available, then everything is assumed to be `utf-8` unless otherwise specified.
 
 ### Notes about languages:
 

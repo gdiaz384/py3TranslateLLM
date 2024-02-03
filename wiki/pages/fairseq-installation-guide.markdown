@@ -42,6 +42,7 @@ Hardware (CPU/GPU)
 ## Install fairseq From Last Stable Version
 
 ### Install Python
+
 - Python 3.8+.
     - Check if Python is already installed:
         - Open a command prompt or terminal. Enter 
@@ -80,11 +81,18 @@ Hardware (CPU/GPU)
         - Linux: `echo $PATH`
     - Alternatively, `choco install ninja`
         - [Chocolatey](//chocolatey.org) is a package manager for Windows. It tends to be very good for programs that do not need any special options set during installation, like Ninja, and unlike Python and Git.
-- On Windows, building from source requires [Visual Studio C++ build tools](//stackoverflow.com/questions/40504552/how-to-install-visual-c-build-tools),  [direct](//visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16) in addition to the requirements below.
-    - Windows 10 users may need to select 'Windows 10 SDK' to install the build tools.
-    - On older versions of Windows, do not select anything. Click on install for only the build tools without extra SDKs.
+- On Windows, building from source requires [Visual Studio C++ 2015 build tools](//stackoverflow.com/questions/40504552/how-to-install-visual-c-build-tools),  [Visual Studio Build Tools 2015-2017](//aka.ms/vs/15/release/vs_buildtools.exe) in addition to the requirements below.
+    - Microsoft bundles the installer for the 2015 Build Tools in with their 2017 Visual Studio Installer.
+    - **Important**: fairseq needs the "Visual C++ 2015 Build Tools" to compile. These are not selected by default.
+        - **Important**: During installation select the "Visual C++ build tools" in the main window pane.
+        - **Important**: On the right pane, scroll down and check "VC++ 2015.3 v14.00 (v140) toolset for desktop".
+        - Do not skip steps. Do not uncheck things.
+        - With both sets of build tools selected, continue installation.
+        - There is likely some workaround to avoid having to install any SDKs while still getting the build tools correctly configured.
+            - However, the SDKs can also just be uninstalled after the build tools are no longer needed.
+    - If not already installed, the build tools install [Microsoft .Net Framework](//dotnet.microsoft.com/en-us/download/dotnet-framework) 4.7.2.
 - On Linux, TODO: Put stuff here.
-- [pytorch](//pytorch.org) contains is a table showing the official installation commands.
+- [PyTorch.org](//pytorch.org) contains is a table showing the official installation commands.
     - Getting started with fairseq and PyTorch GPU processing:
         - Can be very error prone in the real world due different hardware, operating systems, driver versions, Python versions, and CUDA library versions.
         - Requires very large downloads, 2.4GB+ possibly multiple times if any debugging is required.
@@ -92,8 +100,9 @@ Hardware (CPU/GPU)
         - PyTorch has CUDA but not OpenCL support, so it really only works reliably with Nvidia GPUs as of 2024 January.
             - Newer versions of PyTorch do support [ROCm](//rocm.docs.amd.com/en/latest/what-is-rocm.html) on [Linux](//rocm.docs.amd.com/projects/install-on-linux/en/latest/reference/system-requirements.html) for use with AMD GPUs, but very few AMD GPUs are currently compatible in that exact configuration.
             - The [Windows](//rocm.docs.amd.com/projects/install-on-windows/en/latest/reference/system-requirements.html) versions of ROCm support more GPUs but there are no PyTorch builds for Windows that use it.
-            - In addition, fairseq needs to be updated to enable using PyTorch's ROCm support in contrast to CPU and CUDA which are already supported in fairseq.
+            - In addition, fairseq may need to be updated to enable using PyTorch's ROCm support in contrast to CPU and CUDA which are already supported in fairseq.
             - Support for AMD GPUs may improve in the future, but for now only Nvidia GPUs work with fairseq, especially if using Windows.
+            - Technically DirectML, machine learning on DirectX 12, also exists, but it is still in early development and has a mountain's worth of problems.
     - For those reasons, it is strongly recommended to install the CPU version of PyTorch first in order to verify fairseq actually works in the local environment. Once the software stack has been verified to work with PyTorch CPU, it is a relatively simple matter to switch it to PyTorch GPU later.
     - Please refer to the official installation table, but here are some examples:
         - Latest stable PyTorch CPU:
@@ -117,7 +126,7 @@ Hardware (CPU/GPU)
         - Click on the green `<> Code` button at the top -> Download Zip
     - Alternatively: `git clone https://github.com/facebookresearch/fairseq`
     - For a slightly older version, download a release.zip from the [releases page](//github.com/facebookresearch/fairseq/releases).
-- Extract the contents.
+- Extract the contents if needed.
 - Start a command prompt.
 - Enter the following:
 ```
@@ -130,7 +139,7 @@ python setup.py build_ext --inplace
 ### Add the fairseq directory to path.
 
 - Now that it has been built, Python needs to be made aware of it in order for Python programs to `import fairseq`.
-- This can be done by adding the main fairseq directory to the environmental variable PYTHONPATH.
+- This can be done by adding the main fairseq directory to the environmental variable `PYTHONPATH`.
     - Windows: System->Advanced system settings->Advanced->Environmental Variables...-> User variables for [account]
         - New -> Variable name: `PYTHONPATH` and Variable value: `C:\my\path\to\fairseq` -> OK -> OK
         - Edit...-> Append `;C:\my\path\to\fairseq` including the first `;` -> OK -> OK
@@ -146,21 +155,27 @@ python setup.py build_ext --inplace
             - base (900MB -> 1.04GB)
             - big (2.59GB -> 3.06GB)
         - Download the associated Sentencepiece models:
-            - Download -> NMT Models (based on v3.0) -> Sentencepiece models -> Download
+            - Download -> NMT Models (based on v3.0) -> sentencepiece models -> Download
     - fairseq's [list of pretrained models](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md#pre-trained-models).
+    - Sugoi Toolkit has a JPN->ENG model as well available. Download the toolkit [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Toolkit). The model itself is at:
+        - `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
     - Sharad Duwal's [nepali-translator](//github.com/sharad461/nepali-translator), a Nepali-English language pair model. [Demo](//translation.ilprl.ku.edu.np/nep-eng/default).
     - It is also possible to fine tune the output of existing models. Example: [jparacrawl-finetune](//github.com/MorinoseiMorizo/jparacrawl-finetune).
 - Extract the pretrained model and the vocabulary to fairseq/model. Create the folder if it does not exist.
     - Move `big.pretrain.pt`, `dict.en.txt`, and `dict.ja.txt` to fairseql/model
     - Move the extracted sentence pair model and vocabulary to the same folder.
-    - If using Sugoi Offline Translator 4.0, move the model to: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
 
 ## Verify the model works with fairseq
 
 - Interactive mode:
     - See: [Interactive translation via PyTorch Hub](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md#example-usage-torchhub)
+    - Or use their [command line tool](//fairseq.readthedocs.io/en/latest/command_line_tools.html#fairseq-interactive).
+        - This is installed along with fairseq.
 - Server mode:
+    - OpenNMT's [server.py](//github.com/OpenNMT/OpenNMT-py/blob/master/onmt/bin/server.py). [Usage guide](//forum.opennmt.net/t/simple-opennmt-py-rest-server/1392).
+    - reAlpha39's [flask rest server](//github.com/reAlpha39/fairseq-translate-server/blob/main/rest_server.py).
     - Use with [py3fairseqTranslationServer](//github.com/gdiaz384/py3fairseqTranslationServer)
+    - There is also a small flask implementation included in Sugoi Toolkit. Also available [here](//github.com/cbc02009/vno-local-cpu/blob/main/flaskServer.py).
 
 ## Other Notes:
 
@@ -170,4 +185,5 @@ python setup.py build_ext --inplace
     - Stanford's [Japanese-English Subtitle Corpus](//nlp.stanford.edu/projects/jesc) (JESC).
     - [NLPL](http://nlpl.eu)'s [open parallel corpus](//opus.nlpl.eu) (OPUS) project.
 - https://github.com/facebookresearch/fairseq2
+    - Linux only and focused on LLMs instead.
 

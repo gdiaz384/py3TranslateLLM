@@ -32,6 +32,22 @@
     - `pip install openpyxl==3.1.2`
     - `pip uninstall torch torchvision torchaudio`
 
+### Dealing with portable versions of Python 3
+
+- Invoking a particular python.exe will load the environment for that Python binary.
+- Examples: `Python310\python.exe Python310\Scripts\pip.exe install tornado`
+- The above command would invoke the local environment under Python310 and pip would install `tornado` to `Lib\site-packages`
+
+### Pip and self-updates
+
+- `pip` can be invoked both as both a python module by using `python -m pip` and externally as `pip.exe` or `pip3.exe`. Examples:
+    - `python.exe pip.exe install  sentencepiece`
+    - `python.exe pip3.exe install  sentencepiece`
+    - `python.exe -m pip install  sentencepiece`
+- The command to update pip starts with `python -m pip` which invokes pip as a python module in order to update the `pip.exe` on the file system. However, the file system version, `pip.exe`, cannot cannot be used to update itself since the file is locked while in use. The following will fail:
+    - `python pip.exe install --upgrade pip`  
+- In other words, `pip.exe` is not actually needed to manage Python library versions because the module version is always available as `python -m pip` or  to manage 
+
 ## Additional resources
 
 - Python's [official documentation](//docs.python.org/3/installing/index.html)
