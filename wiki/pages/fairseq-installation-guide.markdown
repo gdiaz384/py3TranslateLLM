@@ -25,6 +25,7 @@ Hardware (CPU/GPU)
 ## Last Stable Build VS Building From Source
 
 - Machine learning is an area of active development, so using more recent versions for fairseq and pyTorch may be advisable.
+    - Certain versions of software may also require bugfixes which are only present in newer versions of fairseq.
 - If the version of available using pip is not very recent, then consider building from source instead.
 - To check the available library versions using pip check [this guide](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide). Summary:
     - `pip index versions <libraryname>`
@@ -91,7 +92,9 @@ Hardware (CPU/GPU)
         - There is likely some workaround to avoid having to install any SDKs while still getting the build tools correctly configured.
             - However, the SDKs can also just be uninstalled after the build tools are no longer needed.
     - If not already installed, the build tools install [Microsoft .Net Framework](//dotnet.microsoft.com/en-us/download/dotnet-framework) 4.7.2.
-- On Linux, TODO: Put stuff here.
+- On Linux:
+    - Debian: sudo apt-get install -y git build-essential cmake automake autoconf pkg-config libtool bzip2 curl wget g++ libtool 
+    - Fedora: TODO: Put stuff here.
 - [PyTorch.org](//pytorch.org) contains is a table showing the official installation commands.
     - Getting started with fairseq and PyTorch GPU processing:
         - Can be very error prone in the real world due different hardware, operating systems, driver versions, Python versions, and CUDA library versions.

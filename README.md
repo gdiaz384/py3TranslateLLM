@@ -1,3 +1,5 @@
+[![Python application](//github.com/gdiaz384/py3TranslateLLM/actions/workflows/python-app.yml/badge.svg)](//github.com/gdiaz384/py3TranslateLLM/actions/workflows/python-app.yml)
+
 # py3TranslateLLM.py
 
 py3TranslateLLM.py uses Artificial Intelligence (AI) to translate text files.
