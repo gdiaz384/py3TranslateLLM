@@ -1,17 +1,21 @@
-# fairseq and Sugoi GPU Guide
+# PyTorch GPU Guide for fairseq, CTranslate2, and Sugoi
 
 [fairseq](//github.com/facebookresearch/fairseq) is a project originally used by Meta/Facebook for data training.
 
-Sugoi Translator is a wrapper for [fairseq](//github.com/facebookresearch/fairseq) that comes preconfigured to support JPN->ENG translation. When this guide refers to 'Sugoi', it refers to 'Sugoi Offline Translator 4.0' which comes bundled with 'Sugoi Toolkit' versions 6.0/7.0.
+[CTranslate2](//github.com/OpenNMT/CTranslate2) is an inference engine with an emphasis on high performance and low resource utilization that is part of the [OpenNMT](//opennmt.net), [Py](//github.com/OpenNMT/OpenNMT-py)), [TensorFlow](//github.com/OpenNMT/OpenNMT-tf), open source ecosystem for neural machine translation (NMT) and neural sequence learning.
 
-fairseq itself relies on PyTorch as the backend engine for many of its services. PyTorch is an open-source tensor library designed for deep learning that has both CPU and GPU modes (CUDA, ROCm). There is also a Windows plugin for DirectML.
+Sugoi Translator is a wrapper for fairseq that comes preconfigured to support JPN->ENG translation. When this guide refers to 'Sugoi', it refers to 'Sugoi Offline Translator 4.0' which comes bundled with 'Sugoi Toolkit' versions 6.0/7.0.
 
-fairseq, and thus Sugoi, uses [PyTorch](//pytorch.org), a Machine Learning framework, as its main engine for data processing. In other words, getting fairseq and Sugoi to support GPU processing really just means getting PyTorch to work work as intended. As long as PyTorch is configured properly to use the GPU for processing, it can expose that capability to fairseq/Sugoi for much faster inferencing.
+fairseq and CTranslate2 rely on [PyTorch](//pytorch.org) for many of their backend engine services. PyTorch is an [open-source](//github.com/pytorch/pytorch) tensor framework designed for machine learning and deep learning that has both CPU and GPU modes with native Nvidia CUDA and AMD ROCm support.
+
+While CTranslate2 has native CPU acceleration support, both fairseq and CTranslate2 rely on PyTorch for their GPU acceleration support. PyTorch also has limited support for DirectML by means of a Microsoft written plugin. As of early 2024, there are no PyTorch builds with ROCm support on Windows.
+
+In other words, since fairseq/Sugoi and CTranslate2 use PyTorch as the main engine for data processing, getting fairseq and CTranslate2 to support GPU acceleration really just means getting PyTorch to work work as intended. As long as PyTorch is configured properly to use the GPU for processing, it can expose that capability to fairseq/Sugoi and CTranslate2 for much faster inferencing.
 
 ```
 --top of stack--
 Applications (py3TranslateLLM, Translator++, interactive translators)
-fairseq / Sugoi
+CTranslate2, fairseq / Sugoi
 PyTorch
 Python 3
 Operating System
@@ -19,12 +23,16 @@ Hardware (CPU/GPU)
 --bottom of stack--
 ```
 
-- [Source code](//github.com/facebookresearch/fairseq) and [license](//github.com/facebookresearch/fairseq/blob/main/LICENSE).
+- fairseq [source code](//github.com/facebookresearch/fairseq) and [license](//github.com/facebookresearch/fairseq/blob/main/LICENSE).
 - fairseq's [guide on translation](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md).
+- CTranslate2's [source code](//github.com/OpenNMT/CTranslate2) and [license](//github.com/OpenNMT/CTranslate2/blob/master/LICENSE).
+    - Interesting: https://github.com/ymoslem/DesktopTranslator
 
 ## Important
 
 - Before following this guide, be sure to [install fairseq](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-Installation-Guide) directly or download the prepackaged Sugoi version from [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Toolkit).
+- CTranslate2 can be installed with `pip install ctranslate2`.
+    - More on managing versions with [Python](//github.com/gdiaz384/py3TranslateLLM/wiki/Python-Resources) and [pip](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide).
 
 ## PyTorch Background
 
@@ -32,14 +40,14 @@ Hardware (CPU/GPU)
 - PyTorch supports both CPU and GPU processing of model data.
 - With some caveats, see **Regarding AMD GPUs**, GPU processing basically requires CUDA which means only Nvidia graphics cards can be used to accelerate fairseq/Sugoi as of 2024 January.
 - More info:
-    - PyTorch Website: [pytorch.org](//pytorch.org)
+    - PyTorch Website: [pytorch.org](//pytorch.org).
     - [Soure code](//github.com/pytorch/pytorch) and [license](//github.com/pytorch/pytorch/blob/main/LICENSE).
 
 ## GPU Hardware Requirements
 
 - As of 2024 January, PyTorch supports both CUDA 11.8 and 12.1.
-- For OpenCL, ROCm, and AMD GPUs, see: **Regarding AMD GPUs**.
-- PyTorch Stable (2.1.2) using CUDA requires an Nvidia GPU with Compute Capability 3.5+.
+- For OpenCL, ROCm, DirectML, and AMD GPUs, see: **Regarding AMD GPUs**.
+- PyTorch Stable (2.2.0) using CUDA requires an Nvidia GPU with Compute Capability 3.5+.
 - If Compute Capability 3.5+ is not available, then older versions of PyTorch can be used for CUDA 10.x . Otherwise, use the latest version of PyTorch if at all possible.
 - There is no way to upgrade the hardware's [Compute Capability](//developer.nvidia.com/cuda-gpus) without a new video card as that is a hardware feature.
 - Additional information:
@@ -75,17 +83,21 @@ CUDA 12.x | >=525.60.13 | >=527.41
 - CUDA 12 might be better for GeForce RTX 4000 Series cards, and CUDA 11 might be better for earlier generations.
 - For optimal performance, test each CUDA version on the local system and compare the results.
 
-## Installing PyTorch GPU for fairseq (Not for Sugoi)
+## Installing PyTorch GPU for fairseq and CTranslate2 (Not for Sugoi)
 
-- **Important**: fairseq CPU should already be working. If it is not, then please follow [this guide](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-Installation-Guide) before continuing further.
+- **Important**: fairseq CPU and CTranslate2 should already be working in CPU mode. If it is not, then please follow [this guide](//github.com/gdiaz384/py3TranslateLLM/wiki/fairseq-Installation-Guide) before continuing further.
 - If the CPU version of PyTorch is currently installed, uninstall it:
     - `pip uninstall torch torchvision torchaudio`
-- [pytorch.org](//pytorch.org) has a table showing the official installation commands based upon the selected cells.
+- [PyTorch.org](//pytorch.org) has a table showing the official installation commands based upon the selected cells.
 - Please refer to the official installation table, but here are some examples:
     - Latest stable PyTorch Windows/Linux GPU for CUDA 11.8 Syntax:
         - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
     - Latest stable PyTorch Windows/Linux GPU for CUDA 12.1 Syntax:
         - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`
+    - PyTorch v2.2.0 Windows/Linux GPU for CUDA 11.8 Syntax:
+        - `pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118`
+    - PyTorch v2.2.0 Windows/Linux GPU for CUDA 12.1 Syntax:
+        - `pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121`
     - Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions).
 - `pip install tensorboardX`
 

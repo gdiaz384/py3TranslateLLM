@@ -24,7 +24,7 @@ Hardware (CPU/GPU)
 
 ## Last Stable Build VS Building From Source
 
-- Machine learning is an area of active development, so using more recent versions for fairseq and pyTorch may be advisable.
+- Machine learning is an area of active development, so using more recent versions for fairseq and PyTorch may be advisable.
     - Certain versions of software may also require bugfixes which are only present in newer versions of fairseq.
 - If the version of available using pip is not very recent, then consider building from source instead.
 - To check the available library versions using pip check [this guide](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide). Summary:
@@ -173,7 +173,7 @@ python setup.py build_ext --inplace
 - Interactive mode:
     - See: [Interactive translation via PyTorch Hub](//github.com/facebookresearch/fairseq/blob/main/examples/translation/README.md#example-usage-torchhub)
     - Or use their [command line tool](//fairseq.readthedocs.io/en/latest/command_line_tools.html#fairseq-interactive).
-        - This is installed along with fairseq.
+        - This is installed along with fairseq if using `pip`.
 - Server mode:
     - OpenNMT's [server.py](//github.com/OpenNMT/OpenNMT-py/blob/master/onmt/bin/server.py). [Usage guide](//forum.opennmt.net/t/simple-opennmt-py-rest-server/1392).
     - reAlpha39's [flask rest server](//github.com/reAlpha39/fairseq-translate-server/blob/main/rest_server.py).
