@@ -28,16 +28,23 @@ The focus is the spreadsheet formats, but a built in customizable parser support
     - OpenDocument spreadsheet (.ods).
     - Microsoft Excel 97/2000/XP (.xls).
     - KAG3 used in TyranoBuilder (.ks/.ts?).
-    - JSON (Very limited support).
+    - JSON support:
+        - Support for JSON produced by [VNTranslationTools](//github.com/arcusmaximus/VNTranslationTools).
+        - Support for UlyssesWu's [FreeMote](//github.com/UlyssesWu/FreeMote) text files converted from PSB to JSON.
+        - Support for JSON where all entries are nested under `contents` and there is no additional nesting.
+            - Multiple entries be in a list surrounded by square brackets `[ ]`.
+        - Support for arbitrary JSON types via an external parsing program. Maybe it should be named:
+            - Any2ChocolateStrawberry
+            - Any2Spreadsheet
         - To process additional types of JSON, open an issue and provide an `example.json`.
 
 Not Planned:
 
 - OpenAI's GPT. Instead consider:
     - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both v3.5 and v4.0 LLM models.
-- Sugoi Translator Premium/Papago/DeepL.
+- Sugoi's DeepL, Sugoi Translator Premium, Sugoi Papago.
 - Most other cloud based NMT translation engines: Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
-    - Use [Translator++](//dreamsavior.net/download) for those.
+    - Use [Translator++](//dreamsavior.net/download) or other software like [this] for those.
 - Microsoft Excel 95 (.xls).
     - This might end up being supported anyway.
 
@@ -50,17 +57,20 @@ Undetermined if:
     - Older than 3.4 might be tricky because
         - `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4.
         - Same with `pip`.
-        - 3.4 already requires using an older `openpyxl` version. Using even older versions might incorporate already fixed bugs.
-        - It is unlikely any `deepl-python` version that supports 3.4 still works with their modern API.
+        - 3.4 already requires using an older `openpyxl` version. Using even older versions might incorporate even more already fixed bugs.
+        - It is unlikely any `deepl-python` version that supports 3.4 still works with DeepL's contemporary API.
         - Minor: The `chardet` library requires 3.7+.
             - Minor because that library is optional and text encodings should always be in utf-8 or manually specified anyway.
 
 ## What are the best LLM models available?
 
+- https://artificialanalysis.ai
 - Guide: huggingface's [chatbot-arena-leaderboard](//huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Examples:
     - [Mixtral 8x7b v0.1](//huggingface.co/TheBloke/Mixtral-8x7B-v0.1-GGUF).
     - [Yi-34B-Chat](//huggingface.co/TheBloke/Yi-34B-Chat-GGUF).
     - [Tulu-2-DPO](//huggingface.co/TheBloke/tulu-2-dpo-70B-GGUF).
+    - Google's [Gemma](//huggingface.co/collections/google/gemma-release-65d5efbccdbb8c4202ec078b)
+    - Random: [Japanese StableLM Instruct Gamma 7B](//huggingface.co/TheBloke/japanese-stablelm-instruct-gamma-7B-GGUF)
 - Notes:
     - The size of the model is also the RAM requirements to load it into memory.
     - The more it fits into GPU memory (VRAM), the better the performance.
@@ -70,7 +80,7 @@ Undetermined if:
 
 `Current version: 0.1 - 2024Jan24 pre-alpha`
 
-Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet. This notice will be removed when core functionality has been implemented and the project has entered 'beta' development.
+Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet.
 
 1. Install [Python 3.7+](//www.python.org/downloads). For Windows 7, use [this repository](//github.com/adang1345/PythonWin7/).
     - Make sure the Python version matches the architecture of the host machine:
@@ -114,7 +124,7 @@ Install/configure these other projects as needed:
 - [fairseq](//github.com/facebookresearch/fairseq) is a library released by Facebook/Meta for data training.
     - Sugoi NMT is a wrapper for fairseq that comes preconfigured with a Japanese->English dictionary.
     - To install and use fairseq outside of Jpn->Eng translation, refer to fairseq's [documentation](//fairseq.readthedocs.io/en/latest) and obtain an appropriately trained model.
-- Sugoi NMT, a wrapper for fairseq that only does Jpn->Eng translation, requires Sugoi Translator which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
+- Sugoi NMT, a wrapper for fairseq that only does Jpn->Eng translation, requires Sugoi Offline Translator which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
     - DL: [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Toolkit).
     - Reccomended: Remove some of the included spyware.
         - Open: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\main.js`
@@ -144,7 +154,7 @@ py3TranslateLLM fairseq [options]
  
 ### Parameters
 
-`partial list:`
+TODO: This section.
 
 Parameter | Description | Example(s)
 --- | --- | ---
@@ -302,7 +312,7 @@ Variable name | Description | Examples
 
 ### Text Encoding and py3TranslateLLM:
 
-- Read [this] - Wiki.
+- Read the [Text Encoding](//github.com/gdiaz384/py3TranslateLLM/wiki/Text-Encoding) wiki entry.
 - After reading the above wiki entry, the rest of this section should make more sense.
 - Tip: Use `py3TranslateLLM.ini` to specify the encoding for text files used with `py3TranslateLLM.py` .
 - For compatability reasons, everything gets converted to binary strings for stdout which can result in the console sometimes showing utf-8 hexadecimal (hex) encoded unicode characters, like `\xe3\x82\xaf\xe3\x83\xad\xe3\x82\xa8`, especially with `debug` enabled. To convert them back to non-ascii chararacters, like `クロエ`, dump them into a hex to unicode converter.

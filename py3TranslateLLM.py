@@ -244,11 +244,11 @@ postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictio
 # Newer code that focuses on using pathlib.Path() its methods:
 currentScriptPathObject = pathlib.Path( __file__ ).absolute()
 currentScriptPathOnly = str(currentScriptPathObject.parent) #Does not include last / and this will return one subfolder up if it is called on a folder.
-currentScriptNameWithoutPath = __file__
+currentScriptNameWithoutPath = currentScriptPathObject.name
 currentScriptNameWithoutPathOrExt = currentScriptPathObject.stem
 currentScriptNameWithPathNoExt = currentScriptPathOnly + '/' + currentScriptNameWithoutPathOrExt
 
-backupsFolder=currentScriptPathOnly + '/backups'  #does not include last /
+backupsFolder=currentScriptPathOnly + '/backups'  #does not include last /   Edit: Should probably not hardcode this. Use a default instead.
 scriptSettingsFileFullNameAndPath = currentScriptNameWithPathNoExt + defaultScriptSettingsFileExtension
 scriptSettingsFileNameOnly = pathlib.Path(scriptSettingsFileFullNameAndPath).name
 

@@ -140,22 +140,20 @@ set pythonExe="D:\Sugoi-Toolkit-V7.0_New_Year\Sugoi_Translator_Toolkit_V7\Code\P
 - Press Enter.
 - The `pythonExe` variable can be invoked by surrounding it with `%`. Example: `%pythonExe%`
     - In Batch, the native Windows scripting language, the case does not matter.
-- Next, find `pip.exe`.
-    - It is under: `Python39\Scripts`.
-- Hold Shift -> Right-click on `pip.exe` -> Copy as path
-- In the command prompt window type:
-```
-set pipExe=
-```
-- Paste the location of pip into the command prompt window after the `=` and and press Enter. Example:
-```
-set pipExe="D:\Sugoi-Toolkit-V7.0_New_Year\Sugoi_Translator_Toolkit_V7\Code\Power-Source\Python39\Scripts\pip.exe"
-```
-- Python and pip can be invoked together to use the correct paths by entering one executable after the other. Example: `python.exe pip.exe`
-- Since they are both variables, the syntax is: `%pythonExe% %pipExe%`
+- Next, is `pip.exe`.
+    - pip is available as the python module `pip` which can be invoked more simply as:
+        - `python.exe -m pip`
+        - Since python is already available as a variable, the final syntax is: `%pythonExe% -m pip`
+    - This `python -m pip` syntax for invoking pip as a Python module is preferred since that reduces the need to worry about the path to pip.exe and the correct environment for both is always invoked automatically.
+    - Technically, Python and pip.exe can also be invoked together to use the correct paths by entering one executable after the other.
+        - Example: `python.exe pip.exe`
+        - pip.exe is at: `Python39\Scripts\pip.exe`.
+        - A variable for pip could be created similarly as above with `set pipExe=`
+        - Since they would both be variables, the syntax would be: `%pythonExe% %pipExe%`
+        - However, the module syntax will be used going forward as that is simpler.
 - To get the current version of pip and confirm it is working with the embedded environment, enter: 
 ``` 
-%pythonExe% %pipExe% --version
+%pythonExe% -m pip --version
 ```
 If all of the paths are correct, then it should output something like:
 ```
@@ -163,7 +161,7 @@ pip 21.2.4 from D:\Sugoi-Toolkit-V7.0_New_Year\Sugoi_Translator_To
 olkit_V7\Code\Power-Source\Python39\lib\site-packages\pip (python 3.9)
 ```
 - That confirms that this Python and Pip invocation are not conflicting with the local environment.
-- If it crashes or outputs something like:
+- If it crashes, displays that pip is not a recognized command, or outputs something like:
 ```
 pip 23.3.2 from D:\Python310\lib\site-packages\pip (python 3.10)
 ```
@@ -175,18 +173,19 @@ Then the paths are not correct. Troubleshoot before proceding further.
 - If the CPU version of PyTorch is currently installed, uninstall it:
     - `%pythonExe% %pipExe% uninstall torch torchvision torchaudio`
 - [pytorch.org](//pytorch.org) has a table showing the official installation commands based upon the selected cells.
-    - Replace their `pip3` syntax with the updated syntax of `%pythonExe% %pipExe%` that uses the local Sugoi environment.
+    - Replace their `pip3` syntax with the updated syntax of `%pythonExe% -m pip` that uses the local Sugoi environment.
     - The commands should otherwise be the same.
 - Please refer to the official installation table, but here are some examples:
     - Latest stable PyTorch Windows/Linux GPU for CUDA 11.8 Syntax:
 ```
-%pythonExe% %pipExe% install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+%pythonExe% -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 - Latest stable PyTorch Windows/Linux GPU for CUDA 12.1 Syntax:
 ```
-%pythonExe% %pipExe% install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+%pythonExe% -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 - Previous versions (CPU + GPU): [pytorch.org/get-started/previous-versions](//pytorch.org/get-started/previous-versions)
+    - Use the 'For Windows and Linux' options.
 
 ## Verify that CUDA is available in PyTorch:
 
@@ -197,13 +196,14 @@ Launch a command prompt and launch the Python interpreter:
 ```
 python
 ```
-- If using Sugoi, then launch Python using `%pythonExe%` instead.
+- For Windows, if using Sugoi, then launch Python using `%pythonExe%` instead.
+- For Linux, check if an Nvidia GPU is active with the following command:
+    - `nvidia-smi -L`
 - Next, enter the following:
 ```
 import torch
 torch.cuda.is_available()
 ```
-
 - It might take a few moments to import torch.
 - If it prints True, then PyTorch is available to use with fairseq.
 - Alternatively, try Method 2. It is longer but more automated once it is working.
@@ -308,6 +308,16 @@ ja2en.cuda()
 - Test Sugoi.
 - The GPU should now register usage.
 
+## Additional resources:
+
+- cuDNN:
+    - https://developer.download.nvidia.com/compute/redist/cudnn/
+    - https://developer.download.nvidia.com/compute/redist/cudnn/v8.8.0/local_installers/11.8/
+    - https://developer.download.nvidia.com/compute/redist/cudnn/v8.8.0/local_installers/12.0/
+    - https://developer.download.nvidia.com/compute/redist/cudnn/v8.2.4/
+        - Last Windows 7 version is `cudnn-11.4-windows-x64-v8.2.4.15.zip`
+    - https://github.com/Purfview/whisper-standalone-win/releases/tag/libs
+
 ## Regarding Windows 7 and Windows 8:
 
 With some caveats, CUDA supports compatibility between minor versions transparently. So, even if PyTorch supports up to CUDA 11.8, PyTorch will work with any CUDA 11.x version provided that CUDA version is available from the driver and the correct library file is used.
@@ -325,6 +335,7 @@ With some caveats, CUDA supports compatibility between minor versions transparen
 - GeForce 16 Series, RX 2000 Series, RTX 3000 Series (Windows 7 only):
     - https://www.nvidia.com/download/driverResults.aspx/197672
     - Note: Nvidia does not have any Windows 8 drivers for these cards.
+- cuDNN: https://developer.download.nvidia.com/compute/redist/cudnn/v8.2.4/cudnn-11.4-windows-x64-v8.2.4.15.zip
 
 The installation order starts roughly the same as above:
 
@@ -360,6 +371,7 @@ The installation order starts roughly the same as above:
     - https://rocm.docs.amd.com/projects/install-on-windows/en/latest/reference/system-requirements.html
     - https://rocm.docs.amd.com/projects/install-on-windows/en/latest/reference/component-support.html
     - https://rocm.docs.amd.com/projects/radeon/en/latest/docs/compatibility.html
+    - https://github.com/ROCm/pytorch/wiki/Building-PyTorch-for-ROCm
 
 ### Microsoft DirectML
 
@@ -369,18 +381,28 @@ The installation order starts roughly the same as above:
     - Windows 1703/1903.
     - DirectX 12 capable GPU (Nvidia, AMD, Intel, Qualcomm).
     - PyTorch 1.3.0
-```
-Data Collection Notice
-The software may collect information about you and your use of the software and send it to Microsoft. Microsoft may use this information to provide services and improve our products and services. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with a copy of Microsoft's privacy statement. Our privacy statement is located at https://go.microsoft.com/fwlink/?LinkID=824704. You can learn more about data collection and use in the help documentation and our privacy statement. Your use of the software operates as your consent to these practices.
-
-Specifically, in torch-directml, we are collecting the GPU device info and operators that fall back to CPU for improving operator coverage.
-```
 - Currently, in "Public Preview" and has a lot of bugs.
 - Documentation:
-    - https://pypi.org/project/torch-directml
+    - https://pypi.org/project/torch-directml  Includes built-in spyware notice.
     - https://github.com/microsoft/DirectML
     - https://github.com/microsoft/DirectML/tree/master/PyTorch
     - Conflicting licenses: [Microsoft.AI.DirectML 1.13.0](//www.nuget.org/packages/Microsoft.AI.DirectML/1.13.0/License) vs [MIT](//github.com/microsoft/DirectML/blob/master/LICENSE)
+
+```
+Data Collection Notice
+The software may collect information about you and your use of the software and send it to Microsoft.
+Microsoft may use this information to provide services and improve our products and services. There
+are also some features in the software that may enable you and Microsoft to collect data from users of
+your applications. If you use these features, you must comply with applicable law, including providing
+appropriate notices to users of your applications together with a copy of Microsoft's privacy statement.
+Our privacy statement is located at https://go.microsoft.com/fwlink/?LinkID=824704. You can learn more
+about data collection and use in the help documentation and our privacy statement. Your use of the
+software operates as your consent to these practices.
+
+Specifically, in torch-directml, we are collecting the GPU device info and operators that fall back to CPU
+for improving operator coverage.
+```
+
 - Installation:
     - `pip install torch-directml`
     - Add the following import statment near the top of the server.py file: `import torch_directml`

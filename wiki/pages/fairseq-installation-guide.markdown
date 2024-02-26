@@ -164,6 +164,33 @@ python setup.py build_ext --inplace
         - `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\japaneseModel`
     - Sharad Duwal's [nepali-translator](//github.com/sharad461/nepali-translator), a Nepali-English language pair model. [Demo](//translation.ilprl.ku.edu.np/nep-eng/default).
     - It is also possible to fine tune the output of existing models. Example: [jparacrawl-finetune](//github.com/MorinoseiMorizo/jparacrawl-finetune).
+
+### Aside: Different model formats.
+
+- This should probably go somewhere else, but for now, here are some links to different models even if they are not in fairseq format or for other types of generation.
+- Background: 
+    - OpenAI released Whisper model open-source
+    - Meta released MMS and Llama 70B.
+    - Google released a slim version of their Gemini model named [Gemma](//blog.google/technology/developers/gemma-open-models).
+- Variety, including LLMs:
+    - https://huggingface.co
+    - https://huggingface.co/google
+- Text->Image: 
+    - https://civitai.com/search/models
+- Text->Text:
+    - https://opennmt.net/Models-py/
+    - https://github.com/miguelknals/UN-EU-corpus-Demo-streamlit 
+        - Related English <-> French [demo](https://un-eu-corpus-demo.streamlit.app).
+- Audio->Text:
+    - https://github.com/openai/whisper
+        - https://huggingface.co/openai/whisper-base
+        - https://huggingface.co/openai/whisper-large-v3
+    - https://github.com/SYSTRAN/faster-whisper
+        - https://huggingface.co/Systran
+        - https://huggingface.co/Systran/faster-whisper-large-v3
+        - https://github.com/Purfview/whisper-standalone-win
+    - Whisper: https://huggingface.co/guillaumekln
+
 - Extract the pretrained model and the vocabulary to fairseq/model. Create the folder if it does not exist.
     - Move `big.pretrain.pt`, `dict.en.txt`, and `dict.ja.txt` to fairseql/model
     - Move the extracted sentence pair model and vocabulary to the same folder.
