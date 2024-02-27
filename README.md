@@ -69,8 +69,8 @@ Undetermined if:
     - [Mixtral 8x7b v0.1](//huggingface.co/TheBloke/Mixtral-8x7B-v0.1-GGUF).
     - [Yi-34B-Chat](//huggingface.co/TheBloke/Yi-34B-Chat-GGUF).
     - [Tulu-2-DPO](//huggingface.co/TheBloke/tulu-2-dpo-70B-GGUF).
-    - Google's [Gemma](//huggingface.co/collections/google/gemma-release-65d5efbccdbb8c4202ec078b)
-    - Random: [Japanese StableLM Instruct Gamma 7B](//huggingface.co/TheBloke/japanese-stablelm-instruct-gamma-7B-GGUF)
+    - Google's [Gemma](//huggingface.co/collections/google/gemma-release-65d5efbccdbb8c4202ec078b).
+    - Random: [Japanese StableLM Instruct Gamma 7B](//huggingface.co/TheBloke/japanese-stablelm-instruct-gamma-7B-GGUF).
 - Notes:
     - The size of the model is also the RAM requirements to load it into memory.
     - The more it fits into GPU memory (VRAM), the better the performance.
@@ -78,7 +78,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Jan24 pre-alpha`
+`Current version: 0.1 - 2024Feb26 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet.
 
@@ -201,7 +201,7 @@ Variable name | Description | Examples
     - The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
     - Other programs can be used to find and parse small bits of untranslated text in text files and images. This program focuses on dialogue.
     - While it is not the emphasis of this program, there is some code to help extract dialogue from certain common formats and then reinsert it automatically after translation including automatic handling of word wrap.
-- For the spreadsheet formats (.csv, xlsx, .xls, .ods), the following apply when used for translating text:
+- For the spreadsheet formats (.csv, .xlsx, .xls, .ods), the following apply when used for translating text:
     - The first row is reserved for headers and is always ignored for data processing otherwise.
     - The first column (1st) must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
         - Paragraph spacing will not be preserved in the output cell, but will instead be regenerated dynamically when writting to the output files based upon the configurable word wrap settings.

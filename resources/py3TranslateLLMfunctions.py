@@ -21,6 +21,7 @@ assignmentOperatorInSettingsFile='='
 inputErrorHandling='strict'
 #outputErrorHandling='namereplace'
 
+
 translationEngines='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, fairseq, sugoi'
 usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+ translationEngines + '.'
 
@@ -28,6 +29,7 @@ usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mo
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os, os.path                      #Extract extension from filename, and test if file exists.
 from pathlib import Path            #Override file in file system with another and create subfolders.
+import requests
 import sys                                   #End program on fail condition.
 import io                                      #Manipulate files (open/read/write/close).
 import datetime                          #Used to get current date and time.
@@ -57,7 +59,7 @@ if sysVersion >= 5:
 elif sysVersion < 5:
     outputErrorHandling='backslashreplace'    
 else:
-    sys.exit('Unspecified error.'.encode(defaultConsoleEncodingType))
+    sys.exit( 'Unspecified error.'.encode(consoleEncoding) )
 
 
 #Question: how does os.path.splitext(fileName) actually work? Answer: If the extension does not exist, then it returns an empty string '' object for the extension. A None comparison will not work, but...   if myFileExtOnly == '':   ... will return true and conditionally execute.
@@ -68,11 +70,17 @@ def checkIfThisFileExists(myFile):
         return False
     if os.path.isfile(myFile) != True:
         return False
-    else:
-        return True
+    return True
+
 #Usage:
 #checkIfThisFileExists('myfile.csv')
 #checkIfThisFileExists(myVar)
+
+
+def checkIfThisFolderExists(myFolder):
+    if (myFolder == None) or (os.path.isdir(myFolder) != True):
+        return False
+    return True
 
 
 #Errors out if myFile does not exist.
@@ -87,9 +95,18 @@ def verifyThisFileExists(myFile,nameOfFileToOutputInCaseOfError=None):
     if os.path.isfile(myFile) != True:
         #print('pie')
         sys.exit( (' Error: Unable to find file \'' + str(nameOfFileToOutputInCaseOfError) + '\' ' + usageHelp).encode(consoleEncoding) )
+
 #Usage:
 #verifyThisFileExists('myfile.csv','myfile.csv')
 #verifyThisFileExists(myVar, 'myVar')
+
+
+# Errors out if myFolder does not exist.
+def verifyThisFolderExists(myFolder, nameOfFileToOutputInCaseOfError=None):
+    if myFolder == None:
+        sys.exit( ('Error: Please specify a valid folder for: ' + str(nameOfFileToOutputInCaseOfError) + usageHelp).encode(consoleEncoding))
+    if os.path.isdir(myFolder) != True:
+        sys.exit( (' Error: Unable to find folder \'' + str(nameOfFileToOutputInCaseOfError) + '\' ' + usageHelp).encode(consoleEncoding) )
 
 
 #This function reads program settings from text files using a predetermined list of rules.
@@ -99,7 +116,7 @@ def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding
     #print('Hello World'.encode(consoleEncoding))
     #return 'pie'
     if fileNameWithPath == None:
-        print( ('Cannot read settings from null entry: '+fileNameWithPath ).encode(consoleEncoding) )
+        print( ('Cannot read settings from None entry: '+fileNameWithPath ).encode(consoleEncoding) )
         return None
 
     #check if file exists   'scratchpad/ks_testFiles/A01.ks'
@@ -159,13 +176,13 @@ def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding
                 value = False
             tempDictionary[key]=value
 
-        inputFileContents=inputFileContents.partition('\n')[2] #Finished processing line, so remove current line from string to prepare to process next line.
+        #Finished processing line, so remove current line from string to prepare to process next line.
+        inputFileContents=inputFileContents.partition('\n')[2] 
 
     #Finished reading entire file, so return resulting dictionary.
     if debug == True:
         print( (fileNameWithPath+' was turned into this dictionary='+str(tempDictionary)).encode(consoleEncoding) )
     return tempDictionary
-
 
 
 def getCurrentMonthFromNumbers(x):
@@ -198,7 +215,7 @@ def getCurrentMonthFromNumbers(x):
           sys.exit('Unspecified error.'.encode(consoleEncoding))
 
 
-##TODO: Update this into functions so it returns the current day, time, and full (day+time)
+# These functions return the current date, time, yesterday's date, and full (day+time)
 def getYearMonthAndDay():
     today = datetime.datetime.today()
 
@@ -242,8 +259,13 @@ def getDateAndTimeFull():
 #    print(currentDateAndTimeFull.encode(consoleEncoding))
 
 
-
-
+# Returns true if internet is available. Returns false otherwise.
+def checkIfInternetIsAvailable():
+    try:
+        myRequest = requests.get('https://www.google.com',timeout=10)
+        return True
+    except requests.ConnectionError:
+        return False
 
 
 def importDictionaryFromFile(myFile,myFileEncoding=None):

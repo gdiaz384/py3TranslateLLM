@@ -14,7 +14,7 @@ License:
 """
 
 #set defaults and static variables
-versionString='v0.1 - 2024Jan24 pre-alpha'
+versionString='v0.1 - 2024Feb26 pre-alpha'
 
 #Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding='utf-8'
@@ -65,7 +65,7 @@ import argparse                           # Used to add command line options.
 import os, os.path                        # Extract extension from filename, and test if file exists.
 #from pathlib import Path           # Override file in file system with another and create subfolders.
 #import pathlib.Path                    # Does not work. Why not? Maybe because Path is a class and not a Path.py file? So 'from' crawls into files? Maybe from "requires" it. Like Path must be a class inside of pathlib instead of a file named Path.py. 'import' does not seem to care whether it is importing files or classes. They are both made available. But 'from' might.
-import pathlib                               # Works.   #dir(pathlib) does list 'Path', so just always use as pathlib.Path Constructor is Path(mystring). Remember to convert it back to a string if printing it out.
+import pathlib                               # Works.   #dir(pathlib) does list 'Path', so just always use as pathlib.Path Constructor is pathlib.Path(mystring). Remember to convert it back to a string if printing it out.
 import sys                                     # End program on fail condition.
 import io                                        # Manipulate files (open/read/write/close).
 #from io import IOBase               # Test if variable is a file object (an "IOBase" object).
@@ -682,7 +682,7 @@ postDictionaryEncoding = dealWithEncoding.ofThisFile(postDictionaryFileName, pos
 postWritingToFileDictionaryEncoding = dealWithEncoding.ofThisFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding, defaultTextEncoding)
 
 
-##### Input validation is /finally/ done  #####
+##### Input validation is /finally/ done.  ######
 
 
 if (verbose == True) or (debug == True):
@@ -815,11 +815,12 @@ elif fileToTranslateIsASpreadsheet != True:
     mainSpreadsheet = chocolate.Strawberry(fileToTranslateFileName, fileToTranslateEncoding, parseSettingsDict = parseSettingsDictionary, charaNamesDict = charaNamesDictionary)
 
     #then create data structure seperately from reading the file
-    #This returns a very special dictionary where the value in key=value is a special list and then add data row by row using the dictionary values #Edit, moved to chocolate.py so as to not have to do that. All spreadsheets that require a parseFile will therefore always be Strawberries from the chocolate library.
+    # This returns a very special dictionary where the value in key=value is a special list and then add data row by row using the dictionary values #Edit, moved to chocolate.py so as to not have to do that. All spreadsheets that require a parseFile will therefore always be Strawberries from the chocolate library.
 # Strawberry is a wrapper class for the workbook class with additional methods.
-# The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class.
-# mainSpreadsheet=Strawberry()
-#py3TranslateLLMfunctions.parseRawInputTextFile
+# The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class. Syntax:
+# mainSpreadsheet=chocolate.Strawberry()
+# py3TranslateLLMfunctions.parseRawInputTextFile
+
 
 #Before doing anything, just blindly create a backup.
 #backupsFolder does not have / at the end
@@ -836,6 +837,7 @@ if debug == True:
     print( ( 'Yesterday=' + py3TranslateLLMfunctions.getYesterdaysDate() ).encode(consoleEncoding) )
     print( ( 'CurrentTime=' + py3TranslateLLMfunctions.getCurrentTime() ).encode(consoleEncoding) )
     print( ( 'DateAndTime=' + py3TranslateLLMfunctions.getDateAndTimeFull() ).encode(consoleEncoding) )
+
 
 #Now that the main data structure has been created, the spreadsheet is ready to be translated.
 if mode == 'parseOnly':
@@ -864,7 +866,7 @@ if mode == 'parseOnly':
 pathlib.Path( cachePathOnly ).mkdir( parents = True, exist_ok = True )
 
 if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == True:
-    #if present, read cache file into a Strawberry()
+    #if present, read cache file into a chocolate.Strawberry()
     cache=chocolate.Strawberry(myFileName=cacheFileName, myFileNameEncoding=defaultTextEncoding, createNew=False)
 if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == False:
     #otherwise if does not exist yet, create it.
@@ -891,8 +893,8 @@ if (verbose == True) or (debug == True):
 
 # DeepL has already been imported, and it must have an API key. (already checked for)
     #Must have internet access then. How to check?
-
-# Check current engine. fairseq server must be reachable.
+    # Added py3TranslateLLMfunctions.checkIfInternetIsAvailable() function.
+# Check current engine. Sugoi/NMT server must be reachable.
     #
 
 #Now have two column letters for both currentModelColumn and currentCacheColumn.
@@ -976,10 +978,11 @@ CharacterNames=['[＠クロエ]','Chloe']#change this to a dictionary
     #other arbitary data to be decided later like booleans
     #Has the file been processed with characterDictionary? It is not *entirely* invalid to have a toggle for this and to put the post characterDictionary untranslated text in column 1. But it is a better idea not to have this and instead just output any post charaDictionary text into another column so that both are available if that is desired. The text to submit to the translation engine still needs to be computed dynamically anyway. However, without it and without outputting to another column, then py3stringReplace should be updated to support .csv files already.
 # Metadata problems:
-    #Metadata can also just be overtly missing in the case of imported spreadsheet files, so it is also just fundamentally unreliable.
-    #The number of lines in the source cell can also be determined dynamically by counting line breaks.
-    #Which lines to replace in the destination can be determined dynamically.
-    #Already translated or not decision should be computed dynamically and on a line-by-line basis (raw + chosen translator engine determined from header to calculate target cell) in order to support resume operations and cache, so do not add this to metadata.
+    # Metadata can also just be overtly missing in the case of imported spreadsheet files, so it is also just fundamentally unreliable.
+    # The number of lines in the source cell can also be determined dynamically by counting line breaks.
+    # Which lines to replace in the destination can be determined dynamically. 
+        # Replacements can be done either globally (for line-by-line reading) or sequentially as well.
+    # Already translated or not decision should be computed dynamically and on a line-by-line basis (raw + chosen translator engine determined from header to calculate target cell) in order to support resume operations and cache, so do not add this to metadata.
 # Metadata Decision: reserve column 3 for metadata for future use in case special processing or data is ever needed for certain types of source files, but do not use it yet since no information needs to be there to process file except for the character name and character name metadata is important enough to have its own column.
 # Old: For now use the following string:  'numberOfSourceLines_WasADictionaryUsedTrueOrFalse' ex. '2_False_'
 # New: for now use: dictionary[key]=[characterName,str(currentParagraphLineCount)]    So a dictionary containing a [list] filled with the character name and currentParagraphLineCount
@@ -1035,8 +1038,8 @@ pathlib.Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #mainDatabaseWorkbook.save('backups/'+currentDateFull+'/rawUntranslated-'+currentDateAndTimeFull+'.xlsx')
 #print(inputFileContents.partition('\n')[0].encode(consoleEncoding)) #prints only first line
 
-#once all lines are input into a dictionary, if specified, read the preDictionary.csv and perform replacements prior to submission to translation engine
-#Then run DeepL's special code to replace braces {{ }}  {{{ }}}  with special markers that the DeepL engine can escape before submission to the translation engine
+# Once all lines are input into a dictionary, if specified, read the preDictionary.csv and perform replacements prior to submission to translation engine.
+# For DeepL, run DeepL's special code to replace braces {{ }}  {{{ }}}  with special markers that the DeepL engine can escape before submission to the translation engine.
 
 
 #do in memory replacements for CharaNames
@@ -1045,9 +1048,9 @@ pathlib.Path('backups/'+currentDateFull).mkdir(parents=True, exist_ok=True)
 #1) Information that should be preserved in the final translation as-is, but that will also be submitted to the translation engine for consideration so the position of the name or other string can influence the translation itself.
 #To alter specific strings in the text before submission to the translation engine that will also be kept in the translated text, use preDictionary.csv. To alter specific parts of the text after translation, use postDictionary.csv.
 
-#For character names, either:
-#need to know, gender (m, f, u), since that might influence the translation.  Can also append that information to prompt for LLM models.
-#Could also ask user to specify a replacement name. This might be a better idea.
+# For character names, either:
+# Need to know, gender (m, f, u), since that might influence the translation.  Can also append that information to prompt for LLM models.
+# Could also ask user to specify a replacement name. This might be a better idea.
 
 
 

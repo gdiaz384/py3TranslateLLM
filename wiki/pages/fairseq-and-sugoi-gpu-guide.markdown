@@ -160,8 +160,8 @@ If all of the paths are correct, then it should output something like:
 pip 21.2.4 from D:\Sugoi-Toolkit-V7.0_New_Year\Sugoi_Translator_To
 olkit_V7\Code\Power-Source\Python39\lib\site-packages\pip (python 3.9)
 ```
-- That confirms that this Python and Pip invocation are not conflicting with the local environment.
-- If it crashes, displays that pip is not a recognized command, or outputs something like:
+- That confirms that this Python and pip invocation are not conflicting with the local environment.
+- If it crashes, displays that python or pip is not a recognized command or outputs something like:
 ```
 pip 23.3.2 from D:\Python310\lib\site-packages\pip (python 3.10)
 ```
@@ -171,7 +171,9 @@ Then the paths are not correct. Troubleshoot before proceding further.
 
 - **Important**: fairseq/Sugoi CPU should already be working. If it is not, then troubleshoot it before continuing further.
 - If the CPU version of PyTorch is currently installed, uninstall it:
-    - `%pythonExe% %pipExe% uninstall torch torchvision torchaudio`
+    - `%pythonExe% -m pip uninstall torch torchvision torchaudio`
+    - It is possible to check what version of torch is installed by using pip's freeze command.
+        - `%pythonExe% -m pip freeze`
 - [pytorch.org](//pytorch.org) has a table showing the official installation commands based upon the selected cells.
     - Replace their `pip3` syntax with the updated syntax of `%pythonExe% -m pip` that uses the local Sugoi environment.
     - The commands should otherwise be the same.
@@ -207,6 +209,7 @@ torch.cuda.is_available()
 - It might take a few moments to import torch.
 - If it prints True, then PyTorch is available to use with fairseq.
 - Alternatively, try Method 2. It is longer but more automated once it is working.
+- Use CTRL + Z, end of input, to exit the Python interpreter. CTRL + C, keyboard interupt, will not work.
 
 ### Method 2) Use a Python script.
 
@@ -249,8 +252,8 @@ Then something went wrong installing torch or CUDA. Troubleshoot as needed.
 
 ### For fairseq:
 
-Locate the `TransformerModel.from_pretrained()` function and add a `cuda()` method invocation after it to the assigned handle.
-Example: 
+Open software used to invoke fairseq, and find the `TransformerModel.from_pretrained()` function. Add a `cuda()` method invocation after it to the assigned handle.
+Example:
 ```
 from fairseq.models.transformer import TransformerModel
 model = TransformerModel.from_pretrained(
@@ -266,11 +269,11 @@ model = TransformerModel.from_pretrained(
 model.cuda()
 ```
 
-The assigned handle, `model` in the above example, is going to be different depending on the code used to invoke the model but it will always be a variable with the constructor `TransformerModel.from_pretrained()`. Adjust the handle as needed.
+The assigned handle, `model` in the above example, is going to be different depending on the code used to invoke the model but it will always be a variable with the constructor `TransformerModel.from_pretrained()`. Adjust the handle name as needed.
 
 ### For Sugoi:
 
-- Sugoi comes prepackaged with a development flask server. It needs to be updated to invoke PyTorch with CUDA.
+- Sugoi comes prepackaged with a development flask server. It needs to be updated to invoke PyTorch CUDA.
 - Open the following file:
 ```
 Sugoi-Toolkit\Sugoi_Translator_Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\offlineTranslation\fairseq\flaskServer.py

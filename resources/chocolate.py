@@ -16,9 +16,10 @@ verbose=False
 debug=False
 #debug=True
 consoleEncoding='utf-8'
-#metadataDelimiter='_'
+defaultTextEncoding='utf-8'
+metadataDelimiter='_'
 inputErrorHandling='strict'
-#outputErrorHandling='namereplace'
+#outputErrorHandling='namereplace'  #This is set dynamically below.
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import os.path                            #Extract extension from filename, and test if file exists.
@@ -55,8 +56,8 @@ else:
 
 #wrapper class for spreadsheet data structure
 class Strawberry:
-    #self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
-    #Quirk: It can be different string/word for each method and they all still refer to the same object.
+    # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
+    # Quirk: It can be different string/word for each method and they all still refer to the same object.
     def __init__(self, myFileName=None, myFileNameEncoding=None, ignoreWhitespaceForCSV=False,parseSettingsDict=None,charaNamesDict=None,createNew=False): 
         self.workbook = openpyxl.Workbook()
         self.spreadsheet = self.workbook.active
@@ -108,22 +109,22 @@ class Strawberry:
         #return 'pie'
         return str(self.getRow(1))
 
-    #expects a python list
+    # expects a python list
     def appendRow(self,newRow):
         self.spreadsheet.append(newRow)
 
     #def appendColumn(self, newColumn) #Does not seem to be needed. Data is just not processed that way.
 
-    #This sets the value of the cell based upon the cellAddress in the form of 'A4'.
-    def setCellValue(cellAddress,value):
+    # This sets the value of the cell based upon the cellAddress in the form of 'A4'.
+    def setCellValue(self, cellAddress,value):
         self.spreadsheet[cellAddress]=value
 
-    #This retuns the value of the cell based upon the cellAddress in the form of 'A4'.
-    def getCellValue(cellAddress):
-        return self.spreadsheet[cellAddress]
+    # This retuns the value of the cell based upon the cellAddress in the form of 'A4'.
+    def getCellValue(self, cellAddress):
+        return self.spreadsheet[cellAddress].value
 
-    #Full name of this function is getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
-    #This functions would return 'B5' from: <Cell 'Sheet'.B5>
+    # Full name of this function is getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
+    # This functions would return 'B5' from: <Cell 'Sheet'.B5>
     def getCellAddressFromRawCellString(self, myInputCellRaw):
         #print('raw cell data='+str(myInputCellRaw))
         #myInputCellRaw=str(myInputCellRaw)
@@ -131,8 +132,8 @@ class Strawberry:
         return str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
         #return [currentRow, currentColumn
 
-    #This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
-    #such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
+    # This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
+    # such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
     def getRowAndColumnFromRawCellString(self, myInputCellRaw):
         #print('raw cell data='+str(myInputCellRaw))
         #basically, split the string according to . and then split it again according to > to get back only the CellAddress
@@ -143,17 +144,18 @@ class Strawberry:
             try:
                 int(myInputCell[index:index+1])
                 index=i
-                break #this break and the assignment above will only execute when the int conversion works
+                break # This break and the assignment above will only execute when the int conversion works.
             except:
-                #this will execute if there is an error, like int('A')
-                #this will not execute if the int conversion succeds
+                # This will execute if there is an error, like int('A').
+                # This will not execute if the int conversion succeds.
                 #print('index='+str(index))
                 pass
             index+=1
-        currentColumn=myInputCell[:index]#does not include character in string[Index] because index is after the :
-        currentRow=myInputCell[index:]#includes character specified by string[index] because index is before the :
-        #return ['pie', 'apple']
-        return [currentRow, currentColumn]
+        #currentColumn=myInputCell[:index] # Does not include character in string[Index] because index is after the :
+        #currentRow=myInputCell[index:] # Includes character specified by string[index] because index is before the :
+        #return [currentRow, currentColumn]
+        # Same as above, but faster.
+        return [myInputCell[index:], myInputCell[:index]]
 
     #Example:
     #myRawCell=''
@@ -165,8 +167,8 @@ class Strawberry:
     #currentRow, currentColumn = spreadsheet.getRowAndColumnFromRawCellString(myRawCell)
 
 
-    #Returns a list with the contents of the row number specified.
-    #Should return None for any blank entry as in: ['pie', None, 'lots of pies']
+    # Returns a list with the contents of the row number specified.
+    # Should return None for any blank entry as in: ['pie', None, 'lots of pies']
     def getRow(self, rowNumber):
         #print(rowNumber)
         #return spreadsheet[rowNumber] #returns the raw cell addresses instead of the values.
@@ -181,8 +183,8 @@ class Strawberry:
         return myList
 
 
-    #Returns a list with the contents of the column specified (by letter). 
-    #Should return None for any blank entry as in: ['pie', None, 'lots of pies']
+    # Returns a list with the contents of the column specified (by letter). 
+    # Should return None for any blank entry as in: ['pie', None, 'lots of pies']
     def getColumn(self, columnLetter):
         myList=[]
         for cell in self.spreadsheet[columnLetter]:
@@ -196,8 +198,8 @@ class Strawberry:
     #def getColumnLetterFromSearchString():
         #No. Just search normally, and search should always return a list with the column and row seperately.
 
-    #helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
-    #Note: This is only for modifying existing rows. To add a brand new row, use append:
+    # helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
+    # Note: This is only for modifying existing rows. To add a brand new row, use append:
         #Example: newRow = ['pies', 'lots of pies']
         #mySpreadsheet.append(newRow)
     #The rowLocation specified is the nth rowLocation, not the [0,1,2,3...row] because rows start with 1
@@ -228,10 +230,10 @@ class Strawberry:
         if debug == True:
             print(( 'Replacing column \''+columnLetter+'\' with the following contents:').encode(consoleEncoding))
             print(str(newColumnInAList).encode(consoleEncoding))
-        for i in range(len(newRowList)):
+        for i in range(len(newColumnInAList)):
             #Syntax for assignment is: mySpreadsheet['A4'] = 'pie''
             #Rows begin with 1, not 0, so add 1 to the reference row, but not to source list since list starts references at 0.
-            self.spreadsheet.cell(row=int(i+1), column=openpyxl.utils.column_index_from_string(columnLetter)).value=newRowList[i]
+            self.spreadsheet.cell(row=int(i+1), column=openpyxl.utils.column_index_from_string(columnLetter)).value=newColumnInAList[i]
 
     #Example: replaceColumn(newColumn,7)
 
@@ -272,7 +274,7 @@ class Strawberry:
     def searchFirstColumn(self, searchTerm):
         print('Hello, World!'.encode(consoleEncoding))
         cellFound=None
-        for column in self.spreadsheet[A]:  #does this work? TODO: Test this.
+        for column in self.spreadsheet['A']:  #does this work? TODO: Test this.
             for i in column:
                 if i.value == searchTerm:
                     cellFound=i
@@ -283,7 +285,7 @@ class Strawberry:
         return self.getRowAndColumnFromRawCellString(cellFound)[0]
 
 
-    #This returns either [None, None] if there is no cell with the search term, or a list containing the [row, column] (the address). Case and whitespace sensitive.
+    # This returns either [None, None] if there is no cell with the search term, or a list containing the [row, column], the address. Case and whitespace sensitive.
     #To determine the row, the column, or both from the raw cell address, use self.getRowAndColumnFromRawCellString(rawCellAddress)
     def searchSpreadsheet(self, searchTerm):
         for row in self.spreadsheet.iter_rows():
@@ -293,12 +295,12 @@ class Strawberry:
         return [None, None]
 
 
-    #These return either [None,None] if there is no cell with the search term, or a [list] containing the cell row and the cell column (the address in a list). Case insensitive. Whitespace sensitive.
-    #To determine the row, the column, or both from the raw cell address, use self.getRowAndColumnFromRawCellString(rawCellAddress)
+    # These return either [None,None] if there is no cell with the search term, or a [list] containing the cell row and the cell column (the address in a list). Case insensitive. Whitespace sensitive.
+    # To determine the row, the column, or both from the raw cell address, use self.getRowAndColumnFromRawCellString(rawCellAddress)
     def searchRowsCaseInsensitive(self, searchTerm):
         for row in self.spreadsheet.iter_rows():
             for cell in row:
-                if isinstance(cell.value, str):
+                if isinstance( cell.value, (str, int) ):
                     if cell.value.lower() == str(searchTerm).lower():
                         return self.getRowAndColumnFromRawCellString(cell)
         return [None, None]
@@ -306,7 +308,7 @@ class Strawberry:
     def searchColumnsCaseInsensitive(self, searchTerm):
         for column in self.spreadsheet.iter_cols():
             for cell in column:
-                if isinstance(cell.value, str):
+                if isinstance( cell.value, (str, int) ):
                     if cell.value.lower() == str(searchTerm).lower():
                         return self.getRowAndColumnFromRawCellString(cell)
         return [None, None]
@@ -318,7 +320,7 @@ class Strawberry:
             temp=''
             for cell in row:
                 temp=temp+','+str(cell)
-            print(str(temp[1:]).encode(consoleEncoding))#ignore first , in output
+            print(str(temp[1:]).encode(consoleEncoding)) # Ignore first comma , in output
 
     #Old example: printAllTheThings(mySpreadsheet)
     #New syntax: 
@@ -326,18 +328,30 @@ class Strawberry:
     #mySpreadsheet.printAllTheThings()
 
 
-    #This function processes raw data (.ks, .txt. .ts) using a parse file. The extracted data is meant to be loaded into the main workbook data structure for further processing.
-    #parseRawInputTextFile() accepts an (input file name, the encoding for that text file, parseFileDictionary as a Python dictionary, the character dictionary as a Python dictionary) and creates a dictionary where the key is the dialogue, and the value is a list. The first value in the list is the character name, (or None for no chara name), and the second is metadata as a string using the specified delimiter.
-    #This could also be a multidimension array, such as a list full of list pairs [ [ [],[ [][][] ] ] , [ [],[ [][][] ] ] ] because the output is highly regular, but that would allow duplicates. Executive decision was made to disallow duplicates for files since that is correct almost always. However, it does mess with the metadata sometimes by having the speaker be potentially incorrect.
-    #This method then updates the spreadsheet with the first column as the dialogue, the second as the speaker, and the third column as a string containing metadata (number of lines column 1 represents, and what else?) Cache... should always be added. Potentially that creates a situation where cache is not valid when going from one title to another, but that is fine.
+    # This function processes raw data (.ks, .txt. .ts) using a parse file. The extracted data is meant to be loaded into the main workbook data structure for further processing.
+    # Update: This should probably be moved to an external program that is dedicated to parsing input and supports conversion to .xlsx or .csv.
+    # That seperate program should probably support something like: https://github.com/Distributive-Network/PythonMonkey
+    # For cross language support of parsing files. Then again, Python is very easy to use.
+
+    #importFromTextFile() accepts an (input file name, the encoding for that text file, parseFileDictionary as a Python dictionary, the character dictionary as a Python dictionary) and creates a dictionary where the key is the dialogue, and the value is a list. The first value in the list is the character name, (or None for no chara name), and the second is metadata as a string using the specified delimiter.
+    # This could also be a multidimension array, such as a list full of list pairs [ [ [],[ [][][] ] ] , [ [],[ [][][] ] ] ] because the output is highly regular, but that would allow duplicates.
+    #  [ [ ], [ ] , [ ], [ ] ] Would make more sense. A single list, then each entry in that list is a list containing strings or None entries.
+    # Executive decision was made to disallow duplicates for files since that is correct almost always. However, it does mess with the metadata sometimes by having the speaker be potentially incorrect.
+    # TODO: Rethink this since this approach contradicts the project goals.
+    # Instead of a dictionary to remove duplicates, integrated cache should be used to prevent submission of duplicates to translation engines. Removing them while reading from the raw file removes a lot of information and makes ordered replacement of entries impossible.
+
+    # This method then updates the spreadsheet with the first column as the dialogue, the second as the speaker, and the third column as a string containing metadata: number of lines the rawText in column A represents , the line numbers the input is taken from, and what else?
+    # Cache... should always be added. Potentially that creates a situation where cache is not valid when going from one title to another, but that is fine since that is a user decision.
+
     #self.importFromTextFile(myFileName,myFileNameEncoding,parseSettingsDict,charaNamesDict)
-    #def parseRawInputTextFile(self,inputFile,inputFileEncoding,characterDictionary):
-    #def importFromRawTextFile(fileNameWithPath, fileNameEncoding, parseFile, parseFileEncoding):
+    #def importFromTextFile(self,inputFile,inputFileEncoding,characterDictionary):
+    #def importFromTextFile(fileNameWithPath, fileNameEncoding, parseFile, parseFileEncoding):
 
     def importFromTextFile(self, fileNameWithPath,myFileNameEncoding,parseSettingsDict,charaNamesDict=None):
 
-    #parseSettingsDict must exist, and that has already been checked, but charaNamesDict may or may not exist, be == None
+    # parseSettingsDict must exist, and that has already been checked. charaNamesDict may or may not exist, so set it to None by default.
         #The file has already been checked to exist and the encoding correctly determined, so just open it and read contents into a string. Then use that epicly long string for processing.
+    # Alternative method: https://docs.python.org/3/tutorial/inputoutput.html#methods-of-file-objects
         with open(fileNameWithPath, encoding=myFileNameEncoding, errors=inputErrorHandling) as myFileHandle:
             inputFileContents = myFileHandle.read()
 
@@ -346,9 +360,12 @@ class Strawberry:
         #thisdict["x"]="y"              #add to/update dictionary
         #for x, y in thisdict.items():
         #  print(x, y)
+        temporaryList=[]
 
-        temporaryString=None     #set it to None (null) to initialize
+        temporaryString=None     # set it to None (null) to initialize
         currentParagraphLineCount=0
+        currentLineNumber=-1 # Start at negative one so adding one to the line number raises it to line 0 for the first line.
+        currentLineNumberWasUpdated=False
         characterName=None
 
         #previousLine2=None
@@ -387,15 +404,12 @@ class Strawberry:
                             #print( entry[entry.find(startDelimiterForCharaName)+len(startDelimiterForCharaName)] ) )
                             break
 
-
-
-
             #debug code
             #print only if debug option specified
             if debug == True:
                 print(myLine.encode(consoleEncoding)) #prints line that is currently being processed
-            #myLine[:1]#this gets only the first character of a string #what will this output if a line contains only whitespace or only a new line #answer: '' -an empty string for new lines, but probably the whitespace for lines with whitespace
-            #if myLine[:1].strip() != '':#if the first character is not empty or filled with whitespace
+            #myLine[:1]# This gets only the first character of a string #What will this output if a line contains only whitespace or only a new line? # Answer: '' -an empty string for new lines, but probably the whitespace for lines with whitespace.
+            #if myLine[:1].strip() != '':# if the first character is not empty or filled with whitespace
             #    if debug == True:
             #        print(myLine[:1].encode(consoleEncoding))
 
@@ -440,7 +454,8 @@ class Strawberry:
                 #then commit any currently working string to databaseDatastructure, add to temporary dictionary to be added later
                 if temporaryString != None:
                     #temporaryDict[temporaryString] = str(currentParagraphLineCount)+'!+'False' #old. Not currently using metadata
-                    temporaryDict[temporaryString] = [characterName,str(currentParagraphLineCount)]
+                    #temporaryDict[temporaryString] = [characterName,str(currentParagraphLineCount)]
+                    temporaryList.append( [ temporaryString, characterName, str(currentParagraphLineCount), str(currentLineNumber) ] )
                 #and start a new temporaryString
                 temporaryString = None
                 #and reset currentParagraphLineCount
@@ -450,11 +465,12 @@ class Strawberry:
 
             #while myLine[:1] != the first character is not an ignore character, #while the line is valid to feed in as input, then
             elif thisLineIsValid == True:
-
+                currentLineNumber+=1
+                currentLineNumberWasUpdated=True
                 #if temporaryString is not empty, then append \n to temporaryString, and myLine
                 if temporaryString != None:
                     # append \n first, and then add line to temporaryString
-                    temporaryString=temporaryString+'\n'+myLine.strip()
+                    temporaryString = temporaryString + '\n' + myLine.strip()
                     #increment currentParagraphLineCount by 1
                     currentParagraphLineCount += 1
 
@@ -472,8 +488,9 @@ class Strawberry:
                 if (currentParagraphLineCount >= int( parseSettingsDict['maximumNumberOfLinesPerParagraph'] ) ) or (parseSettingsDict['paragraphDelimiter'] == 'newLine'):  
                     #then commit currently working string to databaseDatastructure, #add to temporary dictionary to be added later
                     #The True/False means, if True, the current line has been modified by a dictionary and so is not a valid line to insert into cache, ...if that feature ever materializes.
-                    #temporaryDict[temporaryString]=str(currentParagraphLineCount)+'!False' #Old
-                    temporaryDict[temporaryString] = [characterName,str(currentParagraphLineCount)]
+                    #temporaryDict[temporaryString] = str( currentParagraphLineCount ) + '!False' #Old
+                    temporaryDict[ temporaryString ] = [ characterName , str(currentParagraphLineCount) ]
+                    temporaryList.append( [temporaryString, characterName, str(currentParagraphLineCount), str(currentLineNumber) ] )
 
                     #and start a new temporaryString
                     temporaryString=None
@@ -485,7 +502,11 @@ class Strawberry:
                 #print('pie2')
                 sys.exit('Unspecified error.'.encode(consoleEncoding))
 
-            #remove the current line from inputFileContents, in preparating for reading the next line of inputFileContents
+            if currentLineNumberWasUpdated == False:
+                currentLineNumber+=1
+            currentLineNumberWasUpdated=False
+
+            # Remove the current line from inputFileContents, in preparating for reading the next line of inputFileContents.
             inputFileContents=inputFileContents.partition('\n')[2] #removes first line from string
             #continue processing file onto next line normally without database insertion code until file is fully processed and dictionary is filled
             #Once inputFileContents == '', the loop will end and the dictionary can then be fed into the main database.
@@ -495,9 +516,12 @@ class Strawberry:
             print('inputFileContents is now empty of everything including new lines.'.encode(consoleEncoding))
             #feed temporaryDictionary into spreadsheet #Edit: return dictionary instead.
             #return temporaryDict
-            for dialogue, metadata in temporaryDict.items():
+            #for dialogue, metadata in temporaryDict.items():
                 #print(x, y)
-                self.appendRow([dialogue,metadata[0],metadata[1]])
+            #    self.appendRow([dialogue,metadata[0],metadata[1]])
+            for entry in temporaryList:
+                lengthOfEntry=len(entry)
+                self.appendRow( [ entry[0], entry[1], entry[2] + metadataDelimiter + entry[3] ])
             if debug == True:
                 self.printAllTheThings()
 
@@ -511,7 +535,6 @@ class Strawberry:
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-
     #TODO:
     #1) Export an existing spreadsheet to a file.
     #2) Import a file into an existing spreadsheet or dictionary.
@@ -522,7 +545,7 @@ class Strawberry:
     def importFromCSV(self, fileNameWithPath,myFileNameEncoding,ignoreWhitespace=True):
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
-            sys.exit(('\n Error. Unable to find .csv file:"' + fileNameWithPath + '"' + usageHelp).encode(consoleEncoding))
+            sys.exit(('\n Error. Unable to find .csv file:"' + fileNameWithPath + '"').encode(consoleEncoding))
 
         #tempWorkbook = openpyxl.Workbook()
         #tempSpreadsheet = tempWorkbook.active
@@ -556,8 +579,20 @@ class Strawberry:
         if debug == True:
             self.printAllTheThings()
 
-    def exportToCSV(self, fileNameWithPath, myFileNameEncoding=None):
-        print('Hello World'.encode(consoleEncoding))
+
+    def exportToCSV(self, fileNameWithPath, myFileNameEncoding=defaultTextEncoding,errors=outputErrorHandling):
+        #print('Hello World'.encode(consoleEncoding))
+        with open(fileNameWithPath, 'w', newline='', encoding=myFileNameEncoding) as myOutputFileHandle:
+            myCsvHandle = csv.writer(myOutputFileHandle)
+
+            # Get every row for current spreadsheet.
+            # For every row, get each item's value in a list.
+            # myCsvHandle.writerow(thatList)
+            for row in self.spreadsheet.iter_rows(min_row=1, values_only=True):
+                tempList=[]
+                for cell in row:
+                    tempList.append( str(cell) )
+                myCsvHandle.writerow(tempList)
 
 
     def importFromXLSX(self, fileNameWithPath, myFileNameEncoding=None):

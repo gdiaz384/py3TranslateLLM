@@ -1,7 +1,2 @@
-openpyxl
-requests
-chardet
-deepl
-odfpy
-xlrd
-xlwt
+openpyxl==3.1.2
+requests==2.31.0
