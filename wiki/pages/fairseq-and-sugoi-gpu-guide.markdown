@@ -248,7 +248,7 @@ torch library is not available
 ```
 Then something went wrong installing torch or CUDA. Troubleshoot as needed.
 
-## Updating fairseq to use GPU
+## Updating fairseq and CTranslate2 to use GPU
 
 ### For fairseq:
 
@@ -321,6 +321,10 @@ ja2en.cuda()
         - Last Windows 7 version is `cudnn-11.4-windows-x64-v8.2.4.15.zip`
     - https://github.com/Purfview/whisper-standalone-win/releases/tag/libs
 
+### For CTranslate2:
+
+TODO: Put stuff here.
+
 ## Regarding Windows 7 and Windows 8:
 
 With some caveats, CUDA supports compatibility between minor versions transparently. So, even if PyTorch supports up to CUDA 11.8, PyTorch will work with any CUDA 11.x version provided that CUDA version is available from the driver and the correct library file is used.
@@ -358,6 +362,7 @@ The installation order starts roughly the same as above:
 1. See **Verify that CUDA is available in PyTorch** and continue with the rest of the installation procedure as normal.
 
 ## Regarding AMD GPUs:
+
 - PyTorch supports CPU and CUDA, but it has [no OpenCL support](//github.com/pytorch/pytorch/issues/488).
 - Technically, PyTorch 2.0.1 added support for AMD GPUs through ROCm under Linux. However, this has not been implemented for Windows as of 2024 January and ROCm compatibility on Linux is abysmally small.
 - Newer versions of PyTorch do support [ROCm](//rocm.docs.amd.com/en/latest/what-is-rocm.html) on [Linux](//rocm.docs.amd.com/projects/install-on-linux/en/latest/reference/system-requirements.html) for use with AMD GPUs, but very few AMD GPUs are currently compatible in that exact configuration.
@@ -383,7 +388,7 @@ The installation order starts roughly the same as above:
 - Requirements:
     - Windows 1703/1903.
     - DirectX 12 capable GPU (Nvidia, AMD, Intel, Qualcomm).
-    - PyTorch 1.3.0
+    - PyTorch 1.3.0+
 - Currently, in "Public Preview" and has a lot of bugs.
 - Documentation:
     - https://pypi.org/project/torch-directml  Includes built-in spyware notice.

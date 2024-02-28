@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper/wrapper library to aid in using openpyxl as a data structure.
+Description: A helper library to aid in using openpyxl as a data structure.
 
 Usage: See below. Like at the bottom.
 
 License: See main program.
-
-##stop reading now##
 
 """
 #set defaults
@@ -65,10 +63,8 @@ else:
 #Question: how does os.path.splitext(fileName) actually work? Answer: If the extension does not exist, then it returns an empty string '' object for the extension. A None comparison will not work, but...   if myFileExtOnly == '':   ... will return true and conditionally execute.
 #Returns True or False depending upon if file exists or not.
 def checkIfThisFileExists(myFile):
-    #Check if name of file was never set.
-    if myFile == None:
-        return False
-    if os.path.isfile(myFile) != True:
+    #Check if name of file was never set or if the entered data is not a file.
+    if (myFile == None) or (os.path.isfile(str(myFile)) != True):
         return False
     return True
 
@@ -78,7 +74,7 @@ def checkIfThisFileExists(myFile):
 
 
 def checkIfThisFolderExists(myFolder):
-    if (myFolder == None) or (os.path.isdir(myFolder) != True):
+    if (myFolder == None) or (os.path.isdir(str(myFolder)) != True):
         return False
     return True
 

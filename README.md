@@ -78,7 +78,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Feb26 pre-alpha`
+`Current version: 0.1 - 2024Feb27 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet.
 
@@ -107,6 +107,7 @@ Warning: py3TranslateLLM is currently undergoing active development but the proj
 7. `python py3TranslateLLM.py --help`
 
 Install/configure these other projects as needed:
+
 - DeepL:
     - [DeepL API](//www.deepl.com/pro?cta=header-pro) support is implemented using their [Python library](//pypi.org/project/deepl).
         - It can be installed with:
@@ -158,7 +159,7 @@ TODO: This section.
 
 Parameter | Description | Example(s)
 --- | --- | ---
-`-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `fairseq`, `sugoi`
+`-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `py3translationserver`, `sugoi`
 `-a`, `--address` | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`, `-a=http://localhost`
 `--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
 
@@ -186,21 +187,42 @@ Variable name | Description | Examples
 ## Release Notes:
 
 - [This xkcd](//xkcd.com/1319) is my life.
-- Concept art:
-    - The design concept behind pyTranslateLLM is to produce the highest quality machine and AI translations possible for dialogue and narration by providing LLM/NMT models the information they need to translate to the best of their ability. This includes but is not limited to:
-        - Bunding the source language strings into paragraphs to increase the context of the translated text.
-        - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
-        - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
-        - For LLMs, providing other arbitrary bits of information in the prompt.
-        - Removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
-            - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
-    - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating languages that are heavily sensitive to context, like Japanese, where much or most of the meaning of the language is not found in the spoken or written words but rather in the surrounding context in which the words are spoken.
-        - Aside: For Japanese in particular, context is very important as it is often the only way to identify who is speaking and whom it is they are talking about.
-    - **If translating from context light languages like English, where most of the meaning of the language is found within the language itself, then there should not be any or only small differences in translation quality**.
-    - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
-    - The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
-    - Other programs can be used to find and parse small bits of untranslated text in text files and images. This program focuses on dialogue.
-    - While it is not the emphasis of this program, there is some code to help extract dialogue from certain common formats and then reinsert it automatically after translation including automatic handling of word wrap.
+- If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. Technically `--resume` (`-r`) exists, but it can be overly picky.
+- In addition to the libraries listed below, py3TranslateLLM also uses several libraries from the Python standard library. See source code for an enumeration of those.
+- Settings can be specified at runtime from the command prompt and/or using `py3TranslateLLM.ini`.
+    - Settings read from the command prompt take priority over the `.ini`.
+    - Values are designated using the following syntax:
+        - `commandLineOption=value`
+        - The 'None' keyword for an option indicates no value. Example: `preTranslationDictionary=None`
+        - Whitespace is ignored.
+        - Lines with only whitespace are ignored.
+        - Lines starting with `#` are ignored. In other words, `#` means a comment.
+        - Keys in the key=value pairs are case sensitive. Many values are as well.
+        - Keys in the key=value pairs must match the command line options exactly.
+        - See: `py3TranslateLLM --help` and the **Parameters** enumeration below for valid values.
+- Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
+    - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
+
+### Concept art:
+
+- The design concept behind pyTranslateLLM is to produce the highest quality machine and AI translations possible for dialogue and narration by providing NMT and LLM models the information they need to translate to the best of their ability. This includes but is not limited to:
+    - Bunding the source language strings into paragraphs to increase the context of the translated text.
+    - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
+    - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
+    - For LLMs, providing other arbitrary bits of information in the prompt.
+    - Removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
+        - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
+- Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating languages that are heavily sensitive to context, like Japanese, where much or most of the meaning of the language is not found in the spoken or written words but rather in the surrounding context in which the words are spoken.
+    - Aside: For Japanese in particular, context is very important as it is often the only way to identify who is speaking and whom it is they are talking about.
+- **If translating from context light languages like English, where most of the meaning of the language is found within the language itself, then there should not be any or only small differences in translation quality**.
+- In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
+- The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
+- Other programs can be used to find and parse small bits of untranslated text in text files and images. This program focuses on dialogue.
+- While it is not the emphasis of this program, there is some code to help extract dialogue from certain common formats and then reinsert it automatically after translation including automatic handling of word wrap.
+- While it is not the emphasis of this program, submitting translations in batches to some NMTs is also supported.
+
+### Regarding the Spreadsheet Formats:
+
 - For the spreadsheet formats (.csv, .xlsx, .xls, .ods), the following apply when used for translating text:
     - The first row is reserved for headers and is always ignored for data processing otherwise.
     - The first column (1st) must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
@@ -228,52 +250,21 @@ Variable name | Description | Examples
     - Entries containing more than one double quote `"` within the entry must escape those quotes using a backlash `\` like: `"\"Hello, world!\""`
     - Whitespace is ignored for `languageCodes.csv` and for .csv's that contain the untranslated text.
     - Whitespace is preserved for all of the dictionaries.
-- For the text formats used for input (.txt, .ks, .ts), the inbuilt parser will use the user provided settings file to parse the file.
-    - A settings file is required when parsing such raw text files.
-    - Examples of text file parsing templates can be found under `resources/templates/`.
-- The text formats used for templates and settings (.txt) have their own syntax:
+
+### Regarding Settings Files:
+
+- The text formats used for templates and settings (.ini .txt) have their own syntax:
     - `#` indicates that line is a comment.
     - Values are specified by using `item=value` Example:
         - `paragraphDelimiter=emptyLine`
     - Empty lines are ignored.
-- If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. Technically `--resume` (`-r`) exists, but it can be overly picky.
-- In addition to the libraries listed below, py3TranslateLLM also uses several libraries from the Python standard library. See source code for an enumeration of those.
-- Settings can be specified at runtime from the command prompt and/or using `py3TranslateLLM.ini`.
-    - Settings read from the command prompt take priority over the `.ini`.
-    - Values are designated using the following syntax:
-        - `commandLineOption=value`
-        - The 'None' keyword for an option indicates no value. Example: `preTranslationDictionary=None`
-        - Whitespace is ignored.
-        - Lines with only whitespace are ignored.
-        - Lines starting with `#` are ignored. In other words, `#` means a comment.
-        - Keys in the key=value pairs are case sensitive. Many values are as well.
-        - Keys in the key=value pairs must match the command line options exactly.
-        - See: `py3TranslateLLM --help` and the **Parameters** enumeration below for valid values.
-- The `chararacterNames.csv` dictionary is somewhat overloaded and the name does not match its full functionality perfectly. Nor is it a perfect solution to the problem it was intended to solve.
-    - The actual functionality is as follows:
-        1. Entries in the first column of this dictionary will be replaced with the entries for the second column prior to text getting translated.
-        2. After the translated text returns, every entry matching the second column will be replaced back to the text in the first column.
-        3. If a line begins with the full string specified in the first column, then it will never be ignored for processing by the paragraph creation logic when working with text files (.txt, .ks, .ts) even if the first character in the line matches an entry in the `parseFile.txt`'s `ignoreLinesThatStartWith=`.
-        4. If there is no entry in the second column, not even whitespace, then step 2/step b will be skipped and the text in the first column will simply be removed prior to translation.
-    - Background:
-        - This dictionary was originally concieved from the notion that some dialogue scripts have entries like `[＠クロエ]`, `\N[1]`, `\N[2]` that represent replacable character names within the dialogue. The idea being the player gives a custom name to a character and the game engine will replace these placeholders that are within the dialogue with the chosen name during runtime.
-        - These placeholders, in essence, contain the true names of characters, so they have relevant information that should be considered when translating paragraphs. However, they do not contain that information while they are just placeholders. In addition, they should also be left untranslated in the final text to retain the original functionality of the placeholder.
-        - On a technical level, if left as-is, then in addition to not being allowed to consider the information they contain, these placeholders can also often distort the resulting translation because translation engines might split a paragraph into two fragments based upon the `[ ]`, especially fairseq/Sugoi.
-        - Thus, the idea of the `characterNames.csv` dictionary was concieved. The idea is to specify that `[＠クロエ]` is `Chloe`, a female name, during translation but revert `Chloe` back to `[＠クロエ]` after translation. This idea lead to the functionality described above getting integrated into py3TranslateLLM, including not skipping a line just because it happens to start with a placeholder. However, this approach has a number of problems.
-    - Problems:
-        - There is no gurantee that the translation engine will preserve the entries in the second column, e.g. leave `Chloe` as `Chloe`. If it changes the name of the character in any way, like using a pronoun, then there is no way to revert the substitution.
-        - The untranslated line now contains two languages.
-            - This will almost certainly mess with the translation engine's logic in unintended ways.
-            - This also creates uncertainty in how specifying a source language should be handled. Not specifying the source language all is asking for a lot of unrelated problems to crop up but specifying one source language is technically wrong because there are now two languages in the source text.
-            - However, leaving the name in the source language in the untranslated form `クロエ` to prevent a mixed language scenario will almost certainly cause the translation engine to mess up when it translates it different ways based upon the source context changing constantly. fairseq/Sugoi especially does this a lot.
-        - One not automated solution is to replace the substitution string `[＠クロエ]` with the name in the source language `クロエ` to prevent multiple languages from in the source text. Then tell the translation engine to explcitly translate that name/string of characters a very specific way `Chloe` using a translation engine specific dictionary. And finally, revert the translation back to the original substitution string using after translation by the translation engine.
-        - This can be done in py3TranslateLLM by:
-            1. Specifying an entry in the `preTranslation.csv` dictionary to remove the [ ] and add the actual name in the source language: `[＠クロエ]` -> `クロエ`.
-            1. Tell the LLM translation engine to translate the name a specific way using the `prompt.txt` file or a DeepL dictionary `クロエ` -> `Chloe`.
-                - Note: DeepL dictionaries are not currently implemented in py3TranslateLLM.
-            1. Specifying an entry in the `postTranslation.csv` dictionary to revert back the translated text to the original placeholder text used by the game engine: `Chloe` -> `[＠クロエ]`.
-        - At this time, it is not clear which approach is 'better' because the 'problems' with the `chararacterNames.csv` dictionary approach are entirely hypothetical and so might be non-existant for a particular translation engine.
-        - Regardless, being able to say 'do not include this line usually but make an exception if starts with this string' is very powerful for automation, so this functionality will be retained even if `characterNames.csv` gets removed or renamed later.
+- TODO: Update this part.
+- For the text formats used for input (.txt, .ks, .ts), the inbuilt parser will use the user provided settings file to parse the file.
+    - A settings file is required when parsing such raw text files.
+    - Examples of text file parsing templates can be found under `resources/templates/`.
+
+### Regarding the Various Dictionaries:
+
 -  There are a lot of dictionary.csv files involved. Understanding the overall flow of the program should clarify how to use them:
     1. All input files besides `fileToTranslate` are read and parsed.
     1. The data structure that holds both the untranslated and translated text while the program is working is called `mainSpreadsheet`. How it is created is handled differently depending upon if `fileToTranslate` is a spreadsheet or a text file. For spreadsheets:
@@ -295,20 +286,53 @@ Variable name | Description | Examples
     1. Settings in this parsing template are considered as they relate to word wrap and outputing the translation into the text files (.txt, .ks, .ts).
     1. The right most entry in each row is written to a copy of the text.ks file.
     1. `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions since codec conversions are not lossless.
+
+#### Regarding chararacterNames.csv:
+
+- The `chararacterNames.csv` dictionary is somewhat overloaded and the name does not match its full functionality perfectly. Nor is it a perfect solution to the problem it was intended to solve.
+- The actual functionality is as follows:
+    1. Entries in the first column of this dictionary will be replaced with the entries for the second column prior to text getting translated.
+    2. After the translated text returns, every entry matching the second column will be replaced back to the text in the first column.
+    3. If a line begins with the full string specified in the first column, then it will never be ignored for processing by the paragraph creation logic when working with text files (.txt, .ks, .ts) even if the first character in the line matches an entry in the `parseFile.txt`'s `ignoreLinesThatStartWith=`.
+    4. If there is no entry in the second column, not even whitespace, then step 2/step b will be skipped and the text in the first column will simply be removed prior to translation.
+- Background:
+    - This dictionary was originally concieved from the notion that some dialogue scripts have entries like `[＠クロエ]`, `\N[1]`, `\N[2]` that represent replacable character names within the dialogue. The idea being the player gives a custom name to a character and the game engine will replace these placeholders that are within the dialogue with the chosen name during runtime.
+    - These placeholders, in essence, contain the true names of characters, so they have relevant information that should be considered when translating paragraphs. However, they do not contain that information while they are just placeholders. In addition, they should also be left untranslated in the final text to retain the original functionality of the placeholder.
+    - On a technical level, if left as-is, then in addition to not being allowed to consider the information they contain, these placeholders can also often distort the resulting translation because translation engines might split a paragraph into two fragments based upon the `[ ]`, especially fairseq/Sugoi.
+    - Thus, the idea of the `characterNames.csv` dictionary was concieved. The idea is to specify that `[＠クロエ]` is `Chloe`, a female name, during translation but revert `Chloe` back to `[＠クロエ]` after translation. This idea lead to the functionality described above getting integrated into py3TranslateLLM, including not skipping a line just because it happens to start with a placeholder. However, this approach has a number of problems.
+- Problems:
+    - There is no gurantee that the translation engine will preserve the entries in the second column, e.g. leave `Chloe` as `Chloe`. If it changes the name of the character in any way, like using a pronoun, then there is no way to revert the substitution.
+    - The untranslated line now contains two languages.
+        - This will almost certainly mess with the translation engine's logic in unintended ways.
+        - This also creates uncertainty in how specifying a source language should be handled. Not specifying the source language all is asking for a lot of unrelated problems to crop up but specifying one source language is technically wrong because there are now two languages in the source text.
+        - However, leaving the name in the source language in the untranslated form `クロエ` to prevent a mixed language scenario will almost certainly cause the translation engine to mess up when it translates it different ways based upon the source context changing constantly. fairseq/Sugoi especially does this a lot.
+    - One not automated solution is to replace the substitution string `[＠クロエ]` with the name in the source language `クロエ` to prevent multiple languages from in the source text. Then tell the translation engine to explcitly translate that name/string of characters a very specific way `Chloe` using a translation engine specific dictionary. And finally, revert the translation back to the original substitution string using after translation by the translation engine.
+    - This can be done in py3TranslateLLM by:
+        1. Specifying an entry in the `preTranslation.csv` dictionary to remove the [ ] and add the actual name in the source language: `[＠クロエ]` -> `クロエ`.
+        1. Tell the LLM translation engine to translate the name a specific way using the `prompt.txt` file or a DeepL dictionary `クロエ` -> `Chloe`.
+            - Note: DeepL dictionaries are not currently implemented in py3TranslateLLM.
+        1. Specifying an entry in the `postTranslation.csv` dictionary to revert back the translated text to the original placeholder text used by the game engine: `Chloe` -> `[＠クロエ]`.
+    - At this time, it is not clear which approach is 'better' because the 'problems' with the `chararacterNames.csv` dictionary approach are entirely hypothetical and so might be non-existant for a particular translation engine.
+    - Regardless, being able to say 'do not include this line usually but make an exception if starts with this string' is very powerful for automation, so this functionality will be retained even if `characterNames.csv` gets removed or renamed later.
+
+### Regarding DeepL:
+
 - DeepL has a few quirks:
-    - DeepL's [support page](//support.deepl.com/hc).
-    - Certain languages, like Chinese, English, and Portuguese, have regional variants.
-    - DeepL is picky about the target English dialect based upon the source language.
-    - But yet, language dictionaries can be used with any dialect of that language (TODO: double-check this).
-    - DeepL's [API Free](//support.deepl.com/hc/en-us/articles/360021200939-DeepL-API-Free) vs Pro plans.
-        - The formal vs informal feature is only available for Pro users, so not available for the deepl-api-free or deepl-web translation engines. [About-the-formal-informal-feature](https://support.deepl.com/hc/en-us/articles/4406432463762-About-the-formal-informal-feature).
-    - If translating to Japanese, not from, then read DeepL's [plain vs polite feature](//support.deepl.com/hc/en-us/articles/6306700061852-About-the-plain-polite-feature-in-Japanese).
-- Aside: Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write the spreadsheet formats (.csv, .xlsx, .xls, .ods):
+- DeepL's [support page](//support.deepl.com/hc).
+- Certain languages, like Chinese, English, and Portuguese, have regional variants.
+- DeepL is picky about the target English dialect based upon the source language.
+- But yet, language dictionaries can be used with any dialect of that language (TODO: double-check this).
+- DeepL's [API Free](//support.deepl.com/hc/en-us/articles/360021200939-DeepL-API-Free) vs Pro plans.
+    - The formal vs informal feature is only available for Pro users, so not available for the deepl-api-free or deepl-web translation engines. [About-the-formal-informal-feature](https://support.deepl.com/hc/en-us/articles/4406432463762-About-the-formal-informal-feature).
+- If translating to Japanese, not from, then read DeepL's [plain vs polite feature](//support.deepl.com/hc/en-us/articles/6306700061852-About-the-plain-polite-feature-in-Japanese).
+
+### Regarding XLSX
+
+- XLSX (XML... TODO: This part.) is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries directly without any.
+- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write the spreadsheet formats (.csv, .xlsx, .xls, .ods):
     - Apache [OpenOffice](//www.openoffice.org). [License](//www.openoffice.org/license.html) and [source](//openoffice.apache.org/downloads.html). Note: Can read but not write to .xlsx.
     - [LibreOffice](//www.libreoffice.org). [License](//www.libreoffice.org/about-us/licenses) and [source](//www.libreoffice.org/download/download-libreoffice/).
     - [OnlyOffice](//www.onlyoffice.com/download-desktop.aspx) is [AGPL v3](//github.com/ONLYOFFICE/DesktopEditors/blob/master/LICENSE). [Source](//github.com/ONLYOFFICE/DesktopEditors).
-- Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
-    - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
 
 ### Text Encoding and py3TranslateLLM:
 

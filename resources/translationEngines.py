@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: This defines various translation engines to use when translating text. The idea is to expose a semi-uniform interface. These libraries assume the data will be input as either a single string or as a batch. Batches are a single Python list where each entry is a string.
+Description: This library defines various translation engines to use when translating text. The idea is to expose a semi-uniform interface. These libraries assume the data will be input as either a single string or as a batch. Batches are a single Python list where each entry is a string.
 
 Usage: See below. Like at the bottom.
 
 License: See main program.
-
-##stop reading now##
 
 """
 #set defaults
@@ -53,11 +51,10 @@ Usage and concept art:
 import translationEngines
 
 translationEngine=translationEngines.KoboldCpp( sourceLanguage, targetLanguage, address, port, prompt )
-translationEngine=translationEngines.DeepLAPIFree( sourceLanguage, targetLanguage, APIKey )
-translationEngine=translationEngines.DeepLAPIPro( sourceLanguage, targetLanguage, APIKey )
+translationEngine=translationEngines.DeepLAPIFree( sourceLanguage, targetLanguage, APIKey, deeplDictionary )
+translationEngine=translationEngines.DeepLAPIPro( sourceLanguage, targetLanguage, APIKey, deeplDictionary )
 translationEngine=translationEngines.DeepLWeb( sourceLanguage, targetLanguage )
 translationEngine=translationEngines.SugoiNMT( sourceLanguage, targetLanguage, address, port )
-
 
 translationEngine.supportsBatches
 translationEngine.supportsHistory
@@ -71,10 +68,10 @@ translationEngine.apiKey
 translationEngine.translate(mystring)
 translationEngine.translate_batch(myList)
 
-
 batchesAreAvailable=translationEngine.supportsBatches
 if batchesAreAvailable == True:
     # stuff here
 else:
     # line by line only
 
+"""

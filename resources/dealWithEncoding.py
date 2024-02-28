@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A small helper library to help with dealing with text encoding in files. Uses the chardet library if it is available.
+Description: This is a small helper library to help with dealing with text encoding in files. Uses the chardet library if it is available.
 
 Usage: See below. Like at the bottom.
 
 License: See main program.
 
-##stop reading now##
-
 """
+__version__='2024Feb27'
+
 #set defaults
 version = '0.1 2024Jan24'
 printStuff=True
