@@ -13,8 +13,6 @@ And provides interoperability for the following formats:
 
 - Comma separated value text documents (.csv).
 - Microsoft Excel 2007+ (.xlsx).
-- KAG3 used in the kirikiri game engine (.ks).
-- Random text files (.txt).
 
 The focus is the spreadsheet formats, but a built in customizable parser supports inputs and replacements into arbitrary text files.
 
@@ -25,18 +23,11 @@ The focus is the spreadsheet formats, but a built in customizable parser support
     - DeepL (Web hook), NMT.
     - fairseq/Sugoi Offline Translator, NMT.
 - These file formats:
-    - OpenDocument spreadsheet (.ods).
     - Microsoft Excel 97/2000/XP (.xls).
-    - KAG3 used in TyranoBuilder (.ks/.ts?).
-    - JSON support:
-        - Support for JSON produced by [VNTranslationTools](//github.com/arcusmaximus/VNTranslationTools).
-        - Support for UlyssesWu's [FreeMote](//github.com/UlyssesWu/FreeMote) text files converted from PSB to JSON.
-        - Support for JSON where all entries are nested under `contents` and there is no additional nesting.
-            - Multiple entries be in a list surrounded by square brackets `[ ]`.
-        - Support for arbitrary JSON types via an external parsing program. Maybe it should be named:
-            - Any2ChocolateStrawberry
-            - Any2Spreadsheet
-        - To process additional types of JSON, open an issue and provide an `example.json`.
+    - OpenDocument spreadsheet (.ods).
+
+- Generic OpenAI compatible web servers.
+    - Example: https://github.com/vllm-project/vllm
 
 Not Planned:
 

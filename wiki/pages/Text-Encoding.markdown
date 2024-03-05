@@ -9,13 +9,14 @@
 
 ### Common and Standard Encodings
 
-- For the supported encodings see: [standard-encodings](//docs.python.org/3.7/library/codecs.html#standard-encodings).  Common encodings:
+- For all Python supported encodings see: [standard-encodings](//docs.python.org/3.7/library/codecs.html#standard-encodings).  Common encodings:
     - `utf-8` - If at all possible, please only use `utf-8`, and use it for absolutely everything.
         - py3TranslateLLM uses `utf-8` as the default encoding for everything except kirikiri.
     - `shift-jis` - Required by the kirikiri game engine and many Japanese visual novels, games, programs, media, and text files in general.
     - `utf-16-le` - a.k.a. `ucs2-bom-le`. Alternative encoding used by the kirikiri game engine. TODO: Double check this.
     - `cp437` - This is the old IBM/DOS code page for English that Windows with an English locale often uses by default. 
     - `cp1252` - This is the code page for western european languages that Windows with an English locale often uses by default.
+- [Error handlers](//docs.python.org/3.7/library/codecs.html#error-handlers) can be used to handle conversion errors from one type of encoding to another.
 
 ### Windows specific notes
 

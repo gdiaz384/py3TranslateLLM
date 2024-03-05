@@ -109,8 +109,6 @@ def verifyThisFolderExists(myFolder, nameOfFileToOutputInCaseOfError=None):
 #The text file uses the syntax: setting=value, # are comments, empty/whitespace lines ignored.
 #This function builds a dictionary and then returns it to the caller.
 def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding=consoleEncoding, errorHandlingType=inputErrorHandling,debug=debug):
-    #print('Hello World'.encode(consoleEncoding))
-    #return 'pie'
     if fileNameWithPath == None:
         print( ('Cannot read settings from None entry: '+fileNameWithPath ).encode(consoleEncoding) )
         return None
@@ -120,12 +118,16 @@ def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding
         sys.exit( ('\n Error: Unable to find input file \''+ fileNameWithPath + '\'' + usageHelp).encode(consoleEncoding) )
     #then read entire file into memory
     #If there is an error reading the contents into memory, just close it.
-    try:
-        inputFileHandle = open(fileNameWithPath,'r',encoding=fileNameEncoding, errors=errorHandlingType) #open in read only text mode #Will error out if file does not exist.
+#    try:
+#        inputFileHandle = open(fileNameWithPath,'r',encoding=fileNameEncoding, errors=errorHandlingType) #open in read only text mode #Will error out if file does not exist.
         #open() works with both \ and / to traverse folders.
-        inputFileContents=inputFileHandle.read()
-    finally:
-        inputFileHandle.close()#Always executes, probably.
+#        inputFileContents=inputFileHandle.read()
+#    finally:
+#        inputFileHandle.close()#Always executes, probably.
+
+    #Newer, simplier syntax.
+    with open( fileNameWithPath, 'r', encoding=fileNameEncoding, errors=inputErrorHandling ) as myFileHandle:
+        inputFileContents = myFileHandle.read()
 
     if not isinstance(inputFileContents, str):
         sys.exit( ('Error: Unable to read from file: '+fileNameWithPath).encode(consoleEncoding) )
@@ -305,7 +307,7 @@ def importDictionaryFromCSV(myFile, myFileEncoding,ignoreWhitespace=False):
     tempValue=''
     index=0
     #'with' is correct. Do not use 'while'.
-    with open(myFile, newline='', encoding=myFileEncoding, errors=inputErrorHandling) as myFileHandle:
+    with open(myFile, 'r', newline='', encoding=myFileEncoding, errors=inputErrorHandling) as myFileHandle:
         csvReader = csv.reader(myFileHandle)
         currentLine=0
         for line in csvReader:
