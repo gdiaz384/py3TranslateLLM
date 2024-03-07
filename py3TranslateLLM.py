@@ -110,8 +110,8 @@ commandLineParser.add_argument('-f', '--fileToTranslate', help='Either the raw f
 commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+str(defaultTextEncoding), default=None, type=str)
 commandLineParser.add_argument('-o', '--outputFile', help='The file to insert translations into, including path. Default is same as input file.', default=None, type=str)
 commandLineParser.add_argument('-ofe', '--outputFileEncoding', help='The encoding of the output file. Default is same as input file.', default=None, type=str)
-commandLineParser.add_argument('-pfile', '--parsingSettingsFile', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None, type=str)
-commandLineParser.add_argument('-pfe', '--parsingSettingsFileEncoding', help='Specify encoding for parsing definitions file, default='+str(defaultTextEncoding), default=None, type=str)
+#commandLineParser.add_argument('-pfile', '--parsingSettingsFile', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None, type=str)
+#commandLineParser.add_argument('-pfe', '--parsingSettingsFileEncoding', help='Specify encoding for parsing definitions file, default='+str(defaultTextEncoding), default=None, type=str)
 commandLineParser.add_argument('-p', '--promptFile', help='This file has the prompt for the LLM.', default=None, type=str)
 commandLineParser.add_argument('-pe', '--promptFileEncoding', help='Specify encoding for prompt file, default='+str(defaultTextEncoding), default=None, type=str)
 
@@ -137,7 +137,7 @@ commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines
 commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
 commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength), default=None, type=int)
-commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.', action='store_true')
+#commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.', action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
 
 commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str)
@@ -159,7 +159,7 @@ commandLineArguments=commandLineParser.parse_args()
 
 translationEngine=commandLineArguments.translationEngine
 fileToTranslate=commandLineArguments.fileToTranslate
-parsingSettingsFile=commandLineArguments.parsingSettingsFile
+#parsingSettingsFile=commandLineArguments.parsingSettingsFile
 outputFile=commandLineArguments.outputFile
 promptFile=commandLineArguments.promptFile
 
@@ -180,7 +180,7 @@ reTranslate=commandLineArguments.reTranslate
 readOnlyCache=commandLineArguments.readOnlyCache
 
 contextHistoryLength=commandLineArguments.contextHistoryLength
-lineByLineMode=commandLineArguments.lineByLineMode
+#lineByLineMode=commandLineArguments.lineByLineMode
 resume=commandLineArguments.resume
 
 address=commandLineArguments.address  #Must be reachable. How to test for that?
@@ -329,7 +329,7 @@ if debug == True:
 
 #The variable names needed to be exact for the local()[x] dictionary shenanigans to work, but now that they have been updated, rename them to be more descriptive. The variable names for encoding options will be fixed later.
 fileToTranslateFileName=fileToTranslate
-parseSettingsFileName=parsingSettingsFile
+#parseSettingsFileName=parsingSettingsFile
 outputFileName=outputFile
 promptFileName=promptFile
 
@@ -433,6 +433,8 @@ if implemented == False:
 # Certain files must always exist, like fileToTranslateFileName, and usually languageCodesFileName.
 # parseSettingsFileName is only needed if read or writing to text files. Reading from text files is easy to check.
 # But how to check if writing to them? If output is .txt, .ks, .ts, then writing to text file. Output can also be based upon input. For output, parseOnly must not be specified, so this output text file check should not be checked with the parseOnly block. Alternatively: The only time parseSettingsFileName is not needed is when writting to output files.
+# Updated py3TranslateLLM to only accept spreadsheet inputs in order to divide the logic between parsing files and translating spreadsheets.
+# Use py3AnyText2Spreadsheet to create spreadsheets from raw text files from now on.
 #Errors out if myFile does not exist.
 """
 #Syntax:
@@ -446,7 +448,6 @@ py3TranslateLLMfunctions.verifyThisFolderExists(myVar, 'myVar')
 py3TranslateLLMfunctions.checkIfThisFileExists('myfile.csv')
 py3TranslateLLMfunctions.checkIfThisFolderExists(myVar)
 """
-
 
 
 if languageCodesFileName == None:
@@ -481,59 +482,20 @@ elif fileToTranslateFileExtensionOnly == '.ods':
     fileToTranslateIsASpreadsheet=True
 else:
     fileToTranslateIsASpreadsheet=False
-#fileToTranslateFileName does not need to have an extension. If it has no extension, then it is assumed to be a text file and will thus require a parsefile.
+    print( ('Error: Unrecognized extension for a spreadsheet: ' + str(fileToTranslateFileExtensionOnly)).encode(consoleEncoding) )
+    sys.exit(1)
 
 
 # Either a raw.unparsed.txt must be specified or a raw.untranslated.csv if selecting one of the other engines.
 # if using parseOnly, a valid file (raw.unparsed.txt and parseDefinitionsFile.txt) must exist.
 if mode == 'parseOnly':
+    pass
+
     # Check if valid parsing definition file exists. Example: parseKirikiri.py
-    py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName,'parseSettingsFileName')
+    #py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName,'parseSettingsFileName')
 
-    if fileToTranslateIsASpreadsheet == True:
-        sys.exit( ('parseOnly is only valid with text files. It is not valid with spreadsheets: ' + str(fileToTranslateFileName)).encode(consoleEncoding) )
-
-    # Edit: parseOnly mode has been updated to act purely as a proxy to py3Any2Spreadsheet.py, which returns a chocolate.Strawberry(), and the settings file that must be specified is currently the python script that is passed to py3Any2Spreadsheet.py. All notion of character encodings is handled within that file.
-    # In other words, py3Any2Spreadsheet must import sucessfully as a library in order to be used in this program.
-    try:
-        # This works if py3Any2Spreadsheet\py3Any2Spreadsheet.py exists.
-        import py3Any2Spreadsheet.py3Any2Spreadsheet
-        #print('pie0')
-    except ImportError:
-        try:
-            # This works if ..\py3Any2Spreadsheet\py3Any2Spreadsheet.py exists.
-            # https://peps.python.org/pep-0328/#guido-s-decision
-            #from ...py3Any2Spreadsheet.py3Any2Spreadsheet import py3Any2Spreadsheet #Does not work.
-            tempPath=str( pathlib.Path(currentScriptPathOnly).absolute() ) + '/../py3Any2Spreadsheet'
-            if debug == True:
-                print( 'absolute=' + tempPath )
-            if py3TranslateLLMfunctions.checkIfThisFolderExists(tempPath) == True:
-                #print('pie1')
-                sys.path.append(tempPath)
-                import py3Any2Spreadsheet
-            else:
-                raise ImportError
-            #print('pie2')
-        except ImportError:
-            try:
-            # This works if resources\py3Any2Spreadsheet\py3Any2Spreadsheet.py exists.
-                import resources.py3Any2Spreadsheet.py3Any2Spreadsheet as py3Any2Spreadsheet
-                #print('pie3')
-            except ImportError:
-                try:
-                    # This is nearly last because it will import any folder named resources\py3Any2Spreadsheet as opposed to only resources\py3Any2Spreadsheet.py .
-                    # this should also work to import resources\py3Any2Spreadsheet.py
-                    import resources.py3Any2Spreadsheet as py3Any2Spreadsheet
-                    #print('pie4')
-                except ImportError:
-                    try:
-                        # This is last because it will import any folder named py3Any2Spreadsheet as opposed to only py3Any2Spreadsheet.py .
-                        import py3Any2Spreadsheet
-                        #print('pie5')
-                    except ImportError:
-                        sys.exit( 'Error: parseOnly specified but parser library could not be imported.')
-
-sys.exit(1)
+#    if fileToTranslateIsASpreadsheet == True:
+#        sys.exit( ('parseOnly is only valid with text files. It is not valid with spreadsheets: ' + str(fileToTranslateFileName)).encode(consoleEncoding) )
 
 #    if parseSettingsFileName != None:
 #        if os.path.isfile(parseSettingsFileName) != True:
@@ -614,11 +576,6 @@ if (mode == 'deepl_api_free') or (mode == 'deepl_api_pro'):
     # Syntax: os.environ['CT2_VERBOSE'] = '1'
 
 
-# if the input file is not a spreadsheet, then a parse file is required. If it is a spreadsheed, then it will not have a parse file.
-if fileToTranslateIsASpreadsheet == False:
-    py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName,'parseSettingsFileName')
-
-
 if outputFileName == None:
     # If no outputFileName was specified, then set it the same as the input file. This will have the date and appropriate extension appended to it later.
     outputFileName=fileToTranslateFileName
@@ -696,7 +653,7 @@ else:
 #set rest of encodings using dealWithEncoding.ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding):
 
 #parsingSettingsFileEncoding=commandLineArguments.parsingSettingsFileEncoding
-parseSettingsFileEncoding = dealWithEncoding.ofThisFile(parseSettingsFileName, parsingSettingsFileEncoding, defaultTextEncoding)
+#parseSettingsFileEncoding = dealWithEncoding.ofThisFile(parseSettingsFileName, parsingSettingsFileEncoding, defaultTextEncoding)
 
 promptFileEncoding = dealWithEncoding.ofThisFile(promptFileName, promptFileEncoding, defaultTextEncoding)
 
@@ -824,8 +781,6 @@ if verbose == True:
     print( ('preDictionary='+str(preDictionary)).encode(consoleEncoding) )
     print( ('postDictionary='+str(postDictionary)).encode(consoleEncoding) )
     print( ('postWritingToFileDictionary='+str(postWritingToFileDictionary)).encode(consoleEncoding) )
-
-
 
 
 # Next turn the main inputFile into a data structure.

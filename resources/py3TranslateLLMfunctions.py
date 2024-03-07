@@ -25,14 +25,14 @@ usageHelp='\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mo
 
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
-import os, os.path                      #Extract extension from filename, and test if file exists.
-from pathlib import Path            #Override file in file system with another and create subfolders.
-import requests
-import sys                                   #End program on fail condition.
-import io                                      #Manipulate files (open/read/write/close).
-import datetime                          #Used to get current date and time.
-import openpyxl                          #Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
-import csv                                    #Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
+import os, os.path                      # Extract extension from filename, and test if file exists.
+#import pathlib                            # For pathlib.Path Override file in file system with another and create subfolders. Sane path handling.
+import requests                          # Check if internet exists.
+import sys                                   # End program on fail condition.
+import io                                      # Manipulate files (open/read/write/close).
+import datetime                          # Used to get current date and time.
+import csv                                    # Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
+import openpyxl                          # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
 try:
     import odfpy                           #Provides interoperability for Open Document Spreadsheet (.ods).
     odfpyLibraryIsAvailable=True
@@ -343,6 +343,9 @@ def importDictionaryFromCSV(myFile, myFileEncoding,ignoreWhitespace=False):
 
 def importDictionaryFromXLSX(myFile, myFileEncoding):
     print('Hello World'.encode(consoleEncoding))
+    workbook = openpyxl.load_workbook(filename=myFile) #, data_only=)
+    spreadsheet=workbook.active
+
 
 def importDictionaryFromXLS(myFile, myFileEncoding):
     print('Hello World'.encode(consoleEncoding))

@@ -314,16 +314,17 @@ Variable name | Description | Examples
 - DeepL is picky about the target English dialect based upon the source language.
 - But yet, language dictionaries can be used with any dialect of that language (TODO: double-check this).
 - DeepL's [API Free](//support.deepl.com/hc/en-us/articles/360021200939-DeepL-API-Free) vs Pro plans.
-    - The formal vs informal feature is only available for Pro users, so not available for the deepl-api-free or deepl-web translation engines. [About-the-formal-informal-feature](https://support.deepl.com/hc/en-us/articles/4406432463762-About-the-formal-informal-feature).
+    - The formal vs informal feature is only available for Pro users, so not available for the deepl-api-free or deepl-web translation engines. [About-the-formal-informal-feature](//support.deepl.com/hc/en-us/articles/4406432463762-About-the-formal-informal-feature).
 - If translating to Japanese, not from, then read DeepL's [plain vs polite feature](//support.deepl.com/hc/en-us/articles/6306700061852-About-the-plain-polite-feature-in-Japanese).
 
 ### Regarding XLSX
 
-- XLSX (XML... TODO: This part.) is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries directly without any.
-- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write the spreadsheet formats (.csv, .xlsx, .xls, .ods):
+- [Open Office XML](//en.wikipedia.org/wiki/Office_Open_XML), .xlsx, is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries and the cache directly without any unnecessary conversions that could introduce formatting bugs.
+- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write Open Office XML and the other spreadsheet formats (.csv, .xlsx, .xls, .ods):
     - Apache [OpenOffice](//www.openoffice.org). [License](//www.openoffice.org/license.html) and [source](//openoffice.apache.org/downloads.html). Note: Can read but not write to .xlsx.
     - [LibreOffice](//www.libreoffice.org). [License](//www.libreoffice.org/about-us/licenses) and [source](//www.libreoffice.org/download/download-libreoffice/).
     - [OnlyOffice](//www.onlyoffice.com/download-desktop.aspx) is [AGPL v3](//github.com/ONLYOFFICE/DesktopEditors/blob/master/LICENSE). [Source](//github.com/ONLYOFFICE/DesktopEditors).
+- [OpenPyXL](//openpyxl.readthedocs.io), the library used in the core data structure, follows the OOXML standard closely, and [will not load](//openpyxl.readthedocs.io/en/stable/tutorial.html#errors-loading-workbooks) documents that do not follow the standard closely. In other words, Microsoft Office will probably not work.
 
 ### Text Encoding and py3TranslateLLM:
 
@@ -388,7 +389,7 @@ Variable name | Description | Examples
 
 - Reccomended: If you do not want to deal with this, then use a binary file in the [releases](//github.com/gdiaz384/py3TranslateLLM/releases) page instead.
 - py3TranslateLLM was developed on Python 3.7.6.
-- deepl-python is going to start requiring Python 3.8+ because ???.
+- deepl-python is going to start requiring Python 3.8+ in 2024 because ???.
 - It is not necessarily clear what versions work with what other versions, in part due to the shenanigans of some developers creating deliberate incompatibilities, so just install whatever and hope it works.
 
 Library name | Required, Reccomended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
@@ -408,6 +409,7 @@ Libraries can also require other libraries.
 
 - deepl-python requires: `requests`, `charset-normalizer`, `idna`, `urllib3`, `certifi`.
 - odfpy requires: `defusedxml`.
+- openpyxl has `defusedxml` as an optional library.
 - py3TranslateLLM and the libraries above also use libraries from the Python standard library. For an enumeration of those, check the source code.
 
 ###  Guide: Installing and managing Python library versions with `pip`:
