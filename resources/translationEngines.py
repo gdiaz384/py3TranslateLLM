@@ -23,6 +23,8 @@ import requests
 
 #wrapper class for spreadsheet data structure
 class SugoiNMT:
+    # Address is the protocol and the ip address or hostname of the target server.
+    # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
     def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None): 
         self.sourceLanguage=sourceLanguage
         self.targetLanguage=targetLanguage
@@ -35,11 +37,12 @@ class SugoiNMT:
 
         self.model=None
         self.version=None
-        try:
-            self.model= requests.get(self.address + ':' + self.port + '/api/v1/model',timeout=10)
-            self.version= requests.get(self.address + ':' + self.port + '/api/v1/version',timeout=10)
-        except:
-            pass
+        if (self.address != None) and (self.port != None):
+            try:
+                self.model= requests.get(self.address + ':' + self.port + '/api/v1/model',timeout=10)
+                self.version= requests.get(self.address + ':' + self.port + '/api/v1/version',timeout=10)
+            except:
+                pass
 
         
 
@@ -70,7 +73,7 @@ translationEngine.translate_batch(myList)
 
 batchesAreAvailable=translationEngine.supportsBatches
 if batchesAreAvailable == True:
-    # stuff here
+    # stuff here. Send to translation engine as a list.
 else:
     # line by line only
 
