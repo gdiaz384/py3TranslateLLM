@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
-__version__='2024Feb27'
+__version__='2024Mar17'
 
 #set defaults
 printStuff=True
@@ -396,8 +396,9 @@ class Strawberry:
 
 
     def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
-        print('Hello World'.encode(consoleEncoding))
-        #return workbook
+        self.workbook=openpyxl.load_workbook(filename = fileNameWithPath)
+        self.spreadsheet=self.workbook.active
+
     def exportToXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         #print('Hello World'.encode(consoleEncoding))
         #Syntax: 
