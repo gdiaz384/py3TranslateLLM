@@ -34,7 +34,7 @@ defaultChineseLanguage='Chinese (simplified)'
 # Valid options are 'Portuguese (European)' or 'Portuguese (Brazilian)'
 defaultPortugueseLanguage='Portuguese (European)'
 
-defaultCacheFile='backups/cache.xlsx'
+
 defaultAddress='http://localhost'
 defaultKoboldCppPort=5001
 defaultPy3TranslationServerPort=14366
@@ -53,12 +53,15 @@ defaultAssignmentOperatorInSettingsFile='='
 defaultMetadataDelimiter='_'
 defaultScriptSettingsFileExtension='.ini'
 
-# Currently, this is relative to py3TranslateLLM.py, but it might also make sense to move this either relative to the target or to a system temp folder.
-# There is no gurantee that being relative to the target is a sane thing to do since that depends upon runtime usage, and centralized backups also make sense. Leaving it as-is makes sense too.
+# Currently, these are relative to py3TranslateLLM.py, but it might also make sense to move them either relative to the target or to a system folder intended for holding program data.
+# There is no gurantee that being relative to the target is a sane thing to do since that depends upon runtime usage, and centralized backups also make sense. Leaving it as-is makes sense too as long as py3TranslateLLM is not being used as a library. If it is not being used as a library, then a centralized location under $HOME or %localappdata% makes more sense than relative to py3TranslateLLM.py. Same with the default location for the cache file.
+# Maybe a good way to check for this is the name = __main__ check?
+defaultExportExtension='.xlsx'
+defaultCacheFile='backups/cache' + defaultExportExtension
 defaultBackupsFolder='backups'
 
-translationEngines='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
-usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEngines+'.'
+translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
+usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEnginesAvailable+'.'
 
 
 #import various libraries that py3TranslateLLM depends on
@@ -74,15 +77,15 @@ import io                                        # Manipulate files (open/read/w
 
 #Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes.
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
-import collections                         # Newer syntax. For deque.
-import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'  
+import collections                         # Newer syntax. For deque. Used to hold rolling history of translated items to use as context for new translations.
+#import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'  
 
 #import openpyxl                           # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
 import resources.chocolate as chocolate # Implements openpyxl. A helper/wrapper library to aid in using openpyxl as a datastructure.
 import resources.dealWithEncoding as dealWithEncoding   # dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  # Moved most generic functions here to increase code readability and enforce function best practices.
 #from resources.py3TranslateLLMfunctions import * # Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
-
+import resources.translationEngines as translationEngines
 
 #Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
 sysVersion=int(sys.version_info[1])
@@ -104,14 +107,16 @@ else:
 
 # Add command line options.
 commandLineParser=argparse.ArgumentParser(description='Description: CLI wrapper script for various NMT and LLM models.' + usageHelp)
-commandLineParser.add_argument('-mode', '--translationEngine', help='Specify translation engine to use, options=' + translationEngines+'.', type=str)
+commandLineParser.add_argument('-mode', '--translationEngine', help='Specify translation engine to use, options=' + translationEnginesAvailable+'.', type=str)
 
 commandLineParser.add_argument('-f', '--fileToTranslate', help='Either the raw file to translate or the spreadsheet file to resume translating from, including path.', default=None, type=str)
 commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+str(defaultTextEncoding), default=None, type=str)
 commandLineParser.add_argument('-o', '--outputFile', help='The file to insert translations into, including path. Default is same as input file.', default=None, type=str)
 commandLineParser.add_argument('-ofe', '--outputFileEncoding', help='The encoding of the output file. Default is same as input file.', default=None, type=str)
+
 #commandLineParser.add_argument('-pfile', '--parsingSettingsFile', help='This file defines how to parse raw text and .ks files. It is required for text and .ks files. If not specified, a template will be created.', default=None, type=str)
 #commandLineParser.add_argument('-pfe', '--parsingSettingsFileEncoding', help='Specify encoding for parsing definitions file, default='+str(defaultTextEncoding), default=None, type=str)
+
 commandLineParser.add_argument('-p', '--promptFile', help='This file has the prompt for the LLM.', default=None, type=str)
 commandLineParser.add_argument('-pe', '--promptFileEncoding', help='Specify encoding for prompt file, default='+str(defaultTextEncoding), default=None, type=str)
 
@@ -132,7 +137,7 @@ commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncodin
 commandLineParser.add_argument('-c', '--cacheFile', help='The location of the cache file. Must be in .xlsx format. Default=' + str(defaultCacheFile), default=None, type=str)
 commandLineParser.add_argument('-nc', '--noCache', help='Disables using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries.', action='store_true')
 commandLineParser.add_argument('-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true')
-commandLineParser.add_argument('-oc', '--overrideWithCache', help='Do not retranslate lines, but override any already translated lines in the spreadsheet with results in the cache. Default=Do not override already translated lines.', action='store_true')
+commandLineParser.add_argument('-oc', '--overrideWithCache', help='Do not retranslate lines, but override any already translated lines in the spreadsheet with results taken from the cache. Default=Do not override already translated lines.', action='store_true')
 commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use the cache to fill in previously translated lines.', action='store_true')
 commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
@@ -213,7 +218,7 @@ fileToTranslateEncoding=commandLineArguments.fileToTranslateEncoding
 outputFileEncoding=commandLineArguments.outputFileEncoding
 promptFileEncoding=commandLineArguments.promptFileEncoding
 
-parsingSettingsFileEncoding=commandLineArguments.parsingSettingsFileEncoding
+#parsingSettingsFileEncoding=commandLineArguments.parsingSettingsFileEncoding
 languageCodesFileEncoding=commandLineArguments.languageCodesFileEncoding
 
 characterNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
@@ -419,15 +424,17 @@ elif (translationEngine.lower()=='deepl_web') or (translationEngine.lower()=='de
     mode='deepl_web'
 elif (translationEngine.lower()=='py3translationserver'):
     mode='py3translationserver'
+    implemented=True
 elif (translationEngine.lower()=='sugoi') :
     mode='sugoi'
     #Sugoi has a default port association and only supports Jpn->Eng translations, so having a dedicated entry for it is still useful for input validation, especially since it only supports a subset of the py3translationserver API.
+    implemented=True
 else:
     sys.exit(('\n Error. Invalid translation engine specified: "' + translationEngine + '"' + usageHelp).encode(consoleEncoding))
 
 print(('Mode is set to: \''+str(mode)+'\'').encode(consoleEncoding))
 if implemented == False:
-    sys.exit( ('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEngines).encode(consoleEncoding) )
+    sys.exit( ('\n\"'+mode+'\" not yet implemented. Please pick another translation engine. \n Translation engines: '+ translationEnginesAvailable).encode(consoleEncoding) )
 
 
 # Certain files must always exist, like fileToTranslateFileName, and usually languageCodesFileName.
@@ -482,7 +489,7 @@ elif fileToTranslateFileExtensionOnly == '.ods':
     fileToTranslateIsASpreadsheet=True
 else:
     fileToTranslateIsASpreadsheet=False
-    print( ('Error: Unrecognized extension for a spreadsheet: ' + str(fileToTranslateFileExtensionOnly)).encode(consoleEncoding) )
+    print( ( 'Error: Unrecognized extension for a spreadsheet: ' + str(fileToTranslateFileExtensionOnly) ).encode(consoleEncoding) )
     sys.exit(1)
 
 
@@ -578,8 +585,9 @@ if (mode == 'deepl_api_free') or (mode == 'deepl_api_pro'):
 
 if outputFileName == None:
     # If no outputFileName was specified, then set it the same as the input file. This will have the date and appropriate extension appended to it later.
-    outputFileName=fileToTranslateFileName
-    #print('pie')
+    #outputFileName=fileToTranslateFileName
+    #Update: Just do it here instead.
+    outputFileName=fileToTranslateFileName + '.translated.' + py3TranslateLLMfunctions.getDateAndTimeFull() + defaultExportExtension 
 
 outputFileNameWithoutPathOrExt=pathlib.Path(outputFileName).stem
 outputFileExtensionOnly=pathlib.Path(outputFileName).suffix
@@ -644,7 +652,7 @@ else:
 
 
 #outputFileName
-#outputFileEncoding=
+outputFileEncoding=defaultTextEncoding
 #For the output file encoding:  
 #if the user specified an input file, use the input file's encoding for the output file
 #if the user did not specify an input file, then the program cannot run, but they might have specified a spreadsheet (.csv, .xlsx, .xls, .ods)
@@ -707,11 +715,15 @@ if (verbose == True) or (debug == True):
 #languageCodesSpreadsheet = languageCodesWorkbook.active
 
 # skip reading languageCodesFileName if mode is parseOnly.
+# Update: parseOnly mode is not really supported anymore. It should probably be renamed to dryRun mode where the purpose is to check for parsing errors in everything, including the languageCodes.csv and cache.xlsx files.
 if mode != 'parseOnly':
-    languageCodesSpreadsheet=chocolate.Strawberry(languageCodesFileName,languageCodesEncoding,ignoreWhitespaceForCSV=True)
+    print('languageCodesFileName='+languageCodesFileName)
+    print('languageCodesEncoding='+languageCodesEncoding)
 
-    #replace this code with dedicated search functions from chocolate
-    #use....chocolate.searchColumnsCaseInsensitive(spreadsheet, searchTerm)
+    languageCodesSpreadsheet=chocolate.Strawberry(myFileName=languageCodesFileName,fileEncoding=languageCodesEncoding,removeWhitespaceForCSV=True)
+
+    # replace this code with dedicated search functions from chocolate.Strawberry()
+    # use....Strawberry().searchColumnsCaseInsensitive(spreadsheet, searchTerm)
     #languageCodesSpreadsheet
 
     #Source language is optional.
@@ -784,35 +796,17 @@ if verbose == True:
 
 
 # Next turn the main inputFile into a data structure.
-#then create data structure seperately from reading the file
+# then create data structure seperately from reading the file
 # This returns a very special dictionary where the value in key=value is a special list and then add data row by row using the dictionary values #Edit, moved to chocolate.py so as to not have to do that. All spreadsheets that require a parseFile will therefore always be Strawberries from the chocolate library.
 # Strawberry is a wrapper class for the workbook class with additional methods.
 # The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class. Syntax:
 # mainSpreadsheet=chocolate.Strawberry()
 # py3TranslateLLMfunctions.parseRawInputTextFile
 
-# if the main file is a .txt, .ks or .ts file, then it will have a parse file. Otherwise, if it is a spreadsheet, then it will not have a parse file.
-# if it is a spreadsheet file, then read it in as a datastructure natively.
-if fileToTranslateIsASpreadsheet == True:
-    #then create data structure using that spreadsheet file.
-    mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileToTranslateEncoding)
-elif fileToTranslateIsASpreadsheet != True:
-    #This must have a parse file, so turn it into a dictionary.
-    #read in parseFile which returns as a dictionary. Parse file is usually needed because it has both parse settings (start of processing) and wordWrap settings (end of processing). However, neither parsing nor wordWrap are always needed since user can specify a seperate outfile which just dumps mainSpreadsheet with the translated values.
-
-    parseSettingsDictionary = py3TranslateLLMfunctions.readSettingsFromTextFile(parseSettingsFileName, parseSettingsFileEncoding)
-    if debug == True:
-        print( ('parseSettingsDictionary='+str(parseSettingsDictionary)).encode(consoleEncoding) )
-
-    #And then use that dictionary to create a Strawberry()
-    #mainSpreadsheet = chocolate.Strawberry(fileToTranslateFileName, fileToTranslateEncoding, parseSettingsDict = parseSettingsDictionary, charaNamesDict = charaNamesDictionary)
-
-    parsingScriptObject=pathlib.Path(parsingScript).absolute()
-    sys.path.append(str(parsingScriptObject.parent))
-    parser=parsingScriptObject.name
-    import parser
-
-
+# if main file is a spreadsheet, then it be read in as a native data structure. Otherwise, if the main file is a .txt file, then it will be parsed as line-by-line.
+# Basically, the user is responsible for proper parsing if line-by-line parsing does not work right. Proper parsing is outside the scope of py3TranslateLLM
+# Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
+mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileToTranslateEncoding, addHeaderToTextFile=False)
 
 #Before doing anything, just blindly create a backup.
 #backupsFolder does not have / at the end
@@ -833,6 +827,11 @@ if debug == True:
 
 #Now that the main data structure has been created, the spreadsheet is ready to be translated.
 if mode == 'parseOnly':
+    mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles='A')
+    #work complete. Exit.
+    sys.exit( 'Work complete.'.encode(consoleEncoding) )
+
+    # Old code.
     #The outputFileName will match fileToTranslateFileName if an output file name was not specified. If one was specified, then assume it had an extension.
     if outputFileName == fileToTranslateFileName:
         mainSpreadsheet.exportToXLSX( outputFileName + '.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx' )
@@ -847,16 +846,15 @@ if mode == 'parseOnly':
     elif outputFileExtensionOnly == '.ods':
         mainSpreadsheet.exportToODS(outputFileName)
     elif outputFileExtensionOnly == '.txt':
-        mainSpreadsheet.exportToTextFile(outputFileName,'rawText')
-    #work complete. Exit.
-    sys.exit( 'Work complete.'.encode(consoleEncoding) )
+        mainSpreadsheet.exportToTextFile(outputFileName,'A')
+
 
 #Now need to translate stuff.
 
-# Cache should always be added. This potentially that creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision.
+# Cache should always be added. This potentially creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision to keep cache enabled despite the slight collisions.
 
 #First, initialize cache.xlsx file under backups/
-#Has same structure as mainSpreadsheet except for no speaker and no metadata. Multiple columns with each one.
+# Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header of course. Multiple columns with each one as a different translation engine.
 #if the path for cache does not exist, then create it.
 pathlib.Path( cachePathOnly ).mkdir( parents = True, exist_ok = True )
 
@@ -868,31 +866,106 @@ if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == False:
      #Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
     cache=chocolate.Strawberry(myFileName=cacheFileName,fileEncoding=defaultTextEncoding,createNew=True)
     #Since the Strawberry is brand new, add header row.
-    cache.appendRow(['rawText'])
+    cache.appendRow( ['rawText'] )
     cache.exportToXLSX(cacheFileName)
 
 if (verbose == True) or (debug == True):
     cache.printAllTheThings()
 
-#mainSpreadsheet=chocolate.Strawberry(fileToTranslateFileName, fileToTranslateEncoding)   cacheFileName
 
-# Implement KoboldAPI first, then DeepL, then Sugoi.
+# Implement KoboldAPI first, then DeepL, .
+# Update: Implement py3translationserver, then Sugoi, then KoboldCPP's API then DeepL API, then DeepL Web, then OpenAI's API.
+# Check current engine.
+    # Echo request? Some firewalls block echo requests.
+    # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
+
+# py3translationServer must be reachable Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
+if mode == 'py3translationserver':
+    translationEngine=translationEngines.Py3translationServerEngine(sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port)
+    #Check if the server is reachable. If not, then exit. How? The py3translationServer should have both the version and model available at http://localhost:14366/api/v1/model and version, and should have been set during initalization, so verify they are not None.
+
+    if translationEngine.model == None:
+        print( 'translationEngine.model is None' )
+        sys.exit(1)
+    elif translationEngine.version == None:
+        print( 'translationEngine.version is None' )
+        sys.exit(1)
+
+
+# SugoiNMT server must be reachable.
+
 # KoboldAPI must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
     #if not exist model in main spreadsheet,
     #then add it to headers and return current column for model.
     #else, return current column for model.
+
+# DeepL has already been imported, and it must have an API key. (already checked for)
+    #Must have internet access then. How to check?
+    # Added py3TranslateLLMfunctions.checkIfInternetIsAvailable() function.
+
+
+if translationEngine.reachable != True:
+    print( 'TranslationEngine \''+ mode +'\' is not reachable. Check the connection settings and try again.' )
+    sys.exit(1)
+
+
+# This will return the column letter of the model if the model is already in the spreadsheet. Otherwise, if it is not found, then it will return None.
+currentModelColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
+if currentModelColumn == None:
+    # Then the model is not currently in the spreadsheet, so need to add it. Update currentModelColumn after it has been updated.
+    headers = mainSpreadsheet.getRow( 1 )
+    headers.append( translationEngine.model )
+    mainSpreadsheet.replaceRow( 1, headers )
+    currentModelColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
+    if currentModelColumn == None:
+        print( 'unspecified error.' )
+        sys.exit(1)
+
+
 # Check cache as well.
     #if not exist model in cache,
     #then add it to headers and return the cache's column for model.
     #else, return the cache's column for model.
 
-# DeepL has already been imported, and it must have an API key. (already checked for)
-    #Must have internet access then. How to check?
-    # Added py3TranslateLLMfunctions.checkIfInternetIsAvailable() function.
-# Check current engine. Sugoi/NMT server must be reachable.
-    # Echo request? Some firewalls block echo requests.
-    # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
+currentCacheColumn = cache.searchHeaders(translationEngine.model)
+if currentCacheColumn == None:
+    # Then the model is not currently in the cache, so need to add it. Update currentCacheColumn after it has been updated.
+    headers = cache.getRow(1)
+    headers.append(translationEngine.model)
+    cache.replaceRow( 1, headers )
+    currentCacheColumn = cache.searchHeaders(translationEngine.model)
+    if currentCacheColumn == None:
+        print( 'unspecified error .' )
+        sys.exit(1)
 
+
+if translationEngine.supportsBatches == True:
+    #translationEngine.batchTranslate()
+    # if there is a limit to how large a batch can be, then the server should handle that internally.
+    #currentModelColumn
+    untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
+    #tempHeader = untranslatedEntriesColumnFull[0] # Save the header. #Update: Wrong header. This is always 'rawText'.
+    if debug==True:
+        print( ( 'untranslatedEntriesColumnFull=' + str(untranslatedEntriesColumnFull) ).encode(consoleEncoding) )
+    untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
+    translatedEntries = translationEngine.batchTranslate( untranslatedEntriesColumnFull ) 
+    if debug==True:
+        print( ( 'translatedEntries=' + str(translatedEntries) ).encode(consoleEncoding) )
+
+    #translatedEntries and untranslatedEntriesColumnFull need to be added to the cache file now.
+    counter=0
+#    for rawTextEntry in untranslatedEntriesColumnFull:
+#        if cache. rawTextEntry
+#cache.searchFirstColumn('searchTerm') #can be used to check only the first column. Returns either None if not found or currentRow number if it was found.
+    translatedEntries.insert(0,translationEngine.model) # Put header back. This returns None.
+    mainSpreadsheet.replaceColumn( currentModelColumn , translatedEntries) 
+
+else:
+    #translationEngine.translate()
+    pass
+
+mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentModelColumn)
+#mainSpreadsheet.printAllTheThings()
 
 #Now have two column letters for both currentModelColumn and currentCacheColumn.
 #currentCacheColumn can be None if cache is disabled. cache might also be set to read only mode.

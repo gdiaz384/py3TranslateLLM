@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
-__version__='2024Mar17'
+__version__='2024Mar18'
 
 #set defaults
 printStuff=True
@@ -56,7 +56,7 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=None, ignoreWhitespaceForCSV=False,charaNamesDict=None,createNew=False): 
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False,createNew=False, addHeaderToTextFile=False): 
         self.workbook = openpyxl.Workbook()
         self.spreadsheet = self.workbook.active
 
@@ -80,9 +80,10 @@ class Strawberry:
                 if os.path.isfile(myFileName) != True:
                     sys.exit(('Error: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))   
 
-                #If extension = .csv, then call importFromCSV(myFileName)
+                # if extension = .csv, then call importFromCSV(myFileName)
                 if myFileExtensionOnly == '.csv':
-                    self.importFromCSV(myFileName, fileEncoding, ignoreWhitespaceForCSV)
+#                  def importFromCSV(self, fileNameWithPath,myFileNameEncoding,errors=inputErrorHandling,removeWhitespaceForCSV=True ):
+                    self.importFromCSV(myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV)
                 #if extension = .xlsx, then call importFromXLSX(myFileName)
                 elif myFileExtensionOnly == '.xlsx':
                     self.importFromXLSX(myFileName, fileEncoding)
@@ -91,15 +92,11 @@ class Strawberry:
                 elif myFileExtensionOnly == '.ods':
                     self.importFromODS(myFileName, fileEncoding)
                 else:
-                    #Else the file must be a text file to instantiate a class with. However, a parse file is required for that.
-                    if parseSettingsDict == None:
-                        sys.exit(('Warning: Cannot instantiate chocolate.Strawberry() using file with unknown extension:\'' + myFileExtensionOnly + '\' and no parseSettingsDictionary. Reference:\'' + myFileName + '\'').encode(consoleEncoding))
-                    else:
-                        #print('pie')
-                        #Since the Strawberry is being initalized from raw text data, add header row.
-                        #Strawberries imported from external sources or from spreadsheets have the first row reserved for headers, so it should already be present
-                        self.appendRow( ['rawText', 'speaker', 'metadata'] )
-                        self.importFromTextFile( myFileName, fileEncoding, parseSettingsDict, charaNamesDict)
+                    #Else the file must be a text file to instantiate a class with. Only line-by-line parsing is supported.
+                    print( ('Warning: Attempting to instantiate chocolate.Strawberry() using file with unknown extension:\'' + myFileExtensionOnly + '\' Reading in line-by-line. This is probably incorrect. Reference:\'' + myFileName + '\'').encode(consoleEncoding))
+                    if addHeaderToTextFile == True:
+                        self.appendRow( ['rawText'] )
+                    self.importFromTextFile( myFileName, fileEncoding)
 
     def __str__(self):
         #maybe return the headers from the spreadsheet?
@@ -121,9 +118,9 @@ class Strawberry:
     def getCellValue(self, cellAddress):
         return self.spreadsheet[cellAddress].value
 
-    # Full name of this function is getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
+    # Full name of this function is _getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
     # This functions would return 'B5' from: <Cell 'Sheet'.B5>
-    def getCellAddressFromRawCellString(self, myInputCellRaw):
+    def _getCellAddressFromRawCellString(self, myInputCellRaw):
         #print('raw cell data='+str(myInputCellRaw))
         #myInputCellRaw=str(myInputCellRaw)
         #Basically, split the string according to . and then split it again according to > to get back only the CellAddress
@@ -132,11 +129,11 @@ class Strawberry:
 
     # This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
     # such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
-    def getRowAndColumnFromRawCellString(self, myInputCellRaw):
+    def _getRowAndColumnFromRawCellString(self, myInputCellRaw):
         #print('raw cell data='+str(myInputCellRaw))
         #basically, split the string according to . and then split it again according to > to get back only the CellAddress
         #myInputCell=str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
-        myInputCell=self.getCellAddressFromRawCellString(myInputCellRaw)
+        myInputCell=self._getCellAddressFromRawCellString(myInputCellRaw)
         index=0
         for i in range(10): #Magic number.
             try:
@@ -162,7 +159,7 @@ class Strawberry:
     #        if i.value == 'lots of pies':
     #            print(str(i) + '=' + str(i.value))
     #            myRawCell=i
-    #currentRow, currentColumn = spreadsheet.getRowAndColumnFromRawCellString(myRawCell)
+    #currentRow, currentColumn = spreadsheet._getRowAndColumnFromRawCellString(myRawCell)
 
 
     # Returns a list with the contents of the row number specified.
@@ -174,8 +171,8 @@ class Strawberry:
         myList=[]
         for cell in self.spreadsheet[rowNumber]:
             if debug == True:
-                print( (str(self.spreadsheet[self.getCellAddressFromRawCellString(cell)].value)+',').encode(consoleEncoding),end='')
-            myList.append(self.spreadsheet[self.getCellAddressFromRawCellString(cell)].value)
+                print( (str(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',').encode(consoleEncoding),end='')
+            myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
         if debug == True:
             print('')
         return myList
@@ -186,9 +183,9 @@ class Strawberry:
     def getColumn(self, columnLetter):
         myList=[]
         for cell in self.spreadsheet[columnLetter]:
-            #print(str(mySpreadsheet[self.getCellAddressFromRawCellString(cell)].value)+',',end='')
-            #myList[i]=mySpreadsheet[self.getCellAddressFromRawCellString(cell)].value  #Doesn't work due to out of index error. Use append() method.
-            myList.append(self.spreadsheet[self.getCellAddressFromRawCellString(cell)].value)
+            #print(str(mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',',end='')
+            #myList[i]=mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value  #Doesn't work due to out of index error. Use append() method.
+            myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
         return myList
         #print("Hello, world!")
 
@@ -201,24 +198,28 @@ class Strawberry:
         #Example: newRow = ['pies', 'lots of pies']
         #mySpreadsheet.append(newRow)
     #The rowLocation specified is the nth rowLocation, not the [0,1,2,3...row] because rows start with 1
-    def replaceRow(self, newRowList, rowLocation):
+    def replaceRow( self, rowLocation, newRowList ):
         if debug == True:
-            print(str(len(newRowList)).encode(consoleEncoding))
-            print(str(range(len(newRowList))).encode(consoleEncoding))
+            print( str(len(newRowList) ).encode(consoleEncoding))
+            print( str(range(len(newRowList)) ).encode(consoleEncoding))
+            print( ('newRowList=' + str(newRowList) ).encode(consoleEncoding) )
+
         for i in range(len(newRowList)):
             #Syntax for assignment is: mySpreadsheet['A4'] = 'pie'
             #mySpreadsheet['A4'] without an assignment returns: <Cell 'Sheet'.A4> 
             #columns begin with 1 instead of 0, so add 1 when referencing the target column, but not the source because source is a python list which are referenced as list[0], list[1], list[2], list[3], etc
+
             #Was workaround for Syntax error cannot assign value to function call: mySpreadsheet.cell(row=5, column=3)='pies'  
-            #spreadsheet[getCellAddressFromRawCellString(spreadsheet.cell(row=int(rowLocation), column=i+1))]=newRowList[i]
+            #spreadsheet[_getCellAddressFromRawCellString(spreadsheet.cell(row=int(rowLocation), column=i+1))]=newRowList[i]
+
             #A more direct way of doing the same thing is to use .value without () on the cell after the cell reference.
             self.spreadsheet.cell(row=int(rowLocation), column=i+1).value=newRowList[i]
         #return myWorkbook
 
-    #Example: replaceRow(newRow,7)
+    #Example: replaceRow(7,newRow)
 
 
-    def replaceColumn(self, newColumnInAList, columnLetter):
+    def replaceColumn( self, columnLetter, newColumnInAList ):
         #So, how to convert a columnLetter into a number or does column='A' also work?
         #Answer column='A' does not work but there are some built in methods:
         #x = openpyxl.utils.column_index_from_string('A')   #returns 1 as an int
@@ -237,8 +238,16 @@ class Strawberry:
 
 
     # Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
-    # Aside: To determine the row, the column, or both from the raw cell address, call self.getRowAndColumnFromRawCellString(rawCellAddress)
+    # Aside: To determine the row, the column, or both from the raw cell address, call self._getRowAndColumnFromRawCellString(rawCellAddress)
     def searchHeaders(self, searchTerm):
+        for row in self.spreadsheet.iter_rows():
+            for cell in row:
+                if cell.value == searchTerm:
+                    return self._getRowAndColumnFromRawCellString(cell)[1]
+            break
+        return None
+
+        # Old code.
         cellFound=None
         for row in self.spreadsheet[1]:
             for i in row:
@@ -254,9 +263,9 @@ class Strawberry:
             return None
         #Slower.
         #else:
-            #myRowNumber, myColumnLetter = self.getRowAndColumnFromRawCellString(cellFound)
+            #myRowNumber, myColumnLetter = self._getRowAndColumnFromRawCellString(cellFound)
         #return myColumnLetter
-        return self.getRowAndColumnFromRawCellString(cellFound)[1]   #Faster.
+        return self._getRowAndColumnFromRawCellString(cellFound)[1]   #Faster.
 
     #Example:
     #cellFound=None
@@ -270,7 +279,15 @@ class Strawberry:
     # This searches the first column for the searchTerm and returns None if not found or the row number if it found it. 
     # Case and whitespace sensitive search.
     def searchFirstColumn(self, searchTerm):
-        print('Hello, World!'.encode(consoleEncoding))
+        #print('Hello, World!'.encode(consoleEncoding))
+        for column in self.spreadsheet.iter_cols():
+            for cell in column:
+                if cell.value == searchTerm:
+                    return self._getRowAndColumnFromRawCellString(cell)[0]
+            break
+        return None
+
+        # Old code.
         cellFound=None
         for column in self.spreadsheet['A']:  #does this work? TODO: Test this.
             for i in column:
@@ -280,35 +297,36 @@ class Strawberry:
             break #stop searching after first column #Hummmm.
         if cellFound == None:
             return None
-        return self.getRowAndColumnFromRawCellString(cellFound)[0]
+        return self._getRowAndColumnFromRawCellString(cellFound)[0]
 
 
     # This returns either [None, None] if there is no cell with the search term, or a list containing the [row, column], the address. Case and whitespace sensitive.
-    #To determine the row, the column, or both from the raw cell address, use self.getRowAndColumnFromRawCellString(rawCellAddress)
+    #To determine the row, the column, or both from the raw cell address, use self._getRowAndColumnFromRawCellString(rawCellAddress)
     def searchSpreadsheet(self, searchTerm):
         for row in self.spreadsheet.iter_rows():
             for cell in row:
                 if cell.value == searchTerm:
-                    return self.getRowAndColumnFromRawCellString(cell)
+                    return self._getRowAndColumnFromRawCellString(cell)
         return [None, None]
 
 
     # These return either [None,None] if there is no cell with the search term, or a [list] containing the cell row and the cell column (the address in a list). Case insensitive. Whitespace sensitive.
-    # To determine the row, the column, or both from the raw cell address, use self.getRowAndColumnFromRawCellString(rawCellAddress)
+    # To determine the row, the column, or both from the raw cell address, use self._getRowAndColumnFromRawCellString(rawCellAddress)
     def searchRowsCaseInsensitive(self, searchTerm):
         for row in self.spreadsheet.iter_rows():
             for cell in row:
                 if isinstance( cell.value, (str, int) ):
                     if cell.value.lower() == str(searchTerm).lower():
-                        return self.getRowAndColumnFromRawCellString(cell)
+                        return self._getRowAndColumnFromRawCellString(cell)
         return [None, None]
+
 
     def searchColumnsCaseInsensitive(self, searchTerm):
         for column in self.spreadsheet.iter_cols():
             for cell in column:
                 if isinstance( cell.value, (str, int) ):
                     if cell.value.lower() == str(searchTerm).lower():
-                        return self.getRowAndColumnFromRawCellString(cell)
+                        return self._getRowAndColumnFromRawCellString(cell)
         return [None, None]
 
 
@@ -326,11 +344,38 @@ class Strawberry:
     #mySpreadsheet.printAllTheThings()
 
 
+    # Export spreadsheet to file, write it to the file system, based upon constructor settings, path, and file extension in the path.
+    def export(self, outputFileNameWithPath=None, fileEncoding=defaultTextFileEncoding, columnToExportForTextFiles='A'):
+        outputFileNameOnly, outputFileExtensionOnly = os.path.splitext( str(outputFileNameWithPath) )
+        if outputFileExtensionOnly == '.csv':
+            #Should probably try to handle the path in a sane way.
+            self.exportToCSV(outputFileNameWithPath, fileEncoding=self.fileEncoding)
+        elif outputFileExtensionOnly == '.xlsx':
+            self.exportToXLSX(outputFileNameWithPath)
+        elif outputFileExtensionOnly == '.xls':
+            self.exportToXLS(outputFileNameWithPath)
+        elif outputFileExtensionOnly == '.ods':
+            self.exportToODS(outputFileNameWithPath)
+        elif outputFileExtensionOnly == '.txt':
+            self.exportToTextFile(outputFileNameWithPath, columnToExport=columnToExportForTextFiles, fileEncoding=self.fileEncoding)
+        else:
+            print( ( 'Warning: Unable to export chocolate.Strawberry() to file with unknown extension of \''+ outputFileExtensionOnly + '\' Full path: '+ str(outputFileNameWithPath) ).encode(consoleEncoding) )
+
+
+    # Supports line by line parsing only. Header should already be part of text file.
+    def importFromTextFile(self, fileNameWithPath,fileEncoding=defaultTextFileEncoding):
+        myFileContents=[]
+        # Open file as text file with specified encoding and input error handler.
+        with open( fileNameWithPath, 'r', newline='', encoding=fileEncoding, errors=inputErrorHandling ) as myFileHandle:
+        # Create a list from every line and append that list to the current spreadsheet.
+            self.appendRow( [ myFileHandle.readline() ] )
+
+
     #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
     #if columnToExport == None: then dynamically calculate what should be exported. Only the translated line furthest to the right is valid to export, along with any untranslated lines.
-    #Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output then? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines of there is no translated line for that row.
-    #When is this useful? What is the use case?
-    def exportToTextFile(self, fileNameWithPath,columnToExport=None):
+    # Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output then? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines of there is no translated line for that row.
+    # When is this useful? What is the use case? It always makes more sense to export as .csv right? Otherwise, a specific column will need to be chosen and that should probably be exposed in the CLI. Otherwise, should a mixed mode be supported? Like exporting the right-most entry in the spreadsheet data structure?
+    def exportToTextFile(self, fileNameWithPath, columnToExport=None, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
@@ -342,7 +387,8 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath,myFileNameEncoding,ignoreWhitespace=True):
+    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,errors=inputErrorHandling,removeWhitespaceForCSV=True ):
+        print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
             sys.exit(('\n Error. Unable to find .csv file:"' + fileNameWithPath + '"').encode(consoleEncoding))
@@ -351,24 +397,24 @@ class Strawberry:
         #tempSpreadsheet = tempWorkbook.active
         #tempSpreadsheet = Strawberry()
 
-        #It looks like quoting fields in csv's that use commas , and new
-        #lines works but only as double quotes " and not single quotes '
-        #Spaces are also preserved as-is if they are within the commas (,) by default, so remove them
-        #If spaces are intended to be within the entry, then the user can encapslate them in double quotes
-        #Need to test. Even double quotes might not preserve them. Tested: They do not.
-        #Could also just say not supported since it is almost certainly an error for hand-written CSV's.
-        #Could also have a flag that switches back and forth.
-        #Partial solution, added "ignoreWhitespace" function parameter which defaults to True.
-        #Reading from dictionaries can be called with the "False" option for maximum flexibility.
-        #New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
+        # It looks like quoting fields in csv's that use commas , and new
+        # lines works but only as double quotes " and not single quotes '
+        # Spaces are also preserved as-is if they are within the commas (,) by default, so remove them
+        # If spaces are intended to be within the entry, then the user can encapslate them in double quotes
+        # Need to test. Even double quotes might not preserve them. Tested: They do not.
+        # Could also just say not supported since it is almost certainly an error for hand-written CSV's.
+        # Could also have a flag that switches back and forth.
+        # Partial solution, added "removeWhitespaceForCSV" function parameter which defaults to True.
+        # Reading from dictionaries can be called with the "False" option for maximum flexibility.
+        # New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
         #print(inputErrorHandling)
-        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling) as myFile:#shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
+        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=errors) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
             csvReader = csv.reader(myFile)
             for line in csvReader:
                 if debug == True:
                     print(str(line).encode(consoleEncoding))
                 #clean up whitespace for entities
-                if ignoreWhitespace == True:
+                if removeWhitespaceForCSV == True:
                     #Not entirely sure what this for loop does or why it is needed, but just leave it alone. Was probably a bug fix for something at some point. Maybe it removes whitespace from like... , Eng,... and so forth?
                     for i in range(len(line)):
                         line[i]=line[i].strip()
@@ -382,7 +428,7 @@ class Strawberry:
 
     def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,errors=outputErrorHandling):
         #print('Hello World'.encode(consoleEncoding))
-        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding) as myOutputFileHandle:
+        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding,errors=errors) as myOutputFileHandle:
             myCsvHandle = csv.writer(myOutputFileHandle)
 
             # Get every row for current spreadsheet.
@@ -393,9 +439,11 @@ class Strawberry:
                 for cell in row:
                     tempList.append( str(cell) )
                 myCsvHandle.writerow(tempList)
+        print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
     def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
+        print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         self.workbook=openpyxl.load_workbook(filename = fileNameWithPath)
         self.spreadsheet=self.workbook.active
 
@@ -409,24 +457,21 @@ class Strawberry:
 
     def importFromXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))
+        #print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #return workbook
+
     def exportToXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
     def importFromODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))
+        #print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #return workbook
+
     def exportToODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
-
-
-
-
-
-
-
 
 
 
