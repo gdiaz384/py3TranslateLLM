@@ -5,7 +5,7 @@
 - Computers only understand 1's and 0's. The letter `A` is ultimately a series of 1's and 0's. How does a computer know to display `A`, `a`, `à`, or `あ`? By using a standardized encoding schema.
 - Due to various horrible and historical reasons, there is no way for computers to deterministically detect arbitrary character encodings from files.
 - Automatic encoding detection is a lie. Those just use heuristics which can and will fail catastrophically eventually.
-- Thus, the encodings for the text files and the console must be specified at runtime, or something might break.
+- Thus, the encodings for text files and the console must be specified at runtime, or something might break.
 
 ### Common and Standard Encodings
 

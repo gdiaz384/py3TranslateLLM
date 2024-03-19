@@ -98,25 +98,31 @@ class Strawberry:
                         self.appendRow( ['rawText'] )
                     self.importFromTextFile( myFileName, fileEncoding)
 
+
     def __str__(self):
         #maybe return the headers from the spreadsheet?
         #return str(spreadsheet[1])
         #return 'pie'
         return str(self.getRow(1))
 
+
     # expects a python list
     def appendRow(self,newRow):
         self.spreadsheet.append(newRow)
 
+
     #def appendColumn(self, newColumn) #Does not seem to be needed. Data is just not processed that way.
+
 
     # This sets the value of the cell based upon the cellAddress in the form of 'A4'.
     def setCellValue(self, cellAddress,value):
         self.spreadsheet[cellAddress]=value
 
+
     # This retuns the value of the cell based upon the cellAddress in the form of 'A4'.
     def getCellValue(self, cellAddress):
         return self.spreadsheet[cellAddress].value
+
 
     # Full name of this function is _getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
     # This functions would return 'B5' from: <Cell 'Sheet'.B5>
@@ -126,6 +132,7 @@ class Strawberry:
         #Basically, split the string according to . and then split it again according to > to get back only the CellAddress
         return str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
         #return [currentRow, currentColumn
+
 
     # This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
     # such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
@@ -182,16 +189,18 @@ class Strawberry:
     # Should return None for any blank entry as in: ['pie', None, 'lots of pies']
     def getColumn(self, columnLetter):
         myList=[]
-        for cell in self.spreadsheet[columnLetter]:
+        for cell in self.spreadsheet[columnLetter]:  # Update: Would the built in iterators also work here?
             #print(str(mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',',end='')
             #myList[i]=mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value  #Doesn't work due to out of index error. Use append() method.
             myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
         return myList
         #print("Hello, world!")
 
+
     #case sensitive
     #def getColumnLetterFromSearchString():
         #No. Just search normally, and search should always return a list with the column and row seperately.
+
 
     # helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
     # Note: This is only for modifying existing rows. To add a brand new row, use append:

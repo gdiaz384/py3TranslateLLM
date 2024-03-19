@@ -69,7 +69,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Feb27 pre-alpha`
+`Current version: 0.1 - 2024Mar19 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet.
 
@@ -260,11 +260,10 @@ Variable name | Description | Examples
     1. All input files besides `fileToTranslate` are read and parsed.
     1. The data structure that holds both the untranslated and translated text while the program is working is called `mainSpreadsheet`. How it is created is handled differently depending upon if `fileToTranslate` is a spreadsheet or a text file. For spreadsheets:
         1. If `fileToTranslate` is a spreadsheet (.csv, .xlsx, .xls, .ods), it is converted to `mainSpreadsheet` as-is. See above for the formatting guidelines.
-    1. If `fileToTranslate` is a text file, the following occurs:
-        1. Settings related to parsing dialogue from `parsingSettingsFile` are considered.
-        1. If present, `characterNamesDictionary` is also considered for which lines not to ignore in creating paragraphs from `fileToTranslate`.
-        1. The untranslated dialogue paragraphs are then written to the first column of `mainSpreadsheet`.
-    1. The process to translate the rawText column in `mainSpreadsheet` using a particular translation engine begins. Examples: koboldcpp, deepl api/web, fairseq/sugoi.
+    1. If `fileToTranslate` is a text file:
+        1. The lines in the text file are read in as-is line-by-line without any parsing logic.
+            - To parse the text file in a more complicated way, use [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet).
+    1. The process to translate the rawText column in `mainSpreadsheet` using a particular translation engine begins. Examples: koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationServer, sugoi.
         1. If a paragraph is present in `cache.xlsx`, it is translated using the cache file and the translation process skips to step 7/step g.
         1. If present, `characterNamesDictionary` is considered and replacements are performed.
         1. If present, `preTranslationDictionary` is considered and replacements are performed.
@@ -275,8 +274,8 @@ Variable name | Description | Examples
         1. The translated paragraph is then written to `mainSpreadsheet` in the column specified by the current translation engine.
         1. Periodically as entries are translated, a backup.xlsx is made under `backups/[date]/`.
     1. Settings in this parsing template are considered as they relate to word wrap and outputing the translation into the text files (.txt, .ks, .ts).
-    1. The right most entry in each row is written to a copy of the text.ks file.
-    1. `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions since codec conversions are not lossless.
+    1. The spreadsheet file is written to output, and a final backup.xlsx file is written.
+    1. Outdated?: `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions since codec conversions are not lossless.
 
 #### Regarding chararacterNames.csv:
 
@@ -285,11 +284,13 @@ Variable name | Description | Examples
     1. Entries in the first column of this dictionary will be replaced with the entries for the second column prior to text getting translated.
     2. After the translated text returns, every entry matching the second column will be replaced back to the text in the first column.
     3. If a line begins with the full string specified in the first column, then it will never be ignored for processing by the paragraph creation logic when working with text files (.txt, .ks, .ts) even if the first character in the line matches an entry in the `parseFile.txt`'s `ignoreLinesThatStartWith=`.
+        - Update: This functionality has been moved to [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet).
     4. If there is no entry in the second column, not even whitespace, then step 2/step b will be skipped and the text in the first column will simply be removed prior to translation.
+        - Update: This functionality has been moved to [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet).
 - Background:
     - This dictionary was originally concieved from the notion that some dialogue scripts have entries like `[＠クロエ]`, `\N[1]`, `\N[2]` that represent replacable character names within the dialogue. The idea being the player gives a custom name to a character and the game engine will replace these placeholders that are within the dialogue with the chosen name during runtime.
     - These placeholders, in essence, contain the true names of characters, so they have relevant information that should be considered when translating paragraphs. However, they do not contain that information while they are just placeholders. In addition, they should also be left untranslated in the final text to retain the original functionality of the placeholder.
-    - On a technical level, if left as-is, then in addition to not being allowed to consider the information they contain, these placeholders can also often distort the resulting translation because translation engines might split a paragraph into two fragments based upon the `[ ]`, especially fairseq/Sugoi.
+    - On a technical level, if left as-is, then in addition to not being allowed to consider the information they contain, these placeholders can also often distort the resulting translation because translation engines might split a paragraph into two fragments based upon the `[ ]`, especially fairseq/Sugoi. The translation engine might also change the placeholder in such a way as to cause the game engine to overtly crash.
     - Thus, the idea of the `characterNames.csv` dictionary was concieved. The idea is to specify that `[＠クロエ]` is `Chloe`, a female name, during translation but revert `Chloe` back to `[＠クロエ]` after translation. This idea lead to the functionality described above getting integrated into py3TranslateLLM, including not skipping a line just because it happens to start with a placeholder. However, this approach has a number of problems.
 - Problems:
     - There is no gurantee that the translation engine will preserve the entries in the second column, e.g. leave `Chloe` as `Chloe`. If it changes the name of the character in any way, like using a pronoun, then there is no way to revert the substitution.
@@ -297,7 +298,7 @@ Variable name | Description | Examples
         - This will almost certainly mess with the translation engine's logic in unintended ways.
         - This also creates uncertainty in how specifying a source language should be handled. Not specifying the source language all is asking for a lot of unrelated problems to crop up but specifying one source language is technically wrong because there are now two languages in the source text.
         - However, leaving the name in the source language in the untranslated form `クロエ` to prevent a mixed language scenario will almost certainly cause the translation engine to mess up when it translates it different ways based upon the source context changing constantly. fairseq/Sugoi especially does this a lot.
-    - One not automated solution is to replace the substitution string `[＠クロエ]` with the name in the source language `クロエ` to prevent multiple languages from in the source text. Then tell the translation engine to explcitly translate that name/string of characters a very specific way `Chloe` using a translation engine specific dictionary. And finally, revert the translation back to the original substitution string using after translation by the translation engine.
+    - One not automated solution is to replace the substitution string `[＠クロエ]` with the name in the source language `クロエ` to prevent multiple languages from in the source text. Then tell the translation engine to explcitly translate that name/string of characters a very specific way `Chloe` using a translation engine specific dictionary. And finally, revert the translation back to the original substitution string after translation by the translation engine.
     - This can be done in py3TranslateLLM by:
         1. Specifying an entry in the `preTranslation.csv` dictionary to remove the [ ] and add the actual name in the source language: `[＠クロエ]` -> `クロエ`.
         1. Tell the LLM translation engine to translate the name a specific way using the `prompt.txt` file or a DeepL dictionary `クロエ` -> `Chloe`.
