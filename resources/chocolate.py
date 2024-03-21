@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
-__version__='2024Mar18'
+__version__='2024.03.20'
 
 #set defaults
 printStuff=True
@@ -56,35 +56,37 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False,createNew=False, addHeaderToTextFile=False): 
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, readOnlyMode=False): 
         self.workbook = openpyxl.Workbook()
         self.spreadsheet = self.workbook.active
 
+        # Are there any use cases for creating a spreadsheet in memory without an associated file name? Since chocolate.Strawberry() is a data structure, this must be 'yes' by definition, but what is the use case for that exactly?
         if myFileName != None:
-            if fileEncoding == None:
-                #Actually, the encoding might be None for the binary spreadhsset files. No. Then they should have their encodings specified at the command prompt or settings.ini file or get set to the default value.
-                sys.exit( ('Please specify an encoding for: '+myFileName).encode(consoleEncoding) )
+            #if fileEncoding == None:
+                #Actually, the encoding might be None for the binary spreadsheet files. No. Then they should have their encodings specified at the command prompt or settings.ini file or get set to the default value. No reason to bother checking this then.
+            #    sys.exit( ('Please specify an encoding for: ' + myFileName).encode(consoleEncoding) )
 
             #Then find the extension of the file.
             myFileNameOnly, myFileExtensionOnly = os.path.splitext(myFileName)
 
-            #If there is no extension, then crash.
-            if myFileExtensionOnly == '':
-                sys.exit(   ('Warning: Cannot instantiate class using a file that lacks an extension. Reference:\''+myFileName+'\'').encode(consoleEncoding)   )
+            # if there is no extension, then crash.
+            #if myFileExtensionOnly == '':
+            #    sys.exit(   ('Warning: Cannot instantiate class using a file that lacks an extension. Reference:\''+myFileName+'\'').encode(consoleEncoding)   ) # Update: Just assume it is a text file instead and import as line-by-line.
 
-            #createNew=True means that the Strawberry() will be created in memory instead of from a file, so do not try to import the contents from a file.
-            #createNew == False means import the base contents for Strawberry() from a file.
-            if createNew == False:
-                #Check to make sure file exists.
-                #If file does not exist, then crash.
-                if os.path.isfile(myFileName) != True:
-                    sys.exit(('Error: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))   
+            #createOnlyInMemory == True means that the Strawberry() will be created in memory instead of from a file, so do not try to import the contents from a file.
+            #createOnlyInMemory == False means import the base contents for Strawberry() from a file.
+            # Update: Maybe this should just be implied instead of explicit? Would make for a simpiler UI. Are there any situations where explicit is useful?
+            #if createOnlyInMemory == False:
+            # Check to make sure file exists.
+            # if file does not exist, then crash.
+            #if os.path.isfile(myFileName) != True:
+            #    sys.exit(('Error: This file does not exist:\''+myFileName+'\'').encode(consoleEncoding))   
 
+            # if the file exists, then read contents from the file.
+            if os.path.isfile(myFileName) == True:
                 # if extension = .csv, then call importFromCSV(myFileName)
                 if myFileExtensionOnly == '.csv':
-#                  def importFromCSV(self, fileNameWithPath,myFileNameEncoding,errors=inputErrorHandling,removeWhitespaceForCSV=True ):
                     self.importFromCSV(myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV)
-                #if extension = .xlsx, then call importFromXLSX(myFileName)
                 elif myFileExtensionOnly == '.xlsx':
                     self.importFromXLSX(myFileName, fileEncoding)
                 elif myFileExtensionOnly == '.xls':
@@ -230,20 +232,22 @@ class Strawberry:
 
     def replaceColumn( self, columnLetter, newColumnInAList ):
         #So, how to convert a columnLetter into a number or does column='A' also work?
-        #Answer column='A' does not work but there are some built in methods:
+        #Answer column='A' does not work but there are some built in methods.
+        #Documentation: https://openpyxl.readthedocs.io/en/stable/api/openpyxl.utils.cell.html
         #x = openpyxl.utils.column_index_from_string('A')   #returns 1 as an int
         #y= openpyxl.utils.get_column_letter(1)   #returns 'A'
         #Example: mySpreadsheet.cell(row=3, column=openpyxl.utils.column_index_from_string('B')).value='pies'
-        #Documentation: https://openpyxl.readthedocs.io/en/stable/api/openpyxl.utils.cell.html
+
         if debug == True:
             print(( 'Replacing column \''+columnLetter+'\' with the following contents:').encode(consoleEncoding))
             print(str(newColumnInAList).encode(consoleEncoding))
+
         for i in range(len(newColumnInAList)):
             #Syntax for assignment is: mySpreadsheet['A4'] = 'pie''
             #Rows begin with 1, not 0, so add 1 to the reference row, but not to source list since list starts references at 0.
-            self.spreadsheet.cell(row=int(i+1), column=openpyxl.utils.column_index_from_string(columnLetter)).value=newColumnInAList[i]
+            self.spreadsheet.cell(row=int(i+1), column=openpyxl.utils.column_index_from_string(columnLetter.upper())).value=newColumnInAList[i]
 
-    #Example: replaceColumn(newColumn,7)
+    #Example: replaceColumn('B',newColumn,)
 
 
     # Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
@@ -396,7 +400,7 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,errors=inputErrorHandling,removeWhitespaceForCSV=True ):
+    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,removeWhitespaceForCSV=True ):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
@@ -417,7 +421,7 @@ class Strawberry:
         # Reading from dictionaries can be called with the "False" option for maximum flexibility.
         # New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
         #print(inputErrorHandling)
-        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=errors) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
+        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
             csvReader = csv.reader(myFile)
             for line in csvReader:
                 if debug == True:
@@ -435,9 +439,9 @@ class Strawberry:
             self.printAllTheThings()
 
 
-    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,errors=outputErrorHandling):
+    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         #print('Hello World'.encode(consoleEncoding))
-        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding,errors=errors) as myOutputFileHandle:
+        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding,errors=outputErrors) as myOutputFileHandle:
             myCsvHandle = csv.writer(myOutputFileHandle)
 
             # Get every row for current spreadsheet.
@@ -451,10 +455,16 @@ class Strawberry:
         print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-    def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
+
+    def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, readOnlyMode=False):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
-        self.workbook=openpyxl.load_workbook(filename = fileNameWithPath)
+        self.workbook=openpyxl.load_workbook(filename = fileNameWithPath, read_only=readOnlyMode)
         self.spreadsheet=self.workbook.active
+
+    # https://openpyxl.readthedocs.io/en/stable/optimized.html
+    # read_only requires closing the spreadsheet after use.
+    def close(self):
+        self.workbook.close()
 
     def exportToXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         #print('Hello World'.encode(consoleEncoding))

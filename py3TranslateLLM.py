@@ -14,7 +14,7 @@ License:
 """
 
 #set defaults and static variables
-versionString='v0.1 - 2024Mar19 pre-alpha'
+versionString='2024.03.20 pre-alpha'
 
 #Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding = 'utf-8'
@@ -52,7 +52,8 @@ defaultLinesThatBeginWithThisAreComments = '#'
 defaultAssignmentOperatorInSettingsFile = '='
 defaultMetadataDelimiter = '_'
 defaultScriptSettingsFileExtension = '.ini'
-defaultBlacklistedHeadersForCacheAnyMatch = [ 'rawText','speaker','metadata', 'cache', 'cachedEntry', 'cache entry' ]
+# if a column begins with one of these entries, then it will be assumed to be invalid for cacheAnyMatch. Case insensitive.
+defaultBlacklistedHeadersForCache = [ 'rawText','speaker','metadata' ] #'cache', 'cachedEntry', 'cache entry'
 
 # Currently, these are relative to py3TranslateLLM.py, but it might also make sense to move them either relative to the target or to a system folder intended for holding program data.
 # There is no gurantee that being relative to the target is a sane thing to do since that depends upon runtime usage, and centralized backups also make sense. Leaving it as-is makes sense too as long as py3TranslateLLM is not being used as a library. If it is not being used as a library, then a centralized location under $HOME or %localappdata% makes more sense than relative to py3TranslateLLM.py. Same with the default location for the cache file.
@@ -76,12 +77,12 @@ import io                                        # Manipulate files (open/read/w
 #from io import IOBase               # Test if variable is a file object (an "IOBase" object).
 #import datetime                          # Used to get current date and time.
 
-#Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes.
+# Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes. # Update: Maybe.
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
-import collections                         # Newer syntax. For deque. Used to hold rolling history of translated items to use as context for new translations.
-#import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests'  
+import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
+#import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests' # Update: Moved to functions.py
 
-#import openpyxl                           # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip.
+#import openpyxl                           # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip. # Update: Moved to chocolate.py
 import resources.chocolate as chocolate # Implements openpyxl. A helper/wrapper library to aid in using openpyxl as a datastructure.
 import resources.dealWithEncoding as dealWithEncoding   # dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  # Moved most generic functions here to increase code readability and enforce function best practices.
@@ -132,6 +133,7 @@ commandLineParser.add_argument('-pred', '--preTranslationDictionary', help='The 
 commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 commandLineParser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.', default=None, type=str)
 commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default='+str(defaultTextEncoding), default=None, type=str)
+# Update: postWritingToFileDictionary might only make sense for text files.
 commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.', default=None, type=str)
 commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 
@@ -798,9 +800,9 @@ if verbose == True:
 
 
 # Next turn the main inputFile into a data structure.
-# then create data structure seperately from reading the file
-# This returns a very special dictionary where the value in key=value is a special list and then add data row by row using the dictionary values #Edit, moved to chocolate.py so as to not have to do that. All spreadsheets that require a parseFile will therefore always be Strawberries from the chocolate library.
-# Strawberry is a wrapper class for the workbook class with additional methods.
+# How? Read the file, then create data structure from that file.
+# This returns a very special dictionary where the value in key=value is a special list and then add data row by row using the dictionary values #Edit, moved to chocolate.py so as to not have to do that. All spreadsheets that require a parseFile will therefore always be Strawberries from the chocolate library. # Update: No more parsefiles. That functionality has been moved to seperate program so chocolate.Strawberry() only understands spreadsheets and line-by-line parsing of text files.
+# Strawberry is a wrapper class for the onenpyxl.workbook class with additional methods.
 # The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class. Syntax:
 # mainSpreadsheet=chocolate.Strawberry()
 # py3TranslateLLMfunctions.parseRawInputTextFile
@@ -808,9 +810,9 @@ if verbose == True:
 # if main file is a spreadsheet, then it be read in as a native data structure. Otherwise, if the main file is a .txt file, then it will be parsed as line-by-line.
 # Basically, the user is responsible for proper parsing if line-by-line parsing does not work right. Proper parsing is outside the scope of py3TranslateLLM
 # Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
-mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileToTranslateEncoding, addHeaderToTextFile=False)
+mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileEncoding=fileToTranslateEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False)
 
-#Before doing anything, just blindly create a backup.
+#Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier.
 #backupsFolder does not have / at the end
 backupsFolderWithDate=backupsFolder + '/' + py3TranslateLLMfunctions.getYearMonthAndDay()
 pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
@@ -830,10 +832,12 @@ if debug == True:
 #Now that the main data structure has been created, the spreadsheet is ready to be translated.
 if mode == 'parseOnly':
     mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles='A')
-    #work complete. Exit.
-    sys.exit( 'Work complete.'.encode(consoleEncoding) )
 
-    # Old code.
+    #work complete. Exit.
+    print( 'Work complete.' )
+    sys.exit(0)
+
+    # Old code. This functionality was moved to chocolate.Strawberry().export() as indicated above.
     #The outputFileName will match fileToTranslateFileName if an output file name was not specified. If one was specified, then assume it had an extension.
     if outputFileName == fileToTranslateFileName:
         mainSpreadsheet.exportToXLSX( outputFileName + '.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx' )
@@ -857,40 +861,41 @@ if mode == 'parseOnly':
 
 if cacheEnabled == True:
     #First, initialize cache.xlsx file under backups/
-    # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header of course. Multiple columns with each one as a different translation engine.
+    # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header row of course. Multiple columns with each one as a different translation engine.
     #if the path for cache does not exist, then create it.
     pathlib.Path( cachePathOnly ).mkdir( parents = True, exist_ok = True )
 
-    if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == True:
-        #if present, read cache file into a chocolate.Strawberry()
-        cache=chocolate.Strawberry(myFileName=cacheFileName, fileEncoding=defaultTextEncoding, createNew=False)
+    # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
+    # Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
+    cache=chocolate.Strawberry( myFileName=cacheFileName, fileEncoding=defaultTextEncoding, readOnlyMode=readOnlyCache)
 
-    #elif py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) == False:
-    else:
-        #otherwise if does not exist yet, create it.
-         #Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
-        cache=chocolate.Strawberry(myFileName=cacheFileName,fileEncoding=defaultTextEncoding,createNew=True)
-        #Since the Strawberry is brand new, add header row.
+    if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) != True:
+        # if the Strawberry is brand new, add header row.
         cache.appendRow( ['rawText'] )
-        cache.exportToXLSX(cacheFileName)
 
-    if (verbose == True) or (debug == True):
+    if (debug == True):
         cache.printAllTheThings()
+
+    if readOnlyCache != True:
+        cache.exportToXLSX(cacheFileName)
 
     # Prepare some static data for cacheAnyMatch so that it does not have to be prepared while in the loop on every loop.
     if (cacheAnyMatch == True):
-        blacklistedHeadersForCacheAnyMatch=defaultBlacklistedHeadersForCacheAnyMatch
+        blacklistedHeadersForCacheAnyMatch=defaultBlacklistedHeadersForCache
         blacklistedHeadersForCacheAnyMatch.append(translationEngine.model)
+
         # To help with a case insensitive search, make everything lowercase.
         counter=0
         for i in blacklistedHeadersForCacheAnyMatch:
             blacklistedHeadersForCacheAnyMatch[counter]=i.lower()
             counter+=1
+
         # return the cache header row
         headers = cache.getRow( 1 )
+
         validColumnLettersForCacheAnyMatch=[]
         for header in headers:
-            if header.lower() not in blacklistedHeadersForCacheAnyMatch:
+            if str(header).lower() not in blacklistedHeadersForCacheAnyMatch:
                 # This should append the column letter, not the literal text, to the list.
                 validColumnLettersForCacheAnyMatch.append( cache.searchHeaders(header) )
 
@@ -1076,12 +1081,13 @@ if translationEngine.supportsBatches == True:
         counter=0
         # if every entry was found in the cache
 
+        #if reTranslate == True, then len(tempRequestList) == 0, so do not bother trying to read entries from it. Just set output to postTranslatedList.
         if reTranslate != True:
             if len(postTranslatedList) == 0:
                 #then set finalTranslatedList to all the translated entries that were added to tempRequestList.
                 for i in tempRequestList:
                     finalTranslatedList.append( tempRequestList[2] )
-            # if cache is empty, so only the header is returned. There is nothing to merge.
+            # if cache is empty, so only the header is returned. There is nothing to merge, so set the output to the postTranslatedList.
             elif len( cache.getColumn('A') ) == 1:
                 finalTranslatedList=postTranslatedList
             else:
@@ -1111,16 +1117,31 @@ if translationEngine.supportsBatches == True:
         finalTranslatedList=postTranslatedList
 
 
+# Old code.
 #    counter=0
 #    for rawTextEntry in untranslatedEntriesColumnFull:
 #        if cache. rawTextEntry
 #cache.searchFirstColumn('searchTerm') #can be used to check only the first column. Returns either None if not found or currentRow number if it was found.
-    postTranslatedList.insert(0,translationEngine.model) # Put header back. This returns None.
-    mainSpreadsheet.replaceColumn( currentModelColumn , postTranslatedList) 
+
+
+    # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
+    if overrideWithCache == True:
+        postTranslatedList.insert( 0, translationEngine.model ) # Put header back. This returns None.
+        mainSpreadsheet.replaceColumn( currentModelColumn , postTranslatedList ) # Batch replace the entire column.
+    #if overrideWithCache != True:
+    else:
+        # Consider each entry individually.
+        # Check if the entry is current None.
+        # if entry is none, then always update the entry
+        # if entry is not none
+            # then do not override entry
 
 else:
     #translationEngine.translate()
     pass
+
+# Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
+# if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
 
 mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentModelColumn)
 #mainSpreadsheet.printAllTheThings()
@@ -1171,9 +1192,13 @@ mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToEx
 
 
 
+# https://openpyxl.readthedocs.io/en/stable/optimized.html
+# readOnlyMode requires closing the spreadsheet after use.
+if readOnlyCache == True:
+    cache.close()
 
-
-sys.exit('end reached')
+print('end reached')
+sys.exit(0)
 """
 
 #CharaNamesDictionary time to shine

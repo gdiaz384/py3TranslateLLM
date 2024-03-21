@@ -69,9 +69,10 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Mar19 pre-alpha`
+`Current version: 0.1 - 2024Mar20 pre-alpha`
+`Current version 2024.03.20 pre-alpha`
 
-Warning: py3TranslateLLM is currently undergoing active development but the project in the pre-alpha stages. Do not attempt to use it yet.
+Warning: py3TranslateLLM is currently undergoing active development but the project in the alpha stages. Alpha means core functionality is currently under development.
 
 1. Install [Python 3.7+](//www.python.org/downloads). For Windows 7, use [this repository](//github.com/adang1345/PythonWin7/).
     - Make sure the Python version matches the architecture of the host machine:
@@ -320,18 +321,18 @@ Variable name | Description | Examples
 
 ### Regarding XLSX
 
-- [Open Office XML](//en.wikipedia.org/wiki/Office_Open_XML), .xlsx, is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries and the cache directly without any unnecessary conversions that could introduce formatting bugs.
-- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write Open Office XML and the other spreadsheet formats (.csv, .xlsx, .xls, .ods):
+- [Open Office XML](//en.wikipedia.org/wiki/Office_Open_XML) (OOXML), .xlsx, is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries and the cache directly without any unnecessary conversions that could introduce formatting bugs.
+- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write Open Office XML and the other spreadsheet formats (.csv, .xls, .ods):
     - Apache [OpenOffice](//www.openoffice.org). [License](//www.openoffice.org/license.html) and [source](//openoffice.apache.org/downloads.html). Note: Can read but not write to .xlsx.
     - [LibreOffice](//www.libreoffice.org). [License](//www.libreoffice.org/about-us/licenses) and [source](//www.libreoffice.org/download/download-libreoffice/).
     - [OnlyOffice](//www.onlyoffice.com/download-desktop.aspx) is [AGPL v3](//github.com/ONLYOFFICE/DesktopEditors/blob/master/LICENSE). [Source](//github.com/ONLYOFFICE/DesktopEditors).
-- [OpenPyXL](//openpyxl.readthedocs.io), the library used in the core data structure, follows the OOXML standard closely, and [will not load](//openpyxl.readthedocs.io/en/stable/tutorial.html#errors-loading-workbooks) documents that do not follow the standard closely. In other words, Microsoft Office will probably not work.
+- [OpenPyXL](//openpyxl.readthedocs.io), the library used in the core data structure, follows the Open Office XML standard closely, and [will not load](//openpyxl.readthedocs.io/en/stable/tutorial.html#errors-loading-workbooks) documents that do not follow the standard closely. In other words, Microsoft Office will probably not work. If using MS Office, then export as .csv instead (untested).
 
 ### Text Encoding and py3TranslateLLM:
 
 - Read the [Text Encoding](//github.com/gdiaz384/py3TranslateLLM/wiki/Text-Encoding) wiki entry.
 - After reading the above wiki entry, the rest of this section should make more sense.
-- Tip: Use `py3TranslateLLM.ini` to specify the encoding for text files used with `py3TranslateLLM.py` .
+- Tip: Use `py3TranslateLLM.ini` to specify the encoding for text files used with `py3TranslateLLM.py`.
 - For compatability reasons, everything gets converted to binary strings for stdout which can result in the console sometimes showing utf-8 hexadecimal (hex) encoded unicode characters, like `\xe3\x82\xaf\xe3\x83\xad\xe3\x82\xa8`, especially with `debug` enabled. To convert them back to non-ascii chararacters, like `クロエ`, dump them into a hex to unicode converter.
     - Example: [www.coderstool.com/unicode-text-converter](//www.coderstool.com/unicode-text-converter)
 - Some character encodings cannot be converted to other encodings. When such errors occur, use the following error handling options:
