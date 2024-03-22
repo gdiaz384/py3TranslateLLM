@@ -56,11 +56,12 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, readOnlyMode=False): 
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, readOnlyMode=False):
         self.workbook = openpyxl.Workbook()
         self.spreadsheet = self.workbook.active
+        self.readOnlyMode = readOnlyMode
 
-        # Are there any use cases for creating a spreadsheet in memory without an associated file name? Since chocolate.Strawberry() is a data structure, this must be 'yes' by definition, but what is the use case for that exactly?
+        # Are there any use cases for creating a spreadsheet in memory without an associated file name? Since chocolate.Strawberry() is a data structure, this must be 'yes' by definition, but what is the use case for that exactly? When would it be useful to only create a spreadsheet in memory but never write it out?
         if myFileName != None:
             #if fileEncoding == None:
                 #Actually, the encoding might be None for the binary spreadsheet files. No. Then they should have their encodings specified at the command prompt or settings.ini file or get set to the default value. No reason to bother checking this then.
@@ -108,7 +109,7 @@ class Strawberry:
         return str(self.getRow(1))
 
 
-    # expects a python list
+    # Expects a Python list.
     def appendRow(self,newRow):
         self.spreadsheet.append(newRow)
 
@@ -199,16 +200,11 @@ class Strawberry:
         #print("Hello, world!")
 
 
-    #case sensitive
-    #def getColumnLetterFromSearchString():
-        #No. Just search normally, and search should always return a list with the column and row seperately.
-
-
-    # helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
+    # Helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
     # Note: This is only for modifying existing rows. To add a brand new row, use append:
         #Example: newRow = ['pies', 'lots of pies']
         #mySpreadsheet.append(newRow)
-    #The rowLocation specified is the nth rowLocation, not the [0,1,2,3...row] because rows start with 1
+    # The rowLocation specified is the nth rowLocation, not the [0,1,2,3...] row number because rows start with 1.
     def replaceRow( self, rowLocation, newRowList ):
         if debug == True:
             print( str(len(newRowList) ).encode(consoleEncoding))

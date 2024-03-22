@@ -58,9 +58,10 @@ defaultBlacklistedHeadersForCache = [ 'rawText','speaker','metadata' ] #'cache',
 # Currently, these are relative to py3TranslateLLM.py, but it might also make sense to move them either relative to the target or to a system folder intended for holding program data.
 # There is no gurantee that being relative to the target is a sane thing to do since that depends upon runtime usage, and centralized backups also make sense. Leaving it as-is makes sense too as long as py3TranslateLLM is not being used as a library. If it is not being used as a library, then a centralized location under $HOME or %localappdata% makes more sense than relative to py3TranslateLLM.py. Same with the default location for the cache file.
 # Maybe a good way to check for this is the name = __main__ check?
-defaultExportExtension='.xlsx'
-defaultCacheFile='backups/cache' + defaultExportExtension
 defaultBackupsFolder='backups'
+defaultExportExtension='.xlsx'
+defaultCacheFileLocation=defaultBackupsFolder + '/cache' + defaultExportExtension
+
 
 translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
 usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEnginesAvailable+'.'
@@ -138,7 +139,7 @@ commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help=
 commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 
 commandLineParser.add_argument('-c', '--cache', help='Toggles cache setting. Specifying this will disable using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries.', action='store_true')
-commandLineParser.add_argument('-cf', '--cacheFile', help='The location of the cache file. Must be in .xlsx format. Default=' + str(defaultCacheFile), default=None, type=str)
+commandLineParser.add_argument('-cf', '--cacheFile', help='The location of the cache file. Must be in .xlsx format. Default=' + str(defaultCacheFileLocation), default=None, type=str)
 commandLineParser.add_argument('-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true')
 commandLineParser.add_argument('-oc', '--overrideWithCache', help='Override any already translated lines in the spreadsheet with results from the cache. Default=Do not override already translated lines.', action='store_true')
 commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use the cache to fill in previously translated lines.', action='store_true')
@@ -465,11 +466,13 @@ if languageCodesFileName == None:
     languageCodesFileName = currentScriptPathOnly + '/' + defaultLanguageCodesFile
 
 if cacheFileName != None:
-    # if a cache file was specified, then verify the extension is .xlsx # Update: Shouldn't .csv also work? CSV would be harder for user to edit but might take less space on disk. Need to check. Can a
-    if pathlib.Path(str(cacheFileName)).suffix != '.xlsx':
-        sys.exit( ('\n Error: cacheFileName must have a .xlsx extension: '+str(cacheFileName)).encode(consoleEncoding) )
+    # if a cache file was specified, then verify the extension is .xlsx # Update: Shouldn't .csv also work? CSV would be harder for user to edit but might take less space on disk. Need to check.
+    if (pathlib.Path(str(cacheFileName)).suffix) != '.xlsx' and (pathlib.Path(str(cacheFileName)).suffix != '.csv'):
+        print( ('\n Error: cacheFile must have a spreadsheet extension: '+ pathlib.Path(str(cacheFileName)).suffix).encode(consoleEncoding) )
+        print( ( 'cacheFile: \'' + str(cacheFileName)).encode(consoleEncoding) )
+        sys.exit(1)
 elif cacheFileName == None:
-    cacheFileName = currentScriptPathOnly + '/' + defaultCacheFile
+    cacheFileName = currentScriptPathOnly + '/' + defaultCacheFileLocation
 cachePathOnly=str(pathlib.Path(cacheFileName).parent)
 
 
@@ -867,37 +870,37 @@ if cacheEnabled == True:
 
     # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
     # Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
-    cache=chocolate.Strawberry( myFileName=cacheFileName, fileEncoding=defaultTextEncoding, readOnlyMode=readOnlyCache)
+    cache=chocolate.Strawberry( myFileName=cacheFileName, fileEncoding=defaultTextEncoding, readOnlyMode=readOnlyCache )
 
     if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) != True:
         # if the Strawberry is brand new, add header row.
         cache.appendRow( ['rawText'] )
 
-    if (debug == True):
+    if debug == True:
         cache.printAllTheThings()
 
     if readOnlyCache != True:
-        cache.exportToXLSX(cacheFileName)
+        cache.export(cacheFileName)
 
     # Prepare some static data for cacheAnyMatch so that it does not have to be prepared while in the loop on every loop.
-    if (cacheAnyMatch == True):
+    if cacheAnyMatch == True:
         blacklistedHeadersForCacheAnyMatch=defaultBlacklistedHeadersForCache
         blacklistedHeadersForCacheAnyMatch.append(translationEngine.model)
 
         # To help with a case insensitive search, make everything lowercase.
         counter=0
-        for i in blacklistedHeadersForCacheAnyMatch:
-            blacklistedHeadersForCacheAnyMatch[counter]=i.lower()
+        for blacklistedHeader in blacklistedHeadersForCacheAnyMatch:
+            blacklistedHeadersForCacheAnyMatch[counter]=blacklistedHeader.lower()
             counter+=1
 
-        # return the cache header row
-        headers = cache.getRow( 1 )
-
-        validColumnLettersForCacheAnyMatch=[]
-        for header in headers:
-            if str(header).lower() not in blacklistedHeadersForCacheAnyMatch:
-                # This should append the column letter, not the literal text, to the list.
-                validColumnLettersForCacheAnyMatch.append( cache.searchHeaders(header) )
+        if cacheAnyMatch == True:
+            # Return the cache header row.
+            headers = cache.getRow( 1 )
+            validColumnLettersForCacheAnyMatch=[]
+            for header in headers:
+                if str(header).lower() not in blacklistedHeadersForCacheAnyMatch:
+                    # This should append the column letter, not the literal text, to the list.
+                    validColumnLettersForCacheAnyMatch.append( cache.searchHeaders(header) )
 
 
 # Implement KoboldAPI first, then DeepL, .
@@ -937,14 +940,14 @@ if translationEngine.reachable != True:
 
 
 # This will return the column letter of the model if the model is already in the spreadsheet. Otherwise, if it is not found, then it will return None.
-currentModelColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
-if currentModelColumn == None:
-    # Then the model is not currently in the spreadsheet, so need to add it. Update currentModelColumn after it has been updated.
+currentMainSpreadsheetColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
+if currentMainSpreadsheetColumn == None:
+    # Then the model is not currently in the spreadsheet, so need to add it. Update currentMainSpreadsheetColumn after it has been updated.
     headers = mainSpreadsheet.getRow( 1 )
     headers.append( translationEngine.model )
     mainSpreadsheet.replaceRow( 1, headers )
-    currentModelColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
-    if currentModelColumn == None:
+    currentMainSpreadsheetColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
+    if currentMainSpreadsheetColumn == None:
         print( 'unspecified error.' )
         sys.exit(1)
 
@@ -955,7 +958,6 @@ if cacheEnabled == True:
         #if not exist currentModel in cache,
         #then add it to headers
         #and return the cache's updated column for model.
-
     currentCacheColumn = cache.searchHeaders(translationEngine.model)
     if currentCacheColumn == None:
         # Then the model is not currently in the cache, so need to add it. Update currentCacheColumn after it has been updated.
@@ -972,7 +974,7 @@ if translationEngine.supportsBatches == True:
     #translationEngine.batchTranslate()
     # if there is a limit to how large a batch can be, then the server should handle that internally.
     # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations.
-    #currentModelColumn
+    #currentMainSpreadsheetColumn
     untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
     untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
@@ -1007,12 +1009,10 @@ if translationEngine.supportsBatches == True:
                     # Check if other models should be considered cache hits regardless of not being perfect matches.
                     # determine which columns should be considered to have possible matches
                     # Maybe check all entries past the first 3 blindly? Not valid for spreadsheets without speaker or metadata
-                    counter=0
                     # How about checking header for known bad headers and putting all other column letters into a list?
                     #cache.convertColumnNumberToColumnLetter()
                     # Known bad headers are...  rawText speaker metadata and currentModel
                     # Update: Moved header code up and out of function.
-
                     if ( cacheAnyMatch == True ) and ( len(validColumnLettersForCacheAnyMatch) > 0 ):
                     # if len(list) != 0, If it is 0, then do not bother. The length of that list could be 0 because even though the current model should always be added to cache and it could be returned, the current model should be blacklisted since the relevant cell was already checked.
 
@@ -1033,21 +1033,21 @@ if translationEngine.supportsBatches == True:
                         if len(tempList) > 0:
                             # then take the contents of the right-most/last list in tempList and append them to tempRequestList
                             # tempRequestList.append( [tempList[0], tempList[1], tempList[2] ] )
-                            # len(tempList) returns the number of items in a list. To get the nth last item, take the total items and subtract 1.
+                            # len(tempList) returns the number of items in a list. To get the last item, take the total items and subtract 1 because indexes start with 0.
                             tempRequestList.append( tempList[ len(tempList) - 1 ] )
 
                     # else only perfect hits should be considered
                     # elif cacheAnyMatch == False:
                     else:
                         tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
-                        translateMe.append(untranslatedEntry)
+                        translateMe.append( untranslatedEntry )
 
             #else untranslatedEntry is not in the cache
             #elif tempRowForCacheMatch == None:
             else:
                 # The rawEntry does not exist in the cache.
                 tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
-                translateMe.append(untranslatedEntry)
+                translateMe.append( untranslatedEntry )
 
             # Old code:
 #            if entry in translationCacheDictionary.keys():
@@ -1072,13 +1072,13 @@ if translationEngine.supportsBatches == True:
         print( ( 'translateMe=' + str(translateMe) ).encode(consoleEncoding) )
     # Only attempt to translate entries if there was at least one entry not found in the cache.
     if len(translateMe) > 0:
+        # There should probably be batch size limiter logic here.
         postTranslatedList = translationEngine.batchTranslate( translateMe )
     if debug==True:
         print( ( 'postTranslatedList=' + str(postTranslatedList) ).encode(consoleEncoding) )
 
     finalTranslatedList=[]
     if cacheEnabled == True:
-        counter=0
         # if every entry was found in the cache
 
         #if reTranslate == True, then len(tempRequestList) == 0, so do not bother trying to read entries from it. Just set output to postTranslatedList.
@@ -1091,28 +1091,67 @@ if translationEngine.supportsBatches == True:
             elif len( cache.getColumn('A') ) == 1:
                 finalTranslatedList=postTranslatedList
             else:
+                counter=0
                 # Need to merge processed items, postTranslatedList, with tempRequestList for finalTranslatedList.
                 # iterate over postTranslatedList, for every entry 
+                for translation in postTranslatedList:
                     # if the valueIsFromCache == True
+                    if tempRequestList[1] == True:
                         #append entry[2] to final finalTranslatedList
+                        finalTranslatedList.append( tempRequestList[2] )
                     # elif the valueIsNotFromCache, valueIsFromCache==False
+                    else:
                         # then append the recently translated value, postTranslatedList[counter]
-                        # increase counter
+                        finalTranslatedList.append( postTranslatedList[counter] )
+                        # and increase the counter.
+                        counter += 1
                     # go to next entry
 
         #elif reTranslate == True:
         else:
             finalTranslatedList=postTranslatedList
 
+        if debug == True:
+            print( 'len(finalTranslatedList)=' + str(len(finalTranslatedList)) )
+            print( 'len(untranslatedEntriesColumnFull=' + str(len(untranslatedEntriesColumnFull)) )
+        assert( len(finalTranslatedList) == len(untranslatedEntriesColumnFull) )
+
         if ( len(postTranslatedList) != 0 ) and ( readOnlyCache == False ):
-            #postTranslatedList and untranslatedEntriesColumnFull need to be added to the cache file now.
+            # finalTranslatedList and untranslatedEntriesColumnFull need to be added to the cache file now.
+            counter=0
+            tempSearchResult = '':
             #for every entry
+            for untranslatedString in untranslatedEntriesColumnFull:
+                # tempSearchResult can be a row number (as a string) or None if the string was not found.
+                tempSearchResult=cache.searchFirstColumn( untranslatedString )
                 #if the untranslatedString is not in the cache
-                    #then just append a new row with one entry, retrieve that row number, then set the appropriate column Value.
-                #elif the untranslatedString is in the cache, then get the appropriate cell, the currentModelColumn + temporaryRow.
-                # if the cell's value is None, then replace the value
-                # elif the cell's value is not empty
-                #if reTranslate == True, always update all entries in the cache
+                if tempSearchResult == None:
+                    #then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
+                    cache.appendRow( [ untranslatedString ] )
+                    # This returns the row number of the found entry as a string.
+                    tempSearchResult=cache.searchFirstColumn( untranslatedString )
+                    cache.setCellValue( currentCacheColumn + str(tempSearchResult) , finalTranslatedList[counter] )
+
+                # elif the untranslatedString is in the cache
+                # elif tempSearchResult != None:
+                else:
+                    #, then get the appropriate cell, the currentCacheColumn + temporaryRow.
+                    currentCellAddress=currentCacheColumn + str(tempSearchResult)
+                    # if the cell's value is None
+                    if cache.getCellValue(currentCellAddress) == None:
+                        # then replace the value
+                        cache.setCellValue( currentCellAddress, finalTranslatedList[counter] )
+                    # elif the cell's value is not empty
+                    else:
+                        # Only update the cache if overrideWithCache == True
+                        if overrideWithCache == True:
+                            cache.setCellValue( currentCellAddress, finalTranslatedList[counter] )
+                counter += 1
+
+        if readOnlyCache != True:
+            cache.export(cacheFileName)
+
+    #if reTranslate == True, always update all entries in the cache
     else:
         finalTranslatedList=postTranslatedList
 
@@ -1126,15 +1165,25 @@ if translationEngine.supportsBatches == True:
 
     # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
     if overrideWithCache == True:
-        postTranslatedList.insert( 0, translationEngine.model ) # Put header back. This returns None.
-        mainSpreadsheet.replaceColumn( currentModelColumn , postTranslatedList ) # Batch replace the entire column.
+        finalTranslatedList.insert( 0, translationEngine.model ) # Put header back. This returns None.
+        mainSpreadsheet.replaceColumn( currentMainSpreadsheetColumn , finalTranslatedList ) # Batch replace the entire column.
+
     #if overrideWithCache != True:
     else:
         # Consider each entry individually.
-        # Check if the entry is current None.
-        # if entry is none, then always update the entry
-        # if entry is not none
-            # then do not override entry
+        listCounter=0
+        currentRow=2 # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
+        for untranslatedString in untranslatedEntriesColumnFull:
+            #Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedEntriesColumnFull and finalTranslatedList.
+            #tempSearchResult=cache.searchFirstColumn( untranslatedString )
+
+            currentTranslatedCellAddress=currentMainSpreadsheetColumn + str(currentRow)
+            # Check if the entry is current None. if entry is none
+            if mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None:
+                # then always update the entry
+                mainSpreadsheet.setCellValue(currentTranslatedCellAddress, value)
+            # if entry is not none
+                # then do not override entry
 
 else:
     #translationEngine.translate()
@@ -1143,10 +1192,10 @@ else:
 # Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
 # if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
 
-mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentModelColumn)
+mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentMainSpreadsheetColumn)
 #mainSpreadsheet.printAllTheThings()
 
-#Now have two column letters for both currentModelColumn and currentCacheColumn.
+#Now have two column letters for both currentMainSpreadsheetColumn and currentCacheColumn.
 #currentCacheColumn can be None if cache is disabled. cache might also be set to read only mode.
 
 # Read in raw untranslated cell from column A in spearsheet.
