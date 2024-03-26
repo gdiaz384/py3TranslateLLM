@@ -38,4 +38,6 @@
 - [Translation Technologies - NMT, Language Models, LLMs, and AI](//github.com/gdiaz384/py3TranslateLLM/wiki/Translation-Technologies-%E2%80%90-NMT,-Language-Models,-LLMs,-and-AI)
 - [Command Line Interfaces (CLI) Resources](//github.com/gdiaz384/py3TranslateLLM/wiki/Command-Line-Interfaces-(CLI)-Resources)
 - [Text Encoding](//github.com/gdiaz384/py3TranslateLLM/wiki/Text-Encoding)
-- [Licensing]
+- Summary of Software [Licensing](//docs.codeberg.org/getting-started/licensing).
+    - [What is Free Software?](https://www.gnu.org/philosophy/free-sw.en.html)
+    - [License List](https://www.gnu.org/licenses/license-list.html) and [GPL FAQ](https://www.gnu.org/licenses/gpl-faq.html).

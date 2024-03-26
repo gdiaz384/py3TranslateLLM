@@ -436,8 +436,7 @@ class Strawberry:
 
 
     def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
-        #print('Hello World'.encode(consoleEncoding))
-        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding,errors=outputErrors) as myOutputFileHandle:
+        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrors) as myOutputFileHandle:
             myCsvHandle = csv.writer(myOutputFileHandle)
 
             # Get every row for current spreadsheet.
@@ -448,6 +447,7 @@ class Strawberry:
                 for cell in row:
                     tempList.append( str(cell) )
                 myCsvHandle.writerow(tempList)
+
         print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 

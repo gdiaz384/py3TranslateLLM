@@ -63,7 +63,7 @@ Hardware (CPU/GPU)
 - Download the latest version from [PyPi](//pypi.org/project/fairseq) using pip:
     - `pip install fairseq`
     - Requires:
-        - Python 3.6+
+        - Python 3.8+
         - PyTorch 1.5.0+
 - `pip` will install various dependencies automatically if using a last stable version. 
 - More information: https://pypi.org/project/fairseq/
@@ -76,12 +76,13 @@ Hardware (CPU/GPU)
 - (Optional) Download and install `git`: https://git-scm.com/download/
     - It is possible to download fairseq as a release, a main repository archive, or last stable version using pip.
     - `git` is not needed but still nice to have.
+    - Alternatively, use Chocolatey: `choco install git.install --params "/NoShellIntegration"`
+        - [Chocolatey](//chocolatey.org) is a package manager for Windows. It tends to be very good for programs that do not need any special options set during installation, like Ninja, and unlike Python and `git`. Programs like `git` require special handling to look up which installation parameters are necessary to make them behave. This was provided in the example above for convenience.
 - Download the [Ninja](//ninja-build.org) build system and put the binary somewhere in %path%: [github.com/ninja-build/ninja/releases](//github.com/ninja-build/ninja/releases)
     - To check for locations to place the Ninja binary file, open a command prompt (`cmd.exe`) or terminal and type the following:
         - Windows: `echo %path%`
         - Linux: `echo $PATH`
     - Alternatively, `choco install ninja`
-        - [Chocolatey](//chocolatey.org) is a package manager for Windows. It tends to be very good for programs that do not need any special options set during installation, like Ninja, and unlike Python and Git.
 - On Windows, building from source requires [Visual Studio C++ 2015 build tools](//stackoverflow.com/questions/40504552/how-to-install-visual-c-build-tools),  [Visual Studio Build Tools 2015-2017](//aka.ms/vs/15/release/vs_buildtools.exe) in addition to the requirements below.
     - Microsoft bundles the installer for the 2015 Build Tools in with their 2017 Visual Studio Installer.
     - **Important**: fairseq needs the "Visual C++ 2015 Build Tools" to compile. These are not selected by default.

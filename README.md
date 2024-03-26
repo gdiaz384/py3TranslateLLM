@@ -69,8 +69,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 0.1 - 2024Mar20 pre-alpha`
-`Current version 2024.03.20 pre-alpha`
+`Current version: 2024.03.20 pre-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the alpha stages. Alpha means core functionality is currently under development.
 
@@ -434,9 +433,9 @@ Libraries can also require other libraries.
     - 'Sugoi NMT' is a wrapper for fairseq which, along with the pretrained model, does the heavy lifting for 'Sugoi NMT'.
     - Sugoi NMT is one part of the 'Sugoi Translator Toolkit' which is itself part of the free-as-in-free-beer distributed 'Sugoi Toolkit' which contains other projects like manga translation and upscaling.
     - The use of Github to post source code for Sugoi Toolkit suggests intent to keep the wrapper code under a permissive license. A more concrete license may be available on discord.
-- py3TranslateLLM.py and the associated libraries under `resources/` are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html). Summary:
-    - Feel free to use it, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
-    - The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
+- py3TranslateLLM.py and the associated libraries under `resources/` are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
+    - Summary: You are free to use the software as long as you do not infringe on the [freedoms](https://www.gnu.org/philosophy/free-sw.en.html#four-freedoms) of other people.
+    - Details: Feel free to use it, modify it, and distribute it to an unlimited extent, but *if you distribute binary files of this program outside of your organization*, then please make the source code for those binaries available.
+    - The imperative to make source code available also applies if using this program as part of a server *if that server can be accessed by people outside of your organization*.
     - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.
         - This assumes the licenses for libraries used in the binary are compatible with one another. If the licenses used for a particular binary are not compatible with one another, then the resulting binary is not considered redistributable. Only lawyers can determine that, and also only lawyers need to worry about it.
-
