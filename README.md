@@ -201,32 +201,48 @@ Variable name | Description | Examples
     - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
     - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
     - For LLMs, providing other arbitrary bits of information in the prompt.
-    - Removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples of removed or altered text: [＠クロエ] [r] [repage] [heart].
+    - Supporting dictionaries that allow removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples in-line text that should be removed or altered: [＠クロエ] [r] [repage] [heart].
         - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
 - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating languages that are heavily sensitive to context, like Japanese, where much or most of the meaning of the language is not found in the spoken or written words but rather in the surrounding context in which the words are spoken.
-    - Aside: For Japanese in particular, context is very important as it is often the only way to identify who is speaking and whom it is they are talking about.
-- **If translating from context light languages like English, where most of the meaning of the language is found within the language itself, then there should not be any or only small differences in translation quality**.
+    - Aside: For Japanese in particular, context is very important as it is often the only way to identify who is speaking and whom they are talking about.
+- **If translating from context light languages like English, where most of the meaning of the language is found within the language itself, then there should not be any or only small differences in translation quality**. For such languages, use a translation engine that supports batch translations the maximum possible speed.
 - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
-- The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, and to have a program that complements other automated parsing and script extraction programs.
-- Other programs can be used to find and parse small bits of untranslated text in text files and images. This program focuses on dialogue.
-- While it is not the emphasis of this program, there is some code to help extract dialogue from certain common formats and then reinsert it automatically after translation including automatic handling of word wrap.
+- The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, by providing the highest quality MTL baseline possible from which to start editing and supporting multiple translation engines for easy cross referencing.
+- This program was written as part of a workflow meant to complement other automated parsing and script extraction programs meaning that compatibility with such programs and openness required to adjust workflows as needed are part of the core design concept.
+
+### Regarding Scope
+
+- This program focuses on translating dialogue that has been input into spreadsheets.
+- Other programs can be used to find and parse small bits of untranslated text in text files and images and handle how to reinsert them.
 - While it is not the emphasis of this program, submitting translations in batches to some NMTs is also supported.
+- While it is not the emphasis of this program, there is some code to help translate plain.txt files. This only works in line-by-line mode.
+- For more complicated input, parse the output using a parsing program that can convert it to a spreadsheet format, like .csv, before using py3TranslateLLM. Examples:
+    - [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet). Supports custom parsers via templates but very WIP.
+    - [SExtractor](//github.com/satan53x/SExtractor). Supports regex.
+    - [fileTranslate](//github.com/UserUnknownFactor/filetranslate). Supports regex.
+    - Consider writing a parser yourself. Assuming plain text files, it should not take more than an afternoon to write a parser in Python due to Python's very large standard library, [available templates], and a very large amount of third party libraries readily availble on [PyPi.org](pypi.org).
+        - Tip: After parsing, use [pyexcel](//github.com/pyexcel/pyexcel), [documentation](//docs.pyexcel.org/en/latest/design.html), to export the data to and out of spreadsheets easily. 
+        - pyexcel is a wrapper library for openpyxl and other libraries that focuses on providing i/o for the various spreadsheet formats.
+            - Note that it has a plugin system for various formats and requires those plugins to also be installed. See their [installation](//github.com/pyexcel/pyexcel#installation) section for a lack of guidance on how to install them.
 
 ### Regarding the Spreadsheet Formats:
 
-- For the spreadsheet formats (.csv, .xlsx, .xls, .ods), the following apply when used for translating text:
+- For the spreadsheet formats, .csv, .xlsx, .xls, .ods, the following apply:
     - The first row is reserved for headers and is always ignored for data processing otherwise.
-    - The first column (1st) must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
-        - Paragraph spacing will not be preserved in the output cell, but will instead be regenerated dynamically when writting to the output files based upon the configurable word wrap settings.
-            - This behavior can be disabled by setting paragraphDelimiter=newLine or enabling --lineByLineMode (-lbl) mode at runtime.
-    - The second column (2nd) is reserved for the character speaking if a character name can be determined from the raw dialogue.
+    - The first column, 1st, must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
+        - New lines will not be preserved in the output cell. If this behavior is desired, regenerate them dynamically when writing to the output files as needed. Basically, word wrap is outside the scope of this project.
+    - The second column, 2nd, is reserved for the character speaking.
         - Feel free to add the speaker if a speaker could not be automatically determined.
         - Automatic character name detection is heavily dependent on the settings specified in the parsingSettings.txt file.
-    - The third column (3rd) is reserved for metadata used by py3TranslateLLM.
-        - Do not modify the metadata column.
-    - The fourth column (4th) and columns after it are used for the translation engines (KoboldCPP/modelName, DeepL API, DeepL (Web), fairseq, Sugoi).
-        - One translation engine per column. If the current translation engine does not exist as a column, it will be added dynamically.
+    - The third column, 3th, and columns after it are used for metadata or the translation engines. Currently that is KoboldCPP/modelName, DeepL API, DeepL Web, py3translationServer, Sugoi.
+        - Label the first cell in a column to reserve that column for that translation engine. One translation engine per column.
+        - To reserve it for metadata, call it `metadata` or similar.
+        - If the current translation engine does not exist as a column, then it will be added dynamically as needed.
             - KoboldCPP translation engines are in the format `koboldcpp/[modelName]`, therefore changing the model mid-translation will result in a completely new column because different models produce different output.
+            - py3translationServer columns are in the format py3translationServer/[modelName] which can result in a completely new column when gaming models because different models produce different output.
+                - For CTranslate2, the model name sometimes takes the form py3translationServer/model.bin if the model.bin file was explicitly used when invoking py3translationServer. This behavior can result in collisions between different models and potentially different languages as well. As a workaround, if using py3translationServer +  CTranslate2, then specify loading the model by using the folder name of the model instead and name the folder in a descriptive way.
+                - Example: `b100_model/model.bin` and invoke using `b100_model` only.
+                - This behavior of py3translationServer may change in the future.
         - The source content for the translation engine columns is always based on the first column.
         - The order of the translation engine columns (4+) only matters in the following situation:
             - The column furthest to the right will be preferred when writing back to files (.ks, .ts).
@@ -238,9 +254,13 @@ Variable name | Description | Examples
         - comma(s) `,`
         - must be quoted using two double quotes `"`. Example: `"Hello, world!"`
     - Single quotes `'` are not good enough. Use double quotes `"`
-    - Entries containing more than one double quote `"` within the entry must escape those quotes using a backlash `\` like: `"\"Hello, world!\""`
+    - Entries containing more than one double quote `"` within the entry must escape those quotes.
+        - Use a backlash `\` like: `"\"Hello, world!\""`
+        - Or use double quotes `""` like: `"""Hello, world!"""` TODO: Test this.
     - Whitespace is ignored for `languageCodes.csv` and for .csv's that contain the untranslated text.
     - Whitespace is preserved for all of the dictionaries.
+- .xls is quite old and supports a maximum of 65,000 rows, which is relatively small. [Source](//github.com/pyexcel/pyexcel-xls#warning). Consider using any other format.
+    - Microsoft's [documentation](//learn.microsoft.com/en-us/previous-versions/office/developer/office-2010/gg615597(v=office.14)).
 
 ### Regarding Settings Files:
 
@@ -275,10 +295,11 @@ Variable name | Description | Examples
         1. Periodically as entries are translated, a backup.xlsx is made under `backups/[date]/`.
     1. Settings in this parsing template are considered as they relate to word wrap and outputing the translation into the text files (.txt, .ks, .ts).
     1. The spreadsheet file is written to output, and a final backup.xlsx file is written.
-    1. Outdated?: `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions since codec conversions are not lossless.
+    1. Outdated?: `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions for .csv files since codec conversions are not lossless.
 
 #### Regarding chararacterNames.csv:
 
+- Update: Maybe this should be renamed to revertAfterTranslation.csv?
 - The `chararacterNames.csv` dictionary is somewhat overloaded and the name does not match its full functionality perfectly. Nor is it a perfect solution to the problem it was intended to solve.
 - The actual functionality is as follows:
     1. Entries in the first column of this dictionary will be replaced with the entries for the second column prior to text getting translated.
@@ -318,39 +339,10 @@ Variable name | Description | Examples
     - The formal vs informal feature is only available for Pro users, so not available for the deepl-api-free or deepl-web translation engines. [About-the-formal-informal-feature](//support.deepl.com/hc/en-us/articles/4406432463762-About-the-formal-informal-feature).
 - If translating to Japanese, not from, then read DeepL's [plain vs polite feature](//support.deepl.com/hc/en-us/articles/6306700061852-About-the-plain-polite-feature-in-Japanese).
 
-### Regarding XLSX
-
-- [Open Office XML](//en.wikipedia.org/wiki/Office_Open_XML) (OOXML), .xlsx, is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries and the cache directly without any unnecessary conversions that could introduce formatting bugs.
-- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write Open Office XML and the other spreadsheet formats (.csv, .xls, .ods):
-    - Apache [OpenOffice](//www.openoffice.org). [License](//www.openoffice.org/license.html) and [source](//openoffice.apache.org/downloads.html). Note: Can read but not write to .xlsx.
-    - [LibreOffice](//www.libreoffice.org). [License](//www.libreoffice.org/about-us/licenses) and [source](//www.libreoffice.org/download/download-libreoffice/).
-    - [OnlyOffice](//www.onlyoffice.com/download-desktop.aspx) is [AGPL v3](//github.com/ONLYOFFICE/DesktopEditors/blob/master/LICENSE). [Source](//github.com/ONLYOFFICE/DesktopEditors).
-- [OpenPyXL](//openpyxl.readthedocs.io), the library used in the core data structure, follows the Open Office XML standard closely, and [will not load](//openpyxl.readthedocs.io/en/stable/tutorial.html#errors-loading-workbooks) documents that do not follow the standard closely. In other words, Microsoft Office will probably not work. If using MS Office, then export as .csv instead (untested).
-
-### Text Encoding and py3TranslateLLM:
-
-- Read the [Text Encoding](//github.com/gdiaz384/py3TranslateLLM/wiki/Text-Encoding) wiki entry.
-- After reading the above wiki entry, the rest of this section should make more sense.
-- Tip: Use `py3TranslateLLM.ini` to specify the encoding for text files used with `py3TranslateLLM.py`.
-- For compatability reasons, everything gets converted to binary strings for stdout which can result in the console sometimes showing utf-8 hexadecimal (hex) encoded unicode characters, like `\xe3\x82\xaf\xe3\x83\xad\xe3\x82\xa8`, especially with `debug` enabled. To convert them back to non-ascii chararacters, like `クロエ`, dump them into a hex to unicode converter.
-    - Example: [www.coderstool.com/unicode-text-converter](//www.coderstool.com/unicode-text-converter)
-- Some character encodings cannot be converted to other encodings. When such errors occur, use the following error handling options:
-    - [docs.python.org/3.7/library/codecs.html#error-handlers](//docs.python.org/3.7/library/codecs.html#error-handlers), and [More Examples](//www.w3schools.com/python/ref_string_encode.asp) -> Run example.
-    - The default error handler for input files is `strict` which means 'crash the program if the encoding specified does not match the file perfectly'.
-    - On Python >= 3.5, the default error handler for the output file is `namereplace`.  This obnoxious error handler:
-        - Makes it obvious that there were conversion errors.
-        - Does not crash the program catastrophically.
-        - Makes it easy to do ctrl+f replacements to fix any problems.
-            - Tip: Use `postWritingToFileDictionary` or [py3stringReplace](//github.com/gdiaz384/py3stringReplace) to automate these ctrl+f replacements.
-    - If there are more than one or two such conversion errors per file, then the chosen file encoding settings are probably incorrect.
-- If the `chardet` library is available, it will be used to try to detect the character encoding of files via heuristics. While this imperfect solution is obviously very error prone, it is still better to have it than not.
-    - To make it available: `pip install chardet`
-    - If it is not available, then everything is assumed to be `utf-8` unless otherwise specified.
-
 ### Notes about languages:
 
 - The default list of supported languages can be found at `resources/languageCodes.csv`.
-- If using an LLM for translation and utilizing a language not listed in `languageCodes.csv`, then add that language as a new row to make py3TranslateLLM aware of it.
+- If using an LLM for translation and utilizing a language not listed in `languageCodes.csv`, then add that language as a new row to make py3TranslateLLM aware of it. This file is subject to change without notice.
 - The default supported languages list is based on DeepL's [supported languages list](//support.deepl.com/hc/en-us/articles/360019925219-Languages-included-in-DeepL-Pro) and their [openapi.yaml](//www.deepl.com/docs-api/api-access/openapi) specification.
 - py3TranslateLLM uses mappings based upon [this](//www.loc.gov/standards/iso639-2/php/code_list.php) table and supports any of the following when specifying a language:
     1. The full language: `English`, `German`, `Spanish`, `Russian`.
@@ -385,6 +377,37 @@ Variable name | Description | Examples
         - The above distinction between the two dialects only applies to selecting Portuguese as the target language. If selecting Portuguese as a source language, `Portuguese` is sufficent and will be used regardless.
     - `Romanian` has both RUM (B) and RON (T). It is unclear what DeepL supports. The 3 letter language code of `RON` is used.
     - `Spanish` has an alias of `Castilian`.
+
+### Regarding .XLSX
+
+- [Open Office XML](//en.wikipedia.org/wiki/Office_Open_XML) (OOXML), .xlsx, is the native format used in py3TranslateLLM to store data internally during processing and should be the most convenient way to edit translated entries and the cache directly without any unnecessary conversions that could introduce formatting bugs.
+- Here are some free and open source software ([FOSS](//en.wikipedia.org/wiki/Free_and_open-source_software)) office suits that can read and write Open Office XML and the other spreadsheet formats (.csv, .xls, .ods):
+    - Apache [OpenOffice](//www.openoffice.org). [License](//www.openoffice.org/license.html) and [source](//openoffice.apache.org/downloads.html). Note: Can read but not write to .xlsx.
+    - [LibreOffice](//www.libreoffice.org). [License](//www.libreoffice.org/about-us/licenses) and [source](//www.libreoffice.org/download/download-libreoffice/).
+    - [OnlyOffice](//www.onlyoffice.com/download-desktop.aspx) is [AGPL v3](//github.com/ONLYOFFICE/DesktopEditors/blob/master/LICENSE). [Source](//github.com/ONLYOFFICE/DesktopEditors).
+- [OpenPyXL](//openpyxl.readthedocs.io), the library used in the core data structure for this program, follows the Open Office XML standard closely, and [will not load](//openpyxl.readthedocs.io/en/stable/tutorial.html#errors-loading-workbooks) documents that do not follow the same standard closely.
+- In other words, Microsoft Office will probably not work. If using Microsoft Excel, then export as .ods, .xls, or .csv instead. For Excel .csv files, specify the option... TODO: this part.
+- See Microsoft's [documentation](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e) for why their software does not work correctly.
+
+### Text Encoding and py3TranslateLLM:
+
+- Read the [Text Encoding](//github.com/gdiaz384/py3TranslateLLM/wiki/Text-Encoding) wiki entry.
+- After reading the above wiki entry, the rest of this section should make more sense.
+- Tip: Use `py3TranslateLLM.ini` to specify the encoding for text files used with `py3TranslateLLM.py`.
+- For compatability reasons, everything gets converted to binary strings for stdout which can result in the console sometimes showing utf-8 hexadecimal (hex) encoded unicode characters, like `\xe3\x82\xaf\xe3\x83\xad\xe3\x82\xa8`, especially with `debug` enabled. To convert them back to non-ascii chararacters, like `クロエ`, dump them into a hex to unicode converter.
+    - Example: [www.coderstool.com/unicode-text-converter](//www.coderstool.com/unicode-text-converter)
+- Some character encodings cannot be converted to other encodings. When such errors occur, use the following error handling options:
+    - [docs.python.org/3.7/library/codecs.html#error-handlers](//docs.python.org/3.7/library/codecs.html#error-handlers), and [More Examples](//www.w3schools.com/python/ref_string_encode.asp) -> Run example.
+    - The default error handler for input files is `strict` which means 'crash the program if the encoding specified does not match the file perfectly'.
+    - On Python >= 3.5, the default error handler for the output file is `namereplace`.  This obnoxious error handler:
+        - Makes it obvious that there were conversion errors.
+        - Does not crash the program catastrophically.
+        - Makes it easy to do ctrl+f replacements to fix any problems.
+            - Tip: Use `postWritingToFileDictionary` or [py3stringReplace](//github.com/gdiaz384/py3stringReplace) to automate these ctrl+f replacements.
+    - If there are more than one or two such conversion errors per file, then the chosen file encoding settings are probably incorrect.
+- If the `chardet` library is available, it will be used to try to detect the character encoding of files via heuristics. While this imperfect solution is obviously very error prone, it is still better to have it than not.
+    - To make it available: `pip install chardet`
+    - If it is not available, then everything is assumed to be `utf-8` unless otherwise specified.
 
 ## Regarding Python libraries:
 
@@ -434,8 +457,8 @@ Libraries can also require other libraries.
     - Sugoi NMT is one part of the 'Sugoi Translator Toolkit' which is itself part of the free-as-in-free-beer distributed 'Sugoi Toolkit' which contains other projects like manga translation and upscaling.
     - The use of Github to post source code for Sugoi Toolkit suggests intent to keep the wrapper code under a permissive license. A more concrete license may be available on discord.
 - py3TranslateLLM.py and the associated libraries under `resources/` are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
-    - Summary: You are free to use the software as long as you do not infringe on the [freedoms](https://www.gnu.org/philosophy/free-sw.en.html#four-freedoms) of other people.
-    - Details: Feel free to use it, modify it, and distribute it to an unlimited extent, but *if you distribute binary files of this program outside of your organization*, then please make the source code for those binaries available.
-    - The imperative to make source code available also applies if using this program as part of a server *if that server can be accessed by people outside of your organization*.
+    - You are free to use the software as long as you do not infringe on the [freedoms](https://www.gnu.org/philosophy/free-sw.en.html#four-freedoms) of other people.
+    - Summary: Feel free to use it, modify it, and distribute it to an unlimited extent, but *if you distribute binary files of this program outside of your organization*, then please make the source code for those binaries available.
+    - The imperative to make source code available also applies if using this program as part of a server *if that server can be accessed by people outside of your organization*. For additional details, consult the license text.
     - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.
         - This assumes the licenses for libraries used in the binary are compatible with one another. If the licenses used for a particular binary are not compatible with one another, then the resulting binary is not considered redistributable. Only lawyers can determine that, and also only lawyers need to worry about it.

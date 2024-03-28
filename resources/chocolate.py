@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper/wrapper library to aid in using openpyxl as a data structure.
+Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods.
 
 Usage: See below. Like at the bottom.
 
@@ -37,7 +37,7 @@ try:
 except:
     xlwtLibraryIsAvailable=False
 try:
-    import odfpy                           #Provides interoperability for Open Document Spreadsheet (.ods).
+    import odfpy                           #Provides interoperability for Open Document Spreadsheet (.ods). Alternatives: https://github.com/renoyuan/easyofd pyexcel-ods3, pyexcel-ods, ezodf
     odfpyLibraryIsAvailable=True
 except:
     odfpyLibraryIsAvailable=False
@@ -56,10 +56,12 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, readOnlyMode=False):
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, readOnlyMode=False, csvDialect=None):
         self.workbook = openpyxl.Workbook()
         self.spreadsheet = self.workbook.active
         self.readOnlyMode = readOnlyMode
+        self.csvDialect=csvDialect
+        self.addHeaderToTextFile=addHeaderToTextFile
 
         # Are there any use cases for creating a spreadsheet in memory without an associated file name? Since chocolate.Strawberry() is a data structure, this must be 'yes' by definition, but what is the use case for that exactly? When would it be useful to only create a spreadsheet in memory but never write it out?
         if myFileName != None:
@@ -87,7 +89,7 @@ class Strawberry:
             if os.path.isfile(myFileName) == True:
                 # if extension = .csv, then call importFromCSV(myFileName)
                 if myFileExtensionOnly == '.csv':
-                    self.importFromCSV(myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV)
+                    self.importFromCSV(myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV,csvDialect=csvDialect)
                 elif myFileExtensionOnly == '.xlsx':
                     self.importFromXLSX(myFileName, fileEncoding)
                 elif myFileExtensionOnly == '.xls':
@@ -96,10 +98,9 @@ class Strawberry:
                     self.importFromODS(myFileName, fileEncoding)
                 else:
                     #Else the file must be a text file to instantiate a class with. Only line-by-line parsing is supported.
-                    print( ('Warning: Attempting to instantiate chocolate.Strawberry() using file with unknown extension:\'' + myFileExtensionOnly + '\' Reading in line-by-line. This is probably incorrect. Reference:\'' + myFileName + '\'').encode(consoleEncoding))
-                    if addHeaderToTextFile == True:
-                        self.appendRow( ['rawText'] )
-                    self.importFromTextFile( myFileName, fileEncoding)
+                    if ( myFileExtensionOnly != '.txt' ) and ( myFileExtensionOnly != '.text' ):
+                        print( ('Warning: Attempting to instantiate chocolate.Strawberry() using file with unknown extension:\'' + myFileExtensionOnly + '\' Reading in line-by-line. This is probably incorrect. Reference:\'' + myFileName + '\'').encode(consoleEncoding))
+                    self.importFromTextFile( myFileName, fileEncoding,addHeaderToTextFile=self.addHeaderToTextFile)
 
 
     def __str__(self):
@@ -358,26 +359,30 @@ class Strawberry:
         outputFileNameOnly, outputFileExtensionOnly = os.path.splitext( str(outputFileNameWithPath) )
         if outputFileExtensionOnly == '.csv':
             #Should probably try to handle the path in a sane way.
-            self.exportToCSV(outputFileNameWithPath, fileEncoding=self.fileEncoding)
+            self.exportToCSV(outputFileNameWithPath, fileEncoding=self.fileEncoding,csvDialect=self.csvDialect)
         elif outputFileExtensionOnly == '.xlsx':
             self.exportToXLSX(outputFileNameWithPath)
         elif outputFileExtensionOnly == '.xls':
             self.exportToXLS(outputFileNameWithPath)
         elif outputFileExtensionOnly == '.ods':
             self.exportToODS(outputFileNameWithPath)
-        elif outputFileExtensionOnly == '.txt':
+        elif (outputFileExtensionOnly == '.txt') or (outputFileExtensionOnly == '.text'):
             self.exportToTextFile(outputFileNameWithPath, columnToExport=columnToExportForTextFiles, fileEncoding=self.fileEncoding)
         else:
             print( ( 'Warning: Unable to export chocolate.Strawberry() to file with unknown extension of \''+ outputFileExtensionOnly + '\' Full path: '+ str(outputFileNameWithPath) ).encode(consoleEncoding) )
 
 
     # Supports line by line parsing only. Header should already be part of text file.
-    def importFromTextFile(self, fileNameWithPath,fileEncoding=defaultTextFileEncoding):
-        myFileContents=[]
+    def importFromTextFile(self, fileNameWithPath,fileEncoding=defaultTextFileEncoding,addHeaderToTextFile=self.addHeaderToTextFile):
+        if addHeaderToTextFile == True:
+            self.appendRow( [ 'rawText', 'reserved', 'metadata' ] )
         # Open file as text file with specified encoding and input error handler.
         with open( fileNameWithPath, 'r', newline='', encoding=fileEncoding, errors=inputErrorHandling ) as myFileHandle:
         # Create a list from every line and append that list to the current spreadsheet.
-            self.appendRow( [ myFileHandle.readline() ] )
+            lines = myFileHandle.readline()
+            for counter,line in enumerate(lines):
+                if line.strip() != ''
+                self.appendRow( [  line,'', counter ] )
 
 
     #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
@@ -396,7 +401,7 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,removeWhitespaceForCSV=True ):
+    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,removeWhitespaceForCSV=True,csvDialect=self.csvDialect):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
@@ -435,8 +440,8 @@ class Strawberry:
             self.printAllTheThings()
 
 
-    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
-        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrors) as myOutputFileHandle:
+    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=self.csvDialect):
+        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling) as myOutputFileHandle:
             myCsvHandle = csv.writer(myOutputFileHandle)
 
             # Get every row for current spreadsheet.

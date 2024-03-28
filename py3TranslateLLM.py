@@ -1119,7 +1119,7 @@ if translationEngine.supportsBatches == True:
         if ( len(postTranslatedList) != 0 ) and ( readOnlyCache == False ):
             # finalTranslatedList and untranslatedEntriesColumnFull need to be added to the cache file now.
             counter=0
-            tempSearchResult = '':
+            tempSearchResult = ''
             #for every entry
             for untranslatedString in untranslatedEntriesColumnFull:
                 # tempSearchResult can be a row number (as a string) or None if the string was not found.
@@ -1181,7 +1181,7 @@ if translationEngine.supportsBatches == True:
             # Check if the entry is current None. if entry is none
             if mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None:
                 # then always update the entry
-                mainSpreadsheet.setCellValue(currentTranslatedCellAddress, value)
+                mainSpreadsheet.setCellValue(currentTranslatedCellAddress, None)
             # if entry is not none
                 # then do not override entry
 
