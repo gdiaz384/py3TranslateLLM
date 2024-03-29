@@ -8,10 +8,10 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
-__version__='2024.03.20'
+__version__='2024.03.28'
 
 #set defaults
-printStuff=True
+#printStuff=True
 verbose=False
 debug=False
 #debug=True

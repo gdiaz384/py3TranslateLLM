@@ -9,7 +9,7 @@ License: See main program.
 
 """
 #set defaults
-printStuff=True
+#printStuff=True
 verbose=False
 debug=False
 #debug=True

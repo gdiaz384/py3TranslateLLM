@@ -14,7 +14,7 @@ License:
 """
 
 #set defaults and static variables
-versionString='2024.03.20 pre-alpha'
+versionString='2024.03.28 pre-alpha'
 
 #Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding = 'utf-8'
@@ -45,6 +45,11 @@ defaultPortForHTTP = 80
 defaultPortForHTTPS = 443
 
 defaultContextHistoryLength = 6
+# This setting only affects LLMs, not NMTs.
+defaultEnableBatchesForLLMs=False
+# Valid options for defaultBatchSizeLimit are an integer or None . Sensible limits are 100-10000 depending upon hardware. In addition to this setting, translation engines also have internal limiters.
+#defaultBatchSizeLimit=None
+defaultBatchSizeLimit=1000
 defaultInputEncodingErrorHandler = 'strict'
 #defaultOutputEncodingErrorHandler = 'namereplace'
 
@@ -146,6 +151,8 @@ commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines
 commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
 commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength), default=None, type=int)
+commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Enabling this disables history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
+commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Default='+str(defaultBatchSizeLimit), default=None, type=int)
 #commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.', action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
 
@@ -213,6 +220,7 @@ else:
     tempConsoleEncoding=defaultConsoleEncodingType
 if debug == True:
     print( ('tempConsoleEncoding='+tempConsoleEncoding).encode(tempConsoleEncoding) )
+
 if version == True:
     sys.exit( (versionString).encode(tempConsoleEncoding) )
 
@@ -320,11 +328,18 @@ if scriptSettingsDictionary != None:
                 tempDict[x] = y
         # The boolean values will never be updated by the above loop since the base value is always False instead of None. So check for that.
         elif tempDict[x] == False:
-            #If the new value is false, or anything else, ignore it, but if the user set it to 'True', then set the variable to True.
+            #If the new value is False, or anything else, ignore it, but if the user set it to 'True', then set the variable to True.
             if str(y).lower() == 'true':
                 if (verbose == True) or (debug == True):
                     print( ('Updating variable: '+str(x)+' to \'True\'').encode(tempConsoleEncoding) )
                 tempDict[x] = True
+      elif tempDict[x] == True:
+            #If the new value is True, or anything else, ignore it, but if the user set it to 'False', then set the variable to False.
+            if str(y).lower() == 'false':
+                if (verbose == True) or (debug == True):
+                    print( ('Updating variable: '+str(x)+' to \'True\'').encode(tempConsoleEncoding) )
+                tempDict[x] = False
+
 
 # if consoleEncoding is still None after reading both the CLI and the settings.ini, then just set it to the default value.
 if consoleEncoding == None:
@@ -940,13 +955,13 @@ if translationEngine.reachable != True:
 
 
 # This will return the column letter of the model if the model is already in the spreadsheet. Otherwise, if it is not found, then it will return None.
-currentMainSpreadsheetColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
+currentMainSpreadsheetColumn = mainSpreadsheet.searchHeaders( translationEngine.model )
 if currentMainSpreadsheetColumn == None:
     # Then the model is not currently in the spreadsheet, so need to add it. Update currentMainSpreadsheetColumn after it has been updated.
     headers = mainSpreadsheet.getRow( 1 )
     headers.append( translationEngine.model )
     mainSpreadsheet.replaceRow( 1, headers )
-    currentMainSpreadsheetColumn = mainSpreadsheet.searchHeaders(translationEngine.model)
+    currentMainSpreadsheetColumn = mainSpreadsheet.searchHeaders( translationEngine.model )
     if currentMainSpreadsheetColumn == None:
         print( 'unspecified error.' )
         sys.exit(1)
@@ -958,7 +973,7 @@ if cacheEnabled == True:
         #if not exist currentModel in cache,
         #then add it to headers
         #and return the cache's updated column for model.
-    currentCacheColumn = cache.searchHeaders(translationEngine.model)
+    currentCacheColumn = cache.searchHeaders( translationEngine.model )
     if currentCacheColumn == None:
         # Then the model is not currently in the cache, so need to add it. Update currentCacheColumn after it has been updated.
         headers = cache.getRow(1)
@@ -970,7 +985,31 @@ if cacheEnabled == True:
             sys.exit(1)
 
 
-if translationEngine.supportsBatches == True:
+# if requiresPrompt = True and supportsBatches = True, then is an LLM,
+    # if batchesEnabledForLLMs, then batchModeEnabled=True
+    # if batchesEnabledForLLMs == False, then batchModeEnabled=False
+
+# requiresPrompt = False and supportsBatches = True, then is an NMT, then batchModeEnabled=True
+
+# if requiresPrompt = True and supportsBatches = False, then is an LLM, then batchModeEnabled=False
+# requiresPrompt = False and supportsBatches = False, then is an NMT, then batchModeEnabled=False
+
+if translationEngine.supportsBatches == False:
+    batchModeEnabled=False
+# can be an NMT or LLM.
+elif translationEngine.requiresPrompt == False:
+    # is an NMT, always enable batches.
+    batchModeEnabled=True
+#elif translationEngine.requiresPrompt == True:
+else:
+    # is an LLM, only enable batches if batchesEnabledForLLMs == True
+    if batchesEnabledForLLMs == True:
+        batchModeEnabled=True
+    else:
+        batchModeEnabled=False
+    
+
+if batchModeEnabled == True:
     #translationEngine.batchTranslate()
     # if there is a limit to how large a batch can be, then the server should handle that internally.
     # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations.
@@ -1185,6 +1224,7 @@ if translationEngine.supportsBatches == True:
             # if entry is not none
                 # then do not override entry
 
+#elif batchModeEnabled == False:
 else:
     #translationEngine.translate()
     pass

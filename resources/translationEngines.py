@@ -11,8 +11,10 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
+__version__='2024.03.28'
+
 #set defaults
-printStuff=True
+#printStuff=True
 verbose=False
 debug=False
 consoleEncoding='utf-8'
@@ -23,15 +25,16 @@ import requests
 class Py3translationServerEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None): 
+    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None,timeout=120): 
         self.sourceLanguage=sourceLanguage
         self.targetLanguage=targetLanguage
         self.supportsBatches=True
         self.supportsHistory=False
-        self.supportsPrompt=False
+        self.timeout=timeout
         self.requiresPrompt=False
         self.address=address
         self.port=port
+
         self.addressFull=self.address + ':' + str(self.port)
 
         self.reachable=False
@@ -53,11 +56,18 @@ class Py3translationServerEngine:
 
     # This expects a python list where every entry is.
     def batchTranslate(self, untranslatedList):
-
         #debug=True
         if debug == True:
+            print( 'len(untranslatedList)=' , len(untranslatedList) )
             print( ( 'untranslatedList=' + str(untranslatedList) ).encode(consoleEncoding) )
-        translatedList = requests.post( self.addressFull, json = dict ([ ('content' , untranslatedList ), ('message' , 'translate sentences') ]) ).json()
+
+        # https://docs.python-requests.org/en/latest/user/advanced/#timeouts
+        translatedList = requests.post( self.addressFull, json = dict ([ ('content' , untranslatedList ), ('message' , 'translate sentences') ]) , timeout=(10, self.timeout) ).json()
+
+        # strip whitespace
+        for counter,translatedList enumerate(translatedList):
+            translatedList[counter]=str(translatedList[counter]).strip()
+
         if debug == True:
             print( ( 'translatedList=' + str(translatedList) ).encode(consoleEncoding) )
 
