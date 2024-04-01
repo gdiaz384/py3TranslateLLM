@@ -42,13 +42,14 @@ class Py3translationServerEngine:
 
         self.model=None
         self.version=None
-        print( 'Connecting to py3translationServer at ' + self.addressFull + ' ...' )
+        print( 'Connecting to py3translationServer at ' + self.addressFull + ' ... ', end='')
         if (self.address != None) and (self.port != None):
             try:
                 self.model = requests.get( self.addressFull + '/api/v1/model', timeout=10 ).text
                 self.version = requests.get( self.addressFull + '/api/v1/version', timeout=10 ).text
+                print( 'Success.')
             except requests.exceptions.ConnectTimeout:
-                print( 'Unable to connect to py3translationServer. Please check the connection settings and try again.' )
+                print( '\nUnable to connect to py3translationServer. Please check the connection settings and try again.' )
 
         if self.model != None:
             self.reachable=True
@@ -65,8 +66,8 @@ class Py3translationServerEngine:
         translatedList = requests.post( self.addressFull, json = dict ([ ('content' , untranslatedList ), ('message' , 'translate sentences') ]) , timeout=(10, self.timeout) ).json()
 
         # strip whitespace
-        for counter,translatedList enumerate(translatedList):
-            translatedList[counter]=str(translatedList[counter]).strip()
+        for counter,entry in enumerate(translatedList):
+            translatedList[counter]=entry.strip()
 
         if debug == True:
             print( ( 'translatedList=' + str(translatedList) ).encode(consoleEncoding) )

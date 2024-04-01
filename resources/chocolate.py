@@ -373,7 +373,7 @@ class Strawberry:
 
 
     # Supports line by line parsing only. Header should already be part of text file.
-    def importFromTextFile(self, fileNameWithPath,fileEncoding=defaultTextFileEncoding,addHeaderToTextFile=self.addHeaderToTextFile):
+    def importFromTextFile(self, fileNameWithPath,fileEncoding=defaultTextFileEncoding,addHeaderToTextFile=False):
         if addHeaderToTextFile == True:
             self.appendRow( [ 'rawText', 'reserved', 'metadata' ] )
         # Open file as text file with specified encoding and input error handler.
@@ -381,8 +381,8 @@ class Strawberry:
         # Create a list from every line and append that list to the current spreadsheet.
             lines = myFileHandle.readline()
             for counter,line in enumerate(lines):
-                if line.strip() != ''
-                self.appendRow( [  line,'', counter ] )
+                if line.strip() != '':
+                    self.appendRow( [  line,'', counter ] )
 
 
     #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
@@ -401,7 +401,7 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,removeWhitespaceForCSV=True,csvDialect=self.csvDialect):
+    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,removeWhitespaceForCSV=True,csvDialect=None):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
@@ -423,8 +423,11 @@ class Strawberry:
         # New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
         #print(inputErrorHandling)
         with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
-            csvReader = csv.reader(myFile)
-            for line in csvReader:
+            # if csvDialect != None.:
+                # implement code related to csvDialects here. Default options are unix, excel and excel-tab
+            myCsvHandle = csv.reader(myFile)
+
+            for line in myCsvHandle:
                 if debug == True:
                     print(str(line).encode(consoleEncoding))
                 #clean up whitespace for entities
@@ -440,8 +443,10 @@ class Strawberry:
             self.printAllTheThings()
 
 
-    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=self.csvDialect):
+    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=None):
         with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling) as myOutputFileHandle:
+            # if csvDialect != None.:
+                # implement code related to csvDialects here. Default options are unix, excel and excel-tab
             myCsvHandle = csv.writer(myOutputFileHandle)
 
             # Get every row for current spreadsheet.

@@ -143,7 +143,7 @@ commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding',
 commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.', default=None, type=str)
 commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 
-commandLineParser.add_argument('-c', '--cache', help='Toggles cache setting. Specifying this will disable using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries.', action='store_true')
+commandLineParser.add_argument('-c', '--cache', help='Toggles cache setting. Specifying this will disable using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries.', action='store_false')
 commandLineParser.add_argument('-cf', '--cacheFile', help='The location of the cache file. Must be in .xlsx format. Default=' + str(defaultCacheFileLocation), default=None, type=str)
 commandLineParser.add_argument('-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true')
 commandLineParser.add_argument('-oc', '--overrideWithCache', help='Override any already translated lines in the spreadsheet with results from the cache. Default=Do not override already translated lines.', action='store_true')
@@ -151,8 +151,8 @@ commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines
 commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
 commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength), default=None, type=int)
-commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Enabling this disables history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
-commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Default='+str(defaultBatchSizeLimit), default=None, type=int)
+commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Enabling this disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
+commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to disable. Default='+str(defaultBatchSizeLimit), default=None, type=int)
 #commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.', action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
 
@@ -196,6 +196,8 @@ reTranslate=commandLineArguments.reTranslate
 readOnlyCache=commandLineArguments.readOnlyCache
 
 contextHistoryLength=commandLineArguments.contextHistoryLength
+batchesEnabledForLLMs=commandLineArguments.batchesEnabledForLLMs
+batchSizeLimit=commandLineArguments.batchSizeLimit
 #lineByLineMode=commandLineArguments.lineByLineMode
 resume=commandLineArguments.resume
 
@@ -333,7 +335,7 @@ if scriptSettingsDictionary != None:
                 if (verbose == True) or (debug == True):
                     print( ('Updating variable: '+str(x)+' to \'True\'').encode(tempConsoleEncoding) )
                 tempDict[x] = True
-      elif tempDict[x] == True:
+        elif tempDict[x] == True:
             #If the new value is True, or anything else, ignore it, but if the user set it to 'False', then set the variable to False.
             if str(y).lower() == 'false':
                 if (verbose == True) or (debug == True):
@@ -877,6 +879,8 @@ if mode == 'parseOnly':
 
 # Cache should always be added. This potentially creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision to keep cache enabled despite the slight collisions.
 
+print('cacheEnabled=',cacheEnabled)
+
 if cacheEnabled == True:
     #First, initialize cache.xlsx file under backups/
     # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header row of course. Multiple columns with each one as a different translation engine.
@@ -894,8 +898,9 @@ if cacheEnabled == True:
     if debug == True:
         cache.printAllTheThings()
 
-    if readOnlyCache != True:
-        cache.export(cacheFileName)
+    # Debug code.
+#    if readOnlyCache != True:
+#        cache.export(cacheFileName)
 
     # Prepare some static data for cacheAnyMatch so that it does not have to be prepared while in the loop on every loop.
     if cacheAnyMatch == True:
@@ -916,6 +921,8 @@ if cacheEnabled == True:
                 if str(header).lower() not in blacklistedHeadersForCacheAnyMatch:
                     # This should append the column letter, not the literal text, to the list.
                     validColumnLettersForCacheAnyMatch.append( cache.searchHeaders(header) )
+
+    print( ( 'Cache is available at: '+str(cacheFileName) ).encode(consoleEncoding) )
 
 
 # Implement KoboldAPI first, then DeepL, .
@@ -988,26 +995,26 @@ if cacheEnabled == True:
 # if requiresPrompt = True and supportsBatches = True, then is an LLM,
     # if batchesEnabledForLLMs, then batchModeEnabled=True
     # if batchesEnabledForLLMs == False, then batchModeEnabled=False
-
 # requiresPrompt = False and supportsBatches = True, then is an NMT, then batchModeEnabled=True
-
 # if requiresPrompt = True and supportsBatches = False, then is an LLM, then batchModeEnabled=False
 # requiresPrompt = False and supportsBatches = False, then is an NMT, then batchModeEnabled=False
 
 if translationEngine.supportsBatches == False:
     batchModeEnabled=False
 # can be an NMT or LLM.
+# elif translationEngine.supportsBatches == True:
 elif translationEngine.requiresPrompt == False:
     # is an NMT, always enable batches.
     batchModeEnabled=True
-#elif translationEngine.requiresPrompt == True:
+# elif translationEngine.supportsBatches == True:
+# elif translationEngine.requiresPrompt == True:
 else:
     # is an LLM, only enable batches if batchesEnabledForLLMs == True
     if batchesEnabledForLLMs == True:
         batchModeEnabled=True
     else:
         batchModeEnabled=False
-    
+
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
@@ -1111,33 +1118,36 @@ if batchModeEnabled == True:
         print( ( 'translateMe=' + str(translateMe) ).encode(consoleEncoding) )
     # Only attempt to translate entries if there was at least one entry not found in the cache.
     if len(translateMe) > 0:
+
         # There should probably be batch size limiter logic here.
+        # TODO: Implement it here.
+
         postTranslatedList = translationEngine.batchTranslate( translateMe )
     if debug==True:
         print( ( 'postTranslatedList=' + str(postTranslatedList) ).encode(consoleEncoding) )
 
     finalTranslatedList=[]
     if cacheEnabled == True:
-        # if every entry was found in the cache
 
-        #if reTranslate == True, then len(tempRequestList) == 0, so do not bother trying to read entries from it. Just set output to postTranslatedList.
+        # First, populate finalTranslatedList which requires merging the newly translated entries with the entries obtained from the cache.
         if reTranslate != True:
+            # if every entry was found in the cache
             if len(postTranslatedList) == 0:
                 #then set finalTranslatedList to all the translated entries that were added to tempRequestList.
-                for i in tempRequestList:
-                    finalTranslatedList.append( tempRequestList[2] )
-            # if cache is empty, so only the header is returned. There is nothing to merge, so set the output to the postTranslatedList.
-            elif len( cache.getColumn('A') ) == 1:
+                for entry in tempRequestList:
+                    finalTranslatedList.append( entry[2] )
+            # if cache was empty prior to submitting entries, then it will still be empty here. Only the header will be returned len( ~cache )==1, then there is nothing to merge, so set the output to the postTranslatedList.
+            elif len( cache.getColumn('A') ) <= 1:
                 finalTranslatedList=postTranslatedList
             else:
                 counter=0
                 # Need to merge processed items, postTranslatedList, with tempRequestList for finalTranslatedList.
                 # iterate over postTranslatedList, for every entry 
-                for translation in postTranslatedList:
+                for entry in tempRequestList:
                     # if the valueIsFromCache == True
-                    if tempRequestList[1] == True:
+                    if entry[1] == True:
                         #append entry[2] to final finalTranslatedList
-                        finalTranslatedList.append( tempRequestList[2] )
+                        finalTranslatedList.append( entry[2] )
                     # elif the valueIsNotFromCache, valueIsFromCache==False
                     else:
                         # then append the recently translated value, postTranslatedList[counter]
@@ -1146,6 +1156,7 @@ if batchModeEnabled == True:
                         counter += 1
                     # go to next entry
 
+        #if reTranslate == True, then len(tempRequestList) == 0, so do not bother trying to read entries from it. Just set output to postTranslatedList.
         #elif reTranslate == True:
         else:
             finalTranslatedList=postTranslatedList
@@ -1153,12 +1164,19 @@ if batchModeEnabled == True:
         if debug == True:
             print( 'len(finalTranslatedList)=' + str(len(finalTranslatedList)) )
             print( 'len(untranslatedEntriesColumnFull=' + str(len(untranslatedEntriesColumnFull)) )
-        assert( len(finalTranslatedList) == len(untranslatedEntriesColumnFull) )
 
+    #elif cacheEnabled != True:
+    else:
+        finalTranslatedList=postTranslatedList
+
+    assert( len(finalTranslatedList) == len(untranslatedEntriesColumnFull) )
+
+    # next, update the cache
+    if cacheEnabled == True:
         if ( len(postTranslatedList) != 0 ) and ( readOnlyCache == False ):
             # finalTranslatedList and untranslatedEntriesColumnFull need to be added to the cache file now.
             counter=0
-            tempSearchResult = ''
+            tempSearchResult = None
             #for every entry
             for untranslatedString in untranslatedEntriesColumnFull:
                 # tempSearchResult can be a row number (as a string) or None if the string was not found.
@@ -1182,17 +1200,16 @@ if batchModeEnabled == True:
                         cache.setCellValue( currentCellAddress, finalTranslatedList[counter] )
                     # elif the cell's value is not empty
                     else:
-                        # Only update the cache if overrideWithCache == True
-                        if overrideWithCache == True:
+                        # Then only update the cache if reTranslate == True
+                        if reTranslate == True:
                             cache.setCellValue( currentCellAddress, finalTranslatedList[counter] )
                 counter += 1
 
+        if debug == True:
+            cache.printAllTheThings()
         if readOnlyCache != True:
+            # Should have timer settings here so cache is not exported too often. It might be a good idea to set up a proxy function to determine that.
             cache.export(cacheFileName)
-
-    #if reTranslate == True, always update all entries in the cache
-    else:
-        finalTranslatedList=postTranslatedList
 
 
 # Old code.
@@ -1210,39 +1227,31 @@ if batchModeEnabled == True:
     #if overrideWithCache != True:
     else:
         # Consider each entry individually.
-        listCounter=0
         currentRow=2 # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
-        for untranslatedString in untranslatedEntriesColumnFull:
-            #Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedEntriesColumnFull and finalTranslatedList.
+        for listCounter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
+            #Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedEntriesColumnFull and finalTranslatedList with the same counter.
             #tempSearchResult=cache.searchFirstColumn( untranslatedString )
+            assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(currentRow)) )
 
             currentTranslatedCellAddress=currentMainSpreadsheetColumn + str(currentRow)
+
+            #print(currentTranslatedCellAddress,end='')
             # Check if the entry is current None. if entry is none
             if mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None:
                 # then always update the entry
-                mainSpreadsheet.setCellValue(currentTranslatedCellAddress, None)
+                mainSpreadsheet.setCellValue(currentTranslatedCellAddress, finalTranslatedList[listCounter] )
+                #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + finalTranslatedList[listCounter] ).encode(consoleEncoding) )
             # if entry is not none
-                # then do not override entry
+            #else:
+                # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
+            currentRow+=1
+
 
 #elif batchModeEnabled == False:
 else:
-    #translationEngine.translate()
-    pass
-
-# Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
-# if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
-
-mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentMainSpreadsheetColumn)
-#mainSpreadsheet.printAllTheThings()
-
-#Now have two column letters for both currentMainSpreadsheetColumn and currentCacheColumn.
-#currentCacheColumn can be None if cache is disabled. cache might also be set to read only mode.
-
-# Read in raw untranslated cell from column A in spearsheet.
-# create counter, currentRow=1
-# get column A, the untranslated column
+    # Process each entry individually.
 # for every cell in A, try to translate it.
-    # first check cache
+    # first check if cache  is enabled, and reTranslate != True, check cache for value.
     # if cache enabled
         # search column A in cache for raw untranslated there is a match
         # if cache is normal, get cell back and check if that cell is not None
@@ -1256,23 +1265,26 @@ mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToEx
         # perform replacements specified by charaNamesDictionary
         # perform replacements specified by preTranslationDictionary
         # submit the line to the translation engine, along with the current dequeue #TODO: add options to specify history length of dequeue to the CLI
+        # translate entry
         # once it is back check to make sure it is not None or another error value
         # add it to the dequeue, murdering the oldest entry in the dequeue
         # perform replacements specified by charaNamesDictionary, in reverse
         # If cache enabled, add the untranslated line and the translated line as a pair to the cache file.
             # The untranslated line belongs in a new row. Really? Always? Well it is not gurantted to be unique because the line may have been translated before but not using that particular translation engine. So the cache cell may need to be filled, but on a previous entry. So.... search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
             #the translated line belongs in the column specified.
-        # s
+        # update mainSpreadsheet with value
+        # and move on to the next cell
 
-#when done processing text, currentRow+=1
-#How to check how much time has passed? To see if periodic output should be written. Could also do it programatically every twenty or so lines, but would be better if the minute did not match at least.
+    #translationEngine.translate()
+    pass
 
+# Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
+# if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
 
-
-
-
-
-
+if debug == True:
+    print('mainSpreadsheet.printAllTheThings():')
+    mainSpreadsheet.printAllTheThings()
+mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentMainSpreadsheetColumn)
 
 
 
@@ -1282,13 +1294,26 @@ mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToEx
 
 
 # https://openpyxl.readthedocs.io/en/stable/optimized.html
-# readOnlyMode requires closing the spreadsheet after use.
+# readOnlyMode requires manually closing the spreadsheet after use.
 if readOnlyCache == True:
     cache.close()
 
 print('end reached')
 sys.exit(0)
 """
+
+#Now have two column letters for both currentMainSpreadsheetColumn and currentCacheColumn.
+#currentCacheColumn can be None if cache is disabled. cache might also be set to read only mode.
+
+# Read in raw untranslated cell from column A in spearsheet.
+# create counter, currentRow=1
+# get column A, the untranslated column
+
+        # s
+
+#when done processing text, currentRow+=1
+#How to check how much time has passed? To see if periodic output should be written. Could also do it programatically every twenty or so lines, but would be better if the minute did not match at least.
+
 
 #CharaNamesDictionary time to shine
 CharacterNames=['[＠クロエ]','Chloe']#change this to a dictionary
