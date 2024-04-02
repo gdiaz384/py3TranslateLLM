@@ -151,8 +151,8 @@ commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines
 commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
 commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength), default=None, type=int)
-commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Enabling this disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
-commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to disable. Default='+str(defaultBatchSizeLimit), default=None, type=int)
+commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches. Enabling batches disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
+commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. Default='+str(defaultBatchSizeLimit), default=None, type=int)
 #commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.', action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
 
@@ -1015,14 +1015,14 @@ else:
     else:
         batchModeEnabled=False
 
+untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
+untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
     # if there is a limit to how large a batch can be, then the server should handle that internally.
     # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations.
     #currentMainSpreadsheetColumn
-    untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
-    untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
     translateMe=[]
     tempRequestList=[]
@@ -1247,33 +1247,51 @@ if batchModeEnabled == True:
             currentRow+=1
 
 
+
+
+
 #elif batchModeEnabled == False:
 else:
     # Process each entry individually.
-# for every cell in A, try to translate it.
-    # first check if cache  is enabled, and reTranslate != True, check cache for value.
-    # if cache enabled
-        # search column A in cache for raw untranslated there is a match
-        # if cache is normal, get cell back and check if that cell is not None
-        # if cache is any row, then return all rows in Strawberry() and check if any are not None. Select right-most cell as final value.
-        # if cache hit confirmed, then set this to postTranslatedText=
-        # check with postTranslationDictionary, a Python dictionary for possible updates
-        # and then write cache hit to mainSpreadsheet cell
-        # and move on to next cell
-    # if there is no match, then the fun begins
-        # remove all \n's in the line
-        # perform replacements specified by charaNamesDictionary
-        # perform replacements specified by preTranslationDictionary
-        # submit the line to the translation engine, along with the current dequeue #TODO: add options to specify history length of dequeue to the CLI
-        # translate entry
-        # once it is back check to make sure it is not None or another error value
-        # add it to the dequeue, murdering the oldest entry in the dequeue
-        # perform replacements specified by charaNamesDictionary, in reverse
-        # If cache enabled, add the untranslated line and the translated line as a pair to the cache file.
-            # The untranslated line belongs in a new row. Really? Always? Well it is not gurantted to be unique because the line may have been translated before but not using that particular translation engine. So the cache cell may need to be filled, but on a previous entry. So.... search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
-            #the translated line belongs in the column specified.
-        # update mainSpreadsheet with value
-        # and move on to the next cell
+    #currentMainSpreadsheetColumn
+
+#    if cacheEnabled == True:
+#        tempList=cache.getColumn('A') ) > 1
+#    if ( cacheEnabled == True ) and ( reTranslate != True ) and ( len(tempList) > 1 ):
+# len( cache.getColumn('A') ) > 1
+
+    # for every cell in A, try to translate it.
+    for untranslatedEntry in untranslatedEntriesColumnFull:
+        translatedEntry=[]
+        # first check if cache  is enabled, and reTranslate != True, check cache for value.
+        # if cache enabled
+        if (cacheEnabled == True) and (reTranslate != True):
+            # search column A in cache for raw untranslated there is a match
+            tempRowNumber=cache.searchFirstColumn(untranslatedEntry)
+            tempAddress = currentCacheColumn + tempRowNumber
+            # get cell back and check if that cell is not None
+            # if cache is any row, then return all rows in Strawberry() and check if any are not None.
+            # if cache hit confirmed, then set this to translatedEntry=
+
+
+
+            # check with postTranslationDictionary, a Python dictionary for possible updates
+            # and then write cache hit to mainSpreadsheet cell
+            # and move on to next cell
+        # if there is no match, then the fun begins
+            # remove all \n's in the line
+            # perform replacements specified by charaNamesDictionary
+            # perform replacements specified by preTranslationDictionary
+            # submit the line to the translation engine, along with the current dequeue #TODO: add options to specify history length of dequeue to the CLI
+            # translate entry
+            # once it is back check to make sure it is not None or another error value
+            # add it to the dequeue, murdering the oldest entry in the dequeue
+            # perform replacements specified by charaNamesDictionary, in reverse
+            # If cache enabled, add the untranslated line and the translated line as a pair to the cache file.
+                # The untranslated line belongs in a new row. Really? Always? Well it is not gurantted to be unique because the line may have been translated before but not using that particular translation engine. So the cache cell may need to be filled, but on a previous entry. So.... search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
+                #the translated line belongs in the column specified.
+            # update mainSpreadsheet with value
+            # and move on to the next cell
 
     #translationEngine.translate()
     pass

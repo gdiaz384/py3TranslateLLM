@@ -346,7 +346,7 @@ class Strawberry:
             temp=''
             for cell in row:
                 temp=temp+','+str(cell)
-            print(str(temp[1:]).encode(consoleEncoding)) # Ignore first comma , in output
+            print( str(temp[1:]).encode(consoleEncoding) ) # Ignore first comma , in output
 
     #Old example: printAllTheThings(mySpreadsheet)
     #New syntax: 
