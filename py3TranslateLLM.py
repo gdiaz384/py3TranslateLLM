@@ -36,7 +36,7 @@ defaultPortugueseLanguage = 'Portuguese (European)'
 
 defaultAddress = 'http://localhost'
 defaultKoboldCppPort = 5001
-defaultPy3TranslationServerPort = 14366
+defaultPy3translationServerPort = 14366
 defaultSugoiPort = 14366
 minimumPortNumber = 1
 maximumPortNumber = 65535 #16 bit integer -1
@@ -92,7 +92,8 @@ import resources.chocolate as chocolate # Implements openpyxl. A helper/wrapper 
 import resources.dealWithEncoding as dealWithEncoding   # dealWithEncoding implements the 'chardet' library which is installed with 'pip install chardet'
 import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  # Moved most generic functions here to increase code readability and enforce function best practices.
 #from resources.py3TranslateLLMfunctions import * # Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
-import resources.translationEngines as translationEngines
+#import resources.translationEngines as translationEngines
+
 
 #Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
 sysVersion=int(sys.version_info[1])
@@ -132,8 +133,8 @@ commandLineParser.add_argument('-lcfe', '--languageCodesFileEncoding', help='The
 commandLineParser.add_argument('-sl', '--sourceLanguage', help='Specify language of source text. Default='+str(defaultSourceLanguage), default=None, type=str)
 commandLineParser.add_argument('-tl', '--targetLanguage', help='Specify language of source text. Default='+str(defaultTargetLanguage), default=None, type=str)
 
-commandLineParser.add_argument('-cn', '--characterNamesDictionary', help='The file name and path of characterNames.csv', default=None, type=str)
-commandLineParser.add_argument('-cne', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv. Default='+str(defaultTextEncoding), default=None, type=str)
+commandLineParser.add_argument('-revd', '--revertAfterTranslationDictionary', help='The file name and path of revertAfterTranslation.csv', default=None, type=str)
+commandLineParser.add_argument('-revde', '--revertAfterTranslationDictionaryEncoding', help='The encoding of file revertAfterTranslation.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 commandLineParser.add_argument('-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv', default=None, type=str)
 commandLineParser.add_argument('-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 commandLineParser.add_argument('-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.', default=None, type=str)
@@ -142,17 +143,16 @@ commandLineParser.add_argument('-postde', '--postTranslationDictionaryEncoding',
 commandLineParser.add_argument('-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.', default=None, type=str)
 commandLineParser.add_argument('-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default='+str(defaultTextEncoding), default=None, type=str)
 
-commandLineParser.add_argument('-c', '--cache', help='Toggles cache setting. Specifying this will disable using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries.', action='store_false')
+commandLineParser.add_argument('-c', '--cache', help='Toggles cache setting. Specifying this will disable using or updating the cache file. Default=Use the cache file to fill in previously translated entries and update it with new entries to speed up future translations.', action='store_false')
 commandLineParser.add_argument('-cf', '--cacheFile', help='The location of the cache file. Must be in .xlsx format. Default=' + str(defaultCacheFileLocation), default=None, type=str)
 commandLineParser.add_argument('-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true')
 commandLineParser.add_argument('-oc', '--overrideWithCache', help='Override any already translated lines in the spreadsheet with results from the cache. Default=Do not override already translated lines.', action='store_true')
-commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not retranslate and use the cache to fill in previously translated lines.', action='store_true')
-commandLineParser.add_argument('-rc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
+commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines.', action='store_true')
+commandLineParser.add_argument('-roc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
 commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength), default=None, type=int)
 commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches. Enabling batches disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
 commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. Default='+str(defaultBatchSizeLimit), default=None, type=int)
-#commandLineParser.add_argument('-lbl', '--lineByLineMode', help='Store and translate lines one at a time. Disables grouping lines by delimitor and paragraph style translations.', action='store_true')
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
 
 commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str)
@@ -182,7 +182,7 @@ languageCodesFile=commandLineArguments.languageCodesFile
 sourceLanguage=commandLineArguments.sourceLanguage
 targetLanguage=commandLineArguments.targetLanguage
 
-characterNamesDictionary=commandLineArguments.characterNamesDictionary
+revertAfterTranslationDictionary=commandLineArguments.revertAfterTranslationDictionary
 preTranslationDictionary=commandLineArguments.preTranslationDictionary
 postTranslationDictionary=commandLineArguments.postTranslationDictionary
 postWritingToFileDictionary=commandLineArguments.postWritingToFileDictionary
@@ -223,7 +223,7 @@ if debug == True:
     print( ('tempConsoleEncoding='+tempConsoleEncoding).encode(tempConsoleEncoding) )
 
 if version == True:
-    sys.exit( (__version__).encode(tempConsoleEncoding) )
+    sys.exit( ( __version__ ).encode(tempConsoleEncoding) )
 
 
 #Add stub encoding options. All of these are most certainly None, but they need to exist for locals() to find them so they can get updated.
@@ -234,7 +234,7 @@ promptFileEncoding=commandLineArguments.promptFileEncoding
 #parsingSettingsFileEncoding=commandLineArguments.parsingSettingsFileEncoding
 languageCodesFileEncoding=commandLineArguments.languageCodesFileEncoding
 
-characterNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
+revertAfterTranslationDictionaryEncoding=commandLineArguments.revertAfterTranslationDictionaryEncoding
 preTranslationDictionaryEncoding=commandLineArguments.preTranslationDictionaryEncoding
 postTranslationDictionaryEncoding=commandLineArguments.postTranslationDictionaryEncoding
 postWritingToFileDictionaryEncoding=commandLineArguments.postWritingToFileDictionaryEncoding
@@ -362,7 +362,7 @@ languageCodesFileName=languageCodesFile
 sourceLanguageRaw=sourceLanguage
 targetLanguageRaw=targetLanguage
 
-charaNamesDictionaryFileName=characterNamesDictionary
+revertAfterTranslationDictionaryFileName=revertAfterTranslationDictionary
 preDictionaryFileName=preTranslationDictionary
 postDictionaryFileName=postTranslationDictionary
 postWritingToFileDictionaryFileName=postWritingToFileDictionary
@@ -429,26 +429,32 @@ mode=None
 implemented=False
 #validate input from command line options
 if translationEngine == None:
-    sys.exit( ('Error: Please specify a translation engine. '+usageHelp).encode(consoleEncoding) )
-elif (translationEngine.lower()=='parseonly'):
+    sys.exit( ( 'Error: Please specify a translation engine. ' + usageHelp ).encode(consoleEncoding) )
+elif ( translationEngine.lower()=='parseonly' ):
     mode='parseOnly'
     implemented=True
-elif (translationEngine.lower()=='koboldcpp'):
+elif ( translationEngine.lower()=='koboldcpp' ):
     mode='koboldcpp'
+    import resources.translationEngines.koboldCppEngine as koboldCppEngine
     implemented=True
-elif (translationEngine.lower()=='deepl_api_free') or (translationEngine.lower()=='deepl-api-free'):
+elif ( translationEngine.lower()=='deepl_api_free' ) or ( translationEngine.lower()=='deepl-api-free' ):
     mode='deepl_api_free'
+    import resources.translationEngines.deepLApiFreeEngine as deepLApiFreeEngine
     #import deepl
-elif (translationEngine.lower()=='deepl_api_pro') or (translationEngine.lower()=='deepl-api-pro'):
+elif ( translationEngine.lower()=='deepl_api_pro' ) or ( translationEngine.lower()=='deepl-api-pro' ):
     mode='deepl_api_pro'
-elif (translationEngine.lower()=='deepl_web') or (translationEngine.lower()=='deepl-web'):
+    import resources.translationEngines.deepLApiProEngine as deepLApiProEngine
+elif ( translationEngine.lower()=='deepl_web' ) or ( translationEngine.lower()=='deepl-web' ):
     mode='deepl_web'
-elif (translationEngine.lower()=='py3translationserver'):
+    import resources.translationEngines.deepLWebEngine as deepLWebEngine
+elif ( translationEngine.lower()=='py3translationserver' ):
     mode='py3translationserver'
+    import resources.translationEngines.py3translationServerEngine as py3translationServerEngine
     implemented=True
-elif (translationEngine.lower()=='sugoi') :
+elif ( translationEngine.lower()=='sugoi' ):
     mode='sugoi'
     #Sugoi has a default port association and only supports Jpn->Eng translations, so having a dedicated entry for it is still useful for input validation, especially since it only supports a subset of the py3translationserver API.
+    import resources.translationEngines.sugoiEngine as sugoiEngine
     implemented=True
 else:
     sys.exit(('\n Error. Invalid translation engine specified: "' + translationEngine + '"' + usageHelp).encode(consoleEncoding))
@@ -573,8 +579,8 @@ if (mode == 'koboldcpp') or (mode == 'py3translationserver') or (mode == 'sugoi'
             print( ('Warning: No port specified for ' + mode + ' translation engine. Using default port of: ' + str(defaultKoboldCppPort)).encode(consoleEncoding) )
             port=defaultKoboldCppPort
         elif mode == 'py3translationserver':
-            print( ('Warning: No port specified for ' + mode + ' translation engine. Using default port of: ' + str(defaultPy3TranslationServerPort)).encode(consoleEncoding) )
-            port=defaultPy3TranslationServerPort
+            print( ('Warning: No port specified for ' + mode + ' translation engine. Using default port of: ' + str(defaultPy3translationServerPort)).encode(consoleEncoding) )
+            port=defaultPy3translationServerPort
         elif mode == 'sugoi':
             print( ('Warning: No port specified for ' + mode + ' translation engine. Using default port of: ' + str(defaultSugoiPort)).encode(consoleEncoding) )
             port=defaultSugoiPort
@@ -691,8 +697,8 @@ promptFileEncoding = dealWithEncoding.ofThisFile(promptFileName, promptFileEncod
 #languageCodesEncoding=commandLineArguments.languageCodesFileEncoding
 languageCodesEncoding = dealWithEncoding.ofThisFile(languageCodesFileName, languageCodesFileEncoding, defaultTextEncoding)
 
-#charaNamesDictionaryEncoding=commandLineArguments.characterNamesDictionaryEncoding
-charaNamesDictionaryEncoding = dealWithEncoding.ofThisFile(charaNamesDictionaryFileName, characterNamesDictionaryEncoding, defaultTextEncoding)
+#revertAfterTranslationDictionaryEncoding=commandLineArguments.revertAfterTranslationDictionaryEncoding
+revertAfterTranslationDictionaryEncoding = dealWithEncoding.ofThisFile(revertAfterTranslationDictionaryFileName, revertAfterTranslationDictionaryEncoding, defaultTextEncoding)
 
 #preDictionaryEncoding=commandLineArguments.preTranslationDictionaryEncoding
 preDictionaryEncoding = dealWithEncoding.ofThisFile(preDictionaryFileName, preTranslationDictionaryEncoding, defaultTextEncoding)
@@ -795,12 +801,12 @@ if mode != 'parseOnly':
 
 
 # Read in all other dictionaries.
-# charaNamesDictionaryFileName, preDictionaryFileName, postDictionaryFileName, postWritingToFileDictionaryFileName
+# revertAfterTranslationDictionaryFileName, preDictionaryFileName, postDictionaryFileName, postWritingToFileDictionaryFileName
 
 # read in character dictionary
 # This will either be 'None' if there was some sort of input error, like if the user did not specify one, or it will be a dictionary containing the charaName=value or other data that should be reverted after translation.
-#The value entry in key=value in the charaNamesDictionary can be '' or None. Basically, this signifies that key contains a string that, if at the start of a line, means that line should not be ignored for paragraph consideration, but that it also should not be altered when submitting text for translation.
-charaNamesDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(charaNamesDictionaryFileName, charaNamesDictionaryEncoding)
+#The value entry in key=value in the revertAfterTranslationDictionary can be '' or None. Basically, this signifies that key contains a string that, if at the start of a line, means that line should not be ignored for paragraph consideration, but that it also should not be altered when submitting text for translation.
+revertAfterTranslationDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(revertAfterTranslationDictionaryFileName, revertAfterTranslationDictionaryEncoding)
 
 #read in pre dictionary
 preDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(preDictionaryFileName, preDictionaryEncoding)
@@ -812,7 +818,7 @@ postDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(postDictionar
 postWritingToFileDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding)
 
 if verbose == True:
-    print( ('charaNamesDictionary='+str(charaNamesDictionary)).encode(consoleEncoding) )
+    print( ('revertAfterTranslationDictionary='+str(revertAfterTranslationDictionary)).encode(consoleEncoding) )
     print( ('preDictionary='+str(preDictionary)).encode(consoleEncoding) )
     print( ('postDictionary='+str(postDictionary)).encode(consoleEncoding) )
     print( ('postWritingToFileDictionary='+str(postWritingToFileDictionary)).encode(consoleEncoding) )
@@ -877,6 +883,7 @@ if mode == 'parseOnly':
 #Now need to translate stuff.
 
 # Cache should always be added. This potentially creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision to keep cache enabled despite the slight collisions.
+# Currently, cache does not consider multiple languages. It may be a good idea to specify a specific 'sheet' to load or work from based upon the source and destination 3-letter language names when initalizing it. Something like... source_target, jpn_eng, chi_eng, eng_spn
 
 print('cacheEnabled=',cacheEnabled)
 
@@ -888,7 +895,7 @@ if cacheEnabled == True:
 
     # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
     # Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
-    cache=chocolate.Strawberry( myFileName=cacheFileName, fileEncoding=defaultTextEncoding, readOnlyMode=readOnlyCache )
+    cache=chocolate.Strawberry( myFileName = cacheFileName, fileEncoding = defaultTextEncoding, sheetNameInWorkbook = internalSourceLanguageThreeCode + '_' + internalDestinationLanguageThreeCode, readOnlyMode = readOnlyCache )
 
     if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) != True:
         # if the Strawberry is brand new, add header row.
@@ -907,10 +914,10 @@ if cacheEnabled == True:
         blacklistedHeadersForCacheAnyMatch.append(translationEngine.model)
 
         # To help with a case insensitive search, make everything lowercase.
-        counter=0 #This is screwy. But it works, so I am not touching it.
-        for blacklistedHeader in blacklistedHeadersForCacheAnyMatch:
+        #counter=0 #This is screwy. But it works, so I am not touching it. #Update, updated it with enumerate() function to make it less screwy.
+        for counter,blacklistedHeader in enumerate(blacklistedHeadersForCacheAnyMatch):
             blacklistedHeadersForCacheAnyMatch[counter]=blacklistedHeader.lower()
-            counter+=1
+            #counter+=1
 
         if cacheAnyMatch == True:
             # Return the cache header row.
@@ -932,15 +939,16 @@ if cacheEnabled == True:
 
 # py3translationServer must be reachable Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
 if mode == 'py3translationserver':
-    translationEngine=translationEngines.Py3translationServerEngine(sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port)
-    #Check if the server is reachable. If not, then exit. How? The py3translationServer should have both the version and model available at http://localhost:14366/api/v1/model and version, and should have been set during initalization, so verify they are not None.
+    translationEngine=py3translationServerEngine.Py3translationServerEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port )
 
-    if translationEngine.model == None:
-        print( 'translationEngine.model is None' )
-        sys.exit(1)
-    elif translationEngine.version == None:
-        print( 'translationEngine.version is None' )
-        sys.exit(1)
+    #Check if the server is reachable. If not, then exit. How? The py3translationServer should have both the version and model available at http://localhost:14366/api/v1/model and version, and should have been set during initalization, so verify they are not None.
+    # Update: Moved this code inside the translation engine itself and made it accessible as translationEngine.reachable which is a boolean, which is checked below.
+#    if translationEngine.model == None:
+#        print( 'translationEngine.model is None' )
+#        sys.exit(1)
+#    elif translationEngine.version == None:
+#        print( 'translationEngine.version is None' )
+#        sys.exit(1)
 
 
 # SugoiNMT server must be reachable.
@@ -956,7 +964,7 @@ if mode == 'py3translationserver':
 
 
 if translationEngine.reachable != True:
-    print( 'TranslationEngine \''+ mode +'\' is not reachable. Check the connection settings and try again.' )
+    print( 'TranslationEngine \''+ mode +'\' is not reachable. Check the connection or API settings and try again.' )
     sys.exit(1)
 
 
@@ -1018,7 +1026,7 @@ untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
 # Debug code.
-batchModeEnabled=False
+#batchModeEnabled=False
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
@@ -1259,45 +1267,137 @@ else:
 #    if ( cacheEnabled == True ) and ( reTranslate != True ) and ( len(tempList) > 1 ):
 # len( cache.getColumn('A') ) > 1
 
+
+    # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryLength. If contextHistoryLength== 0 then disable it. contextHistoryLength is always an integer.
+    contextHistory=None
+    if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True) :
+        #https://docs.python.org/3.7/library/queue.html#module-queue
+        contextHistory=queue.queue( maxsize=contextHistoryLength )
+        #To add an entry, contextHistory.put(item)
+        #to remove the oldest, contextHistory.get()
+        # to get every item without modifying the queue
+        #for i in range(contextHistory.qsize()):
+            #print(contextHistory.queue[i])
+        # To check if the queue is full,
+        #if contextHistory.full() == True:
+
+    currentRow=2  # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
+
     # for every cell in A, try to translate it.
     for untranslatedEntry in untranslatedEntriesColumnFull:
-        translatedEntry=[]
+        translatedEntry=None
 
-        # first check if cache  is enabled, and reTranslate != True, check cache for value.
-        # if cache enabled
-        if (cacheEnabled == True) and (reTranslate != True):
-            # search column A in cache for raw untranslated there is a match
-            tempRowNumber=cache.searchFirstColumn(untranslatedEntry)
-            tempAddress = currentCacheColumn + tempRowNumber
-            # get cell back and check if that cell is not None
-            # if cache is any row, then return all rows in Strawberry() and check if any are not None.
-            # if cache hit confirmed, then set this to translatedEntry=
+        # Sanity check.
+        assert( untranslatedEntry == mainSpreadsheet.getCellValue( 'A' + str(currentRow) ) )
 
+        currentTranslatedCellAddress = currentMainSpreadsheetColumn + str(currentRow)
 
+        # if the current cell contents are already translated, then just continue onto the next entry unless retranslate is specified.
+        currentMainSpreadsheetCellContents = mainSpreadsheet.getCellValue( currentTranslatedCellAddress )
+        if (currentMainSpreadsheetCellContents != None) and (reTranslate != True):
+            # Update history.
+            # TODO: update contextHistory here.
+            # It is not clear where the translation already in the spreadsheet came from so do not update cache. Well, it could be determined by reading the header in the current column and looking up the same column in the cache. Will they always match perfectly or is it possible they will not match perfectly? If they always match perfectly, the model in the mainSpreadsheet and the model in cache.xlsx, then it may be possible to 
+            currentRow += 1
+            continue
 
-            # check with postTranslationDictionary, a Python dictionary for possible updates
-            # and then write cache hit to mainSpreadsheet cell
-            # and move on to next cell
-        # if there is no match, then the fun begins
-            # remove all \n's in the line
-            # perform replacements specified by charaNamesDictionary
+        if cacheEnabled == True:
+            tempRowNumberForCache = None
+           # search column A in cache for raw untranslated there is a match
+            tempRowNumberForCache=cache.searchFirstColumn( untranslatedEntry )
+
+        # First check if cache is enabled, and reTranslate != True. If they are, then check cache for value.
+        if ( cacheEnabled == True ) and ( reTranslate != True ):
+
+            tempAddress=None
+            # if tempRowNumberForCache == None, that means the untranslated string does not appear in the cache.
+            if tempRowNumberForCache != None:
+                tempAddress = currentCacheColumn + tempRowNumberForCache
+
+                # if cache hit confirmed, then set this to translatedEntry=
+                # get cell back and check if that cell is not None. If it is None, then that means the untranslated string does appear in the cache, but not for that exact model. A different entry might be valid with cache any match.
+                translatedEntry=cache.getCellValue(tempAddress)
+
+                # if translatedEntry != None, then it has already been translated using a perfect hit in the cache. Just move on to the next step.
+                # if translatedEntry == None, then there is not a perfect cache hit, so expand the search if cacheAnyMatch is enabled.
+                # if cache is any row, then return all rows in Strawberry() and check if any are not None.
+                if ( translatedEntry == None ) and ( cacheAnyMatch == True ) and ( len(validColumnLettersForCacheAnyMatch) > 0 ):
+                    for columnLetter in validColumnLettersForCacheAnyMatch:
+                        tempCellContents=cache.getCellValue( columnLetter +str(tempRowNumberForCache) )
+                        if tempCellContents != None:
+                            #Keep updating translatedEntry to favor the right-most translation engine.
+                            translatedEntry=tempCellContents
+
+        #translationEngine.translate()
+            #pass
+        #elif (cacheEnabled != True) or (reTranslate == True):
+        #else:
+        #    translatedEntry= translationEngine.translate( translateMe )
+
+        # if there is no match in the cache or cache is disabled, then the fun begins
+        if translatedEntry == None:
+            # remove all \n's in the line?
+            # perform replacements specified by revertAfterTranslationDictionary
             # perform replacements specified by preTranslationDictionary
-            # submit the line to the translation engine, along with the current dequeue #TODO: add options to specify history length of dequeue to the CLI
+            # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
+            pass
             # translate entry
             # once it is back check to make sure it is not None or another error value
-            # add it to the dequeue, murdering the oldest entry in the dequeue
-            # perform replacements specified by charaNamesDictionary, in reverse
-            # If cache enabled, add the untranslated line and the translated line as a pair to the cache file.
-                # The untranslated line belongs in a new row. Really? Always? Well it is not gurantted to be unique because the line may have been translated before but not using that particular translation engine. So the cache cell may need to be filled, but on a previous entry. So.... search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
-                #the translated line belongs in the column specified.
-            # update mainSpreadsheet with value
-            # and move on to the next cell
 
-    #translationEngine.translate()
-        pass
-    #elif (cacheEnabled != True) or (reTranslate == True):
-    else:
-        translatedEntry= translationEngine.translate( translateMe )
+
+        # perform replacements specified by revertAfterTranslationDictionary, in reverse
+
+
+        # add it to the dequeue, murdering the oldest entry in the dequeue
+        # Update the contextHistory queue.
+        if contextHistory.full()== True():
+            contextHistory.get()
+        contextHistory.put(translatedEntry)
+
+
+        # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
+        if ( cacheEnabled == True ) and ( readOnlyCache == False ):
+            # Search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
+
+            # if the tempRowNumberForCache for the translated line us not known, then add the untranslated entry to the cache and search for it to get the correct row.
+            if tempRowNumberForCache == None:
+                # Append as new row in cache.
+                # Search the first row for that entry.
+                pass
+
+            # Add new entry using the correct column since the row is already known.
+            cache.setCellValue( currentCacheColumn + str(tempRowNumberForCache) , translatedEntry )
+
+
+        # and then write cache hit to mainSpreadsheet cell
+        #mainSpreadsheet.setCellValue( , translatedEntry )
+
+        # Check if the entry is current None. if entry is none
+        if mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None:
+            # then always update the entry
+            mainSpreadsheet.setCellValue(currentTranslatedCellAddress, finalTranslatedList[listCounter] )
+            #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + finalTranslatedList[listCounter] ).encode(consoleEncoding) )
+        # if entry is not none
+        #else:
+            # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
+
+            # and move on to next cell
+            currentRow+=1
+            continue
+
+
+        #elif translatedEntry != None:
+            # check with postTranslationDictionary, a Python dictionary for possible updates
+
+
+        # update mainSpreadsheet with value
+        # and move on to the next cell
+
+
+
+
+
+
 # Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
 # if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
 

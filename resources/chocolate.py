@@ -56,9 +56,15 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, readOnlyMode=False, csvDialect=None):
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, sheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
         self.workbook = openpyxl.Workbook()
-        self.spreadsheet = self.workbook.active
+        if sheetNameInWorkbook == None:
+            self.spreadsheet = self.workbook.active
+        else:
+            print(sheetNameInWorkbook)
+            self.workbook.create_sheet( title = sheetNameInWorkbook , index=0 )
+            #print(self.workbook.sheetnames)
+            self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
         self.readOnlyMode = readOnlyMode
         self.csvDialect=csvDialect
         self.addHeaderToTextFile=addHeaderToTextFile
@@ -91,11 +97,11 @@ class Strawberry:
                 if myFileExtensionOnly == '.csv':
                     self.importFromCSV(myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV,csvDialect=csvDialect)
                 elif myFileExtensionOnly == '.xlsx':
-                    self.importFromXLSX(myFileName, fileEncoding)
+                    self.importFromXLSX(myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook,readOnlyMode=self.readOnlyMode)
                 elif myFileExtensionOnly == '.xls':
-                    self.importFromXLS(myFileName, fileEncoding)
+                    self.importFromXLS(myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook)
                 elif myFileExtensionOnly == '.ods':
-                    self.importFromODS(myFileName, fileEncoding)
+                    self.importFromODS(myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook)
                 else:
                     #Else the file must be a text file to instantiate a class with. Only line-by-line parsing is supported.
                     if ( myFileExtensionOnly != '.txt' ) and ( myFileExtensionOnly != '.text' ):
@@ -462,15 +468,24 @@ class Strawberry:
 
 
 
-    def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, readOnlyMode=False):
+    def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None, readOnlyMode=False):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         self.workbook=openpyxl.load_workbook(filename = fileNameWithPath, read_only=readOnlyMode)
-        self.spreadsheet=self.workbook.active
+        #print('pie')
+        if sheetNameInWorkbook == None:
+            self.spreadsheet=self.workbook.active
+        else:
+            if sheetNameInWorkbook in self.workbook.sheetnames:
+                self.spreadsheet=self.workbook[ sheetNameInWorkbook ]
+            else:
+                self.workbook.create_sheet( title = str(sheetNameInWorkbook) , index=0 )
+                self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
 
     # https://openpyxl.readthedocs.io/en/stable/optimized.html
     # read_only requires closing the spreadsheet after use.
     def close(self):
         self.workbook.close()
+
 
     def exportToXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         #print('Hello World'.encode(consoleEncoding))
@@ -480,19 +495,22 @@ class Strawberry:
         print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-    def importFromXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
+    def importFromXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #return workbook
+
 
     def exportToXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
-    def importFromODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
+
+    def importFromODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None):
         print('Hello World'.encode(consoleEncoding))
         #print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #return workbook
+
 
     def exportToODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         print('Hello World'.encode(consoleEncoding))

@@ -120,7 +120,7 @@ Install/configure these other projects as needed:
     - Reccomended: Remove some of the included spyware.
         - Open: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\main.js`
         - Comment out `/*  */` or delete the analytics.
-    - Tested using Sugoi Offline Translator 4.0 which is part of Sugoi Toolkit 6.0/7.0.
+    - Tested using Sugoi Offline Translator 4.0 which is part of Sugoi Toolkit 6.0-8.0+.
 
 ## Usage:
 
@@ -169,7 +169,7 @@ Variable name | Description | Examples
 `parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Not required if working only with spreadsheet formats but required if reading from or writing to text files. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
 `outputFile` | The name and path of the file to use as output. Will be same as input if not specified. Specify a spreadsheet format to dump the raw data or a text file to output only the preferred translation. | `None`, `output.csv`, `myFolder/ output.xlsx`
 `promptFile` | This file has the prompt for the LLM. Only needed if using an LLM. | `resources/ templates/ prompt.Mixtral8x7b.example.txt`
-`characterNamesDictionary` | Entries will be submitted to the translation engine but then replaced back to the original text after translation. | `resources/ templates/ characterNamesDictionary_example.csv`
+`revertAfterTranslationDictionary` | Entries will be submitted to the translation engine but then replaced back to the original text after translation. | `resources/ templates/ characterNamesDictionary_example.csv`
 `preTranslationDictionary` | Entries will be replaced prior to submission to the translation engine. | `preTranslationDictionary.csv`
 `postTranslationDictionary` | Entries will be replaced after translation. | `postTranslationDictionary.csv`
 `postWritingToFileDictionary` | After the translated text has been written back to a text file, the file will be opened again to perform these replacements. | `postWritingToFileDictionary.csv`
@@ -228,6 +228,7 @@ Variable name | Description | Examples
 
 - For the spreadsheet formats, .csv, .xlsx, .xls, .ods, the following apply:
     - The first row is reserved for headers and is always ignored for data processing otherwise.
+    - The source content for translation is always based on the first column.
     - The first column, 1st, must be the raw text. Multiple lines within a cell, called 'paragraphs,' are allowed.
         - New lines will not be preserved in the output cell. If this behavior is desired, regenerate them dynamically when writing to the output files as needed. Basically, word wrap is outside the scope of this project.
     - The second column, 2nd, is reserved for the character speaking.
@@ -242,11 +243,8 @@ Variable name | Description | Examples
                 - For CTranslate2, the model name sometimes takes the form py3translationServer/model.bin if the model.bin file was explicitly used when invoking py3translationServer. This behavior can result in collisions between different models and potentially different languages as well. As a workaround, if using py3translationServer +  CTranslate2, then specify loading the model by using the folder name of the model instead and name the folder in a descriptive way.
                 - Example: `b100_model/model.bin` and invoke using `b100_model` only.
                 - This behavior of py3translationServer may change in the future.
-        - The source content for the translation engine columns is always based on the first column.
-        - The order of the translation engine columns (4+) only matters in the following situation:
-            - The column furthest to the right will be preferred when writing back to files (.ks, .ts).
+        - The order of the translation engine columns (4+) only matters when writing back to files (.txt). The column furthest to the right will be preferred.
 - .csv files:
-    - The first row is reserved for headers and is always ignored for data processing otherwise.
     - Must use a comma `,` as a delimiter.
     - Entries containing:
         - new line character(s) `\n`, `\r\n` 
@@ -284,10 +282,10 @@ Variable name | Description | Examples
             - To parse the text file in a more complicated way, use [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet).
     1. The process to translate the rawText column in `mainSpreadsheet` using a particular translation engine begins. Examples: koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationServer, sugoi.
         1. If a paragraph is present in `cache.xlsx`, it is translated using the cache file and the translation process skips to step 7/step g.
-        1. If present, `characterNamesDictionary` is considered and replacements are performed.
+        1. If present, `revertAfterTranslationDictionary` is considered and replacements are performed.
         1. If present, `preTranslationDictionary` is considered and replacements are performed.
         1. The paragraph is submitted to the translation engine.
-        1. If present, `characterNamesDictionary` is considered to revert certain changes.
+        1. If present, `revertAfterTranslationDictionary` is considered to revert certain changes.
         1. The untranslated line and the translated line are added to the `cache.xlsx` file as a pair.
         1. If present, `postTranslationDictionary` is considered to alter the translation further.
         1. The translated paragraph is then written to `mainSpreadsheet` in the column specified by the current translation engine.
@@ -296,10 +294,9 @@ Variable name | Description | Examples
     1. The spreadsheet file is written to output, and a final backup.xlsx file is written.
     1. Outdated?: `postWritingToFileDictionary` is considered. This file is mostly intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions for .csv files since codec conversions are not lossless.
 
-#### Regarding chararacterNames.csv:
+#### Regarding revertAfterTranslation.csv:
 
-- Update: Maybe this should be renamed to revertAfterTranslation.csv?
-- The `chararacterNames.csv` dictionary is somewhat overloaded and the name does not match its full functionality perfectly. Nor is it a perfect solution to the problem it was intended to solve.
+- The `revertAfterTranslation.csv` dictionary is somewhat overloaded and the name does not match its full functionality perfectly. Nor is it a perfect solution to the problem it was intended to solve.
 - The actual functionality is as follows:
     1. Entries in the first column of this dictionary will be replaced with the entries for the second column prior to text getting translated.
     2. After the translated text returns, every entry matching the second column will be replaced back to the text in the first column.
@@ -311,7 +308,7 @@ Variable name | Description | Examples
     - This dictionary was originally concieved from the notion that some dialogue scripts have entries like `[＠クロエ]`, `\N[1]`, `\N[2]` that represent replacable character names within the dialogue. The idea being the player gives a custom name to a character and the game engine will replace these placeholders that are within the dialogue with the chosen name during runtime.
     - These placeholders, in essence, contain the true names of characters, so they have relevant information that should be considered when translating paragraphs. However, they do not contain that information while they are just placeholders. In addition, they should also be left untranslated in the final text to retain the original functionality of the placeholder.
     - On a technical level, if left as-is, then in addition to not being allowed to consider the information they contain, these placeholders can also often distort the resulting translation because translation engines might split a paragraph into two fragments based upon the `[ ]`, especially fairseq/Sugoi. The translation engine might also change the placeholder in such a way as to cause the game engine to overtly crash.
-    - Thus, the idea of the `characterNames.csv` dictionary was concieved. The idea is to specify that `[＠クロエ]` is `Chloe`, a female name, during translation but revert `Chloe` back to `[＠クロエ]` after translation. This idea lead to the functionality described above getting integrated into py3TranslateLLM, including not skipping a line just because it happens to start with a placeholder. However, this approach has a number of problems.
+    - Thus, the idea of the `revertAfterTranslation.csv` dictionary was concieved. The idea is to specify that `[＠クロエ]` is `Chloe`, a female name, during translation but revert `Chloe` back to `[＠クロエ]` after translation. This idea lead to the functionality described above getting integrated into py3TranslateLLM, including not skipping a line just because it happens to start with a placeholder. However, this approach has a number of problems.
 - Problems:
     - There is no gurantee that the translation engine will preserve the entries in the second column, e.g. leave `Chloe` as `Chloe`. If it changes the name of the character in any way, like using a pronoun, then there is no way to revert the substitution.
     - The untranslated line now contains two languages.
@@ -324,8 +321,8 @@ Variable name | Description | Examples
         1. Tell the LLM translation engine to translate the name a specific way using the `prompt.txt` file or a DeepL dictionary `クロエ` -> `Chloe`.
             - Note: DeepL dictionaries are not currently implemented in py3TranslateLLM.
         1. Specifying an entry in the `postTranslation.csv` dictionary to revert back the translated text to the original placeholder text used by the game engine: `Chloe` -> `[＠クロエ]`.
-    - At this time, it is not clear which approach is 'better' because the 'problems' with the `chararacterNames.csv` dictionary approach are entirely hypothetical and so might be non-existant for a particular translation engine.
-    - Regardless, being able to say 'do not include this line usually but make an exception if starts with this string' is very powerful for automation, so this functionality will be retained even if `characterNames.csv` gets removed or renamed later.
+    - At this time, it is not clear which approach is 'better' because the 'problems' with the `revertAfterTranslation.csv` dictionary approach are entirely hypothetical and so might be non-existant for a particular translation engine.
+    - Regardless, being able to say 'do not include this line usually but make an exception if starts with this string' is very powerful for automation, so this functionality will be retained even if `revertAfterTranslation.csv` gets removed or renamed later.
 
 ### Regarding DeepL:
 
@@ -418,9 +415,9 @@ Variable name | Description | Examples
 Library name | Required, Reccomended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
 --- | --- | --- | --- | ---
 [openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Microsoft Excel Document (.xlsx) support. | `pip install openpyxl` | 3.1.2
-chocolate | Required. | Has various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | Unversioned.
-py3TranslateLLMfunctions | Required. | Has various helper functions unrelated to main data structure. | Included with py3TranslateLLM. | Unversioned.
-dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | 0.1 2024Jan21.
+chocolate | Required. | Has various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | See source.
+py3TranslateLLMfunctions | Required. | Has various helper functions unrelated to main data structure. | Included with py3TranslateLLM. | See source.
+dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | See source.
 [requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Reccomended. | Improves text codec handling. | `pip install chardet` | 5.2.0
 [deepl-python](//github.com/DeepLcom/deepl-python) | Optional. | Used for DeepL NMT via their API. Optional otherwise. | `pip install deepl` | 1.16.1

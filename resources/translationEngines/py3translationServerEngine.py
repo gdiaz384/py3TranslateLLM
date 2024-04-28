@@ -25,7 +25,7 @@ import requests
 class Py3translationServerEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None,timeout=120): 
+    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None,timeout=360): 
         self.sourceLanguage=sourceLanguage
         self.targetLanguage=targetLanguage
         self.supportsBatches=True
@@ -38,7 +38,7 @@ class Py3translationServerEngine:
         self.addressFull=self.address + ':' + str(self.port)
 
         self.reachable=False
-        #Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are turned, the server is declared reachable?
+        # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
 
         self.model=None
         self.version=None
@@ -74,13 +74,14 @@ class Py3translationServerEngine:
 
         # print(len(untranslatedList))
         # print(len(translatedList))
-        assert( len(translatedList) == len(untranslatedList) )
+        assert( len(untranslatedList) == len(translatedList) )
 
         return translatedList
 
 
     # This expects a string to translate.
     def translate(self, untranslatedString):
+        #assert string
         return str( self.batchTranslate( [untranslatedString] ) ) # Lazy.
 
 
