@@ -8,12 +8,15 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
+__version__='2024.04.27'
+
 #set defaults
 #printStuff=True
 verbose=False
 debug=False
 #debug=True
 consoleEncoding='utf-8'
+defaultTextFileEncoding='utf-8'   # Settings that should not be left as a default setting should have default prepended to them.
 linesThatBeginWithThisAreComments='#'
 assignmentOperatorInSettingsFile='='
 inputErrorHandling='strict'
@@ -221,10 +224,11 @@ def getYearMonthAndDay():
     #print(datetime.today().strftime('%Y-%m-%d'))
     #print(today.strftime("%d/%m/%Y %H:%M:%S"))
 
-    currentYear = today.strftime('%Y')
-    currentMonth = getCurrentMonthFromNumbers(today.strftime('%m'))
-    currentDay = today.strftime('%d')
-    return( currentYear + currentMonth + currentDay )
+    currentYear = str( today.strftime('%Y') )
+#    currentMonth = getCurrentMonthFromNumbers(today.strftime('%m'))
+    currentMonth = str( today.strftime('%m') )
+    currentDay = str( today.strftime('%d') )
+    return( currentYear + '-' + currentMonth + '-' + currentDay )
 
 
 def getYesterdaysDate():
@@ -234,10 +238,11 @@ def getYesterdaysDate():
     #print(datetime.yesterday().strftime('%Y-%m-%d'))
     #print(yesterday.strftime("%d/%m/%Y %H:%M:%S"))
 
-    currentYear = yesterday.strftime('%Y')
+    currentYear = str( yesterday.strftime('%Y') )
     currentMonth = getCurrentMonthFromNumbers(yesterday.strftime('%m'))
-    currentDay = yesterday.strftime('%d')
-    return( currentYear + currentMonth + currentDay )
+    currentMonth = str( yesterday.strftime('%m') )
+    currentDay = str( yesterday.strftime('%d') )
+    return( currentYear + '-' + currentMonth + '-' + currentDay )
 
 
 def getCurrentTime():
@@ -251,7 +256,7 @@ def getCurrentTime():
 
 def getDateAndTimeFull():
     #currentDateAndTimeFull=currentDateFull+'-'+currentTimeFull
-    return getYearMonthAndDay() + '-' + getCurrentTime()
+    return getYearMonthAndDay() + '.' + getCurrentTime()
 
 #if (verbose == True) or (debug == True):
 #    print(currentDateAndTimeFull.encode(consoleEncoding))

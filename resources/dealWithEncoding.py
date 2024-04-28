@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 License: See main program.
 
 """
-__version__='2024Feb27'
+__version__='2024.02.27'
 
 #set defaults
 version = '0.1 2024Jan24'

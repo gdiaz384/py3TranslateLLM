@@ -14,7 +14,7 @@ License:
 """
 
 #set defaults and static variables
-versionString='2024.03.28 pre-alpha'
+__version__='2024.04.28 alpha'
 
 #Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding = 'utf-8'
@@ -33,7 +33,6 @@ defaultEnglishLanguage = 'English (American)'
 defaultChineseLanguage = 'Chinese (simplified)'
 # Valid options are 'Portuguese (European)' or 'Portuguese (Brazilian)'
 defaultPortugueseLanguage = 'Portuguese (European)'
-
 
 defaultAddress = 'http://localhost'
 defaultKoboldCppPort = 5001
@@ -115,7 +114,7 @@ else:
 
 # Add command line options.
 commandLineParser=argparse.ArgumentParser(description='Description: CLI wrapper script for various NMT and LLM models.' + usageHelp)
-commandLineParser.add_argument('-mode', '--translationEngine', help='Specify translation engine to use, options=' + translationEnginesAvailable+'.', type=str)
+commandLineParser.add_argument('-te', '--translationEngine', help='Specify translation engine to use, options=' + translationEnginesAvailable+'.', type=str)
 
 commandLineParser.add_argument('-f', '--fileToTranslate', help='Either the raw file to translate or the spreadsheet file to resume translating from, including path.', default=None, type=str)
 commandLineParser.add_argument('-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default='+str(defaultTextEncoding), default=None, type=str)
@@ -224,7 +223,7 @@ if debug == True:
     print( ('tempConsoleEncoding='+tempConsoleEncoding).encode(tempConsoleEncoding) )
 
 if version == True:
-    sys.exit( (versionString).encode(tempConsoleEncoding) )
+    sys.exit( (__version__).encode(tempConsoleEncoding) )
 
 
 #Add stub encoding options. All of these are most certainly None, but they need to exist for locals() to find them so they can get updated.
@@ -286,7 +285,7 @@ scriptSettingsDictionary=None
 #if os.path.isfile(scriptSettingsFileFullNameAndPath) == True:
 if py3TranslateLLMfunctions.checkIfThisFileExists(scriptSettingsFileFullNameAndPath) == True:
     print( ('Settings file found. Reading settings from: '+scriptSettingsFileNameOnly).encode(tempConsoleEncoding) )
-    scriptSettingsDictionary=py3TranslateLLMfunctions.readSettingsFromTextFile(scriptSettingsFileFullNameAndPath,defaultTextEncoding, consoleEncoding=tempConsoleEncoding) #Other settings can be specified, but are basically completely unknown at this point, so just use hardcoded defaults instead.
+    scriptSettingsDictionary=py3TranslateLLMfunctions.readSettingsFromTextFile(scriptSettingsFileFullNameAndPath, defaultTextEncoding, consoleEncoding=tempConsoleEncoding) #Other settings can be specified, but are basically completely unknown at this point, so just use hardcoded defaults instead.
 
 
 if scriptSettingsDictionary != None:
@@ -305,7 +304,7 @@ if scriptSettingsDictionary != None:
 #        commandLineArguments.fileToTranslateEncoding = scriptSettingsDictionary['fileToTranslateEncoding']
 #   Okay, try looping method again.
 
-    #Proxy the dictionary to avoid calling locals() multiple times per loop and in a loop.
+    # Proxy the dictionary to avoid calling locals() multiple times per loop and in a loop. # Why does this work without having to do locals() = tempDict?
     tempDict = locals()
     for x, y in scriptSettingsDictionary.items():
         #if y != None:
@@ -321,26 +320,26 @@ if scriptSettingsDictionary != None:
         #Since the variable name referenced by x already exists in the module/global scope, but not locally, this is not considered a local assignment.
         #And since it is just getting a value from a dictionary, it is valid to assign values after it. Invoking a function without a sub property on the left side of an assignment always results in an error: function()=value   #Errors out, but this still works: local()[x] = y
         #if locals()[x] == None:
-        #    local()[x] = y
+        #    locals()[x] = y
         if tempDict[x] == None:
             #Do not bother updating if the new value would be None too.
             if y != None:
                 if (verbose == True) or (debug == True):
                     print( ('Updating variable: '+str(x)+' to \''+str(y)+'\'').encode(tempConsoleEncoding) )
-                tempDict[x] = y
+                locals()[x] = y
         # The boolean values will never be updated by the above loop since the base value is always False instead of None. So check for that.
         elif tempDict[x] == False:
             #If the new value is False, or anything else, ignore it, but if the user set it to 'True', then set the variable to True.
             if str(y).lower() == 'true':
                 if (verbose == True) or (debug == True):
                     print( ('Updating variable: '+str(x)+' to \'True\'').encode(tempConsoleEncoding) )
-                tempDict[x] = True
+                locals()[x] = True
         elif tempDict[x] == True:
             #If the new value is True, or anything else, ignore it, but if the user set it to 'False', then set the variable to False.
             if str(y).lower() == 'false':
                 if (verbose == True) or (debug == True):
                     print( ('Updating variable: '+str(x)+' to \'True\'').encode(tempConsoleEncoding) )
-                tempDict[x] = False
+                locals()[x] = False
 
 
 # if consoleEncoding is still None after reading both the CLI and the settings.ini, then just set it to the default value.
@@ -348,7 +347,7 @@ if consoleEncoding == None:
     consoleEncoding=defaultConsoleEncodingType
 # if version was specified in the .ini, then print out version string and exit.
 if version == True:
-    sys.exit( (versionString).encode(consoleEncoding) )
+    sys.exit( (__version__).encode(consoleEncoding) )
 if debug == True:
     print( ('translationEngine='+str(translationEngine)).encode(consoleEncoding) )
     print( ('fileToTranslateEncoding='+str(fileToTranslateEncoding)).encode(consoleEncoding) )
@@ -837,7 +836,7 @@ mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileEncoding=file
 backupsFolderWithDate=backupsFolder + '/' + py3TranslateLLMfunctions.getYearMonthAndDay()
 pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
 #mainDatabaseWorkbook.save( 'backups/' + py3TranslateLLMfunctions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
-backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFileNameWithoutPathOrExt +'.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
+backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFileNameWithoutPath + '.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
 mainSpreadsheet.exportToXLSX( backupsFilePathWithNameAndDate )
 #print( ('Wrote backup to: ' + backupsFilePathWithNameAndDate).encode(consoleEncoding) )
 
@@ -908,7 +907,7 @@ if cacheEnabled == True:
         blacklistedHeadersForCacheAnyMatch.append(translationEngine.model)
 
         # To help with a case insensitive search, make everything lowercase.
-        counter=0
+        counter=0 #This is screwy. But it works, so I am not touching it.
         for blacklistedHeader in blacklistedHeadersForCacheAnyMatch:
             blacklistedHeadersForCacheAnyMatch[counter]=blacklistedHeader.lower()
             counter+=1
@@ -926,7 +925,7 @@ if cacheEnabled == True:
 
 
 # Implement KoboldAPI first, then DeepL, .
-# Update: Implement py3translationserver, then Sugoi, then KoboldCPP's API then DeepL API, then DeepL Web, then OpenAI's API.
+# Update: Implement py3translationserver, then Sugoi, then KoboldCPP's API, then DeepL API, then DeepL Web, then OpenAI's API (generic).
 # Check current engine.
     # Echo request? Some firewalls block echo requests.
     # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
@@ -953,7 +952,7 @@ if mode == 'py3translationserver':
 
 # DeepL has already been imported, and it must have an API key. (already checked for)
     #Must have internet access then. How to check?
-    # Added py3TranslateLLMfunctions.checkIfInternetIsAvailable() function.
+    # Added py3TranslateLLMfunctions.checkIfInternetIsAvailable() function that uses requests to fetch a web page.
 
 
 if translationEngine.reachable != True:
@@ -1017,6 +1016,9 @@ else:
 
 untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
+
+# Debug code.
+batchModeEnabled=False
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
@@ -1247,9 +1249,6 @@ if batchModeEnabled == True:
             currentRow+=1
 
 
-
-
-
 #elif batchModeEnabled == False:
 else:
     # Process each entry individually.
@@ -1263,6 +1262,7 @@ else:
     # for every cell in A, try to translate it.
     for untranslatedEntry in untranslatedEntriesColumnFull:
         translatedEntry=[]
+
         # first check if cache  is enabled, and reTranslate != True, check cache for value.
         # if cache enabled
         if (cacheEnabled == True) and (reTranslate != True):
@@ -1294,8 +1294,10 @@ else:
             # and move on to the next cell
 
     #translationEngine.translate()
-    pass
-
+        pass
+    #elif (cacheEnabled != True) or (reTranslate == True):
+    else:
+        translatedEntry= translationEngine.translate( translateMe )
 # Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
 # if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
 

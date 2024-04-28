@@ -25,7 +25,6 @@ The focus is the spreadsheet formats, but a built in customizable parser support
 - These file formats:
     - Microsoft Excel 97/2000/XP (.xls).
     - OpenDocument spreadsheet (.ods).
-
 - Generic OpenAI compatible web servers.
     - Example: https://github.com/vllm-project/vllm
 
@@ -69,7 +68,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 2024.03.20 pre-alpha`
+`Current version: 2024.04.28 alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development but the project in the alpha stages. Alpha means core functionality is currently under development.
 
