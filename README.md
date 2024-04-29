@@ -68,9 +68,9 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 2024.04.28 alpha`
+`Current version: 2024.04.29 alpha`
 
-Warning: py3TranslateLLM is currently undergoing active development but the project in the alpha stages. Alpha means core functionality is currently under development.
+Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 
 1. Install [Python 3.7+](//www.python.org/downloads). For Windows 7, use [this repository](//github.com/adang1345/PythonWin7/).
     - Make sure the Python version matches the architecture of the host machine:
@@ -94,6 +94,7 @@ Warning: py3TranslateLLM is currently undergoing active development but the proj
 1. Open an administrative command prompt.
 1. `cd /d py3TranslateLLM`  #change directory to enter the `py3TranslateLLM` folder.
 6. `pip install -r resources/requirements.txt`
+6. `pip install -r resources/optional.txt`
 7. `python py3TranslateLLM.py --help`
 
 Install/configure these other projects as needed:
@@ -414,16 +415,18 @@ Variable name | Description | Examples
 
 Library name | Required, Reccomended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
 --- | --- | --- | --- | ---
-[openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Microsoft Excel Document (.xlsx) support. | `pip install openpyxl` | 3.1.2
-chocolate | Required. | Has various functions to manage using openpyxl as a data structure. | Included with py3TranslateLLM. | See source.
+[openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Open Office XML (.xlsx) support. | `pip install openpyxl` | 3.1.2
+chocolate | Required. | Implements `openpyxl`. Has various functions to manage using it as a data structure. | Included with py3TranslateLLM. | See source.
 py3TranslateLLMfunctions | Required. | Has various helper functions unrelated to main data structure. | Included with py3TranslateLLM. | See source.
 dealWithEncoding | Required. | Handles text codecs and implements `chardet`. | Included with py3TranslateLLM. | See source.
+translationEngines/* | Required. | Handles logic for translation services. | Included with py3TranslateLLM. | See source.
 [requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Reccomended. | Improves text codec handling. | `pip install chardet` | 5.2.0
 [deepl-python](//github.com/DeepLcom/deepl-python) | Optional. | Used for DeepL NMT via their API. Optional otherwise. | `pip install deepl` | 1.16.1
 [xlrd](//pypi.org/project/xlrd/) | Optional. | Provides reading from Microsoft Excel Document (.xls). | `pip install xlrd` | 2.0.1
 [xlwt](//pypi.org/project/xlwt/) | Optional. | Provides writing to Microsoft Excel Document (.xls). | `pip install xlwt` | 1.3.0
 [odfpy](//pypi.org/project/odfpy) | Optional. | Provides interoperability for Open Document Spreadsheet (.ods). | `pip install odfpy` | 1.4.1
+[tdqm](//pypi.org/project/tqdm) | Optional. | Adds progress bar to CLI. | `pip install tdqm` | 0.0.1
 
 Libraries can also require other libraries.
 
@@ -441,9 +444,10 @@ Libraries can also require other libraries.
 - Python standard library's [license](//docs.python.org/3/license.html). For source code, open the Python installation directory on the local system.
 - [openpyxl](//pypi.python.org/pypi/openpyxl)'s [license](//foss.heptapod.net/openpyxl/openpyxl/-/blob/3.1.2/LICENCE.rst) and [source code](//foss.heptapod.net/openpyxl/openpyxl).
 - [chardet](//pypi.org/project/chardet)'s license is [LGPL v2+](//github.com/chardet/chardet/blob/main/LICENSE). [Source code](//github.com/chardet/chardet).
-- [odfpy](//pypi.org/project/odfpy)'s, license is [GPL v2](//github.com/eea/odfpy/blob/master/GPL-LICENSE-2.txt). [Source code](//github.com/eea/odfpy).
 - [xlrd](//pypi.org/project/xlrd)'s [license](//github.com/python-excel/xlrd/blob/master/LICENSE) and [source code](//github.com/python-excel/xlrd).
-- [xlwt](//pypi.org/project/xlwt/)'s [license](//github.com/python-excel/xlwt/blob/master/LICENSE) and [source code](//github.com/python-excel).
+- [xlwt](//pypi.org/project/xlwt)'s [license](//github.com/python-excel/xlwt/blob/master/LICENSE) and [source code](//github.com/python-excel).
+- [odfpy](//pypi.org/project/odfpy)'s, license is [GPL v2](//github.com/eea/odfpy/blob/master/GPL-LICENSE-2.txt). [Source code](//github.com/eea/odfpy).
+- [tdqm](//pypi.org/project/tqdm)'s [license](//github.com/tqdm/tqdm/blob/master/LICENCE) and [source code](//github.com/tqdm/tqdm).
 - [KoboldCPP](//github.com/LostRuins/koboldcpp) is [AGPL v3](//github.com/LostRuins/koboldcpp/blob/concedo/LICENSE.md). The GGML library and llama.cpp part of KoboldCPP has this [license](//github.com/LostRuins/koboldcpp/blob/concedo/MIT_LICENSE_GGML_LLAMACPP_ONLY).
 - DeepL's [various plans](//www.deepl.com/pro) and [Terms of Use](//www.deepl.com/en/pro-license). DeepL's [python library](//pypi.org/project/deepl) for their API has this [license](//github.com/DeepLcom/deepl-python/blob/main/LICENSE) and [source code](//github.com/DeepLcom/deepl-python).
 - [fairseq](//github.com/facebookresearch/fairseq) and [license](//github.com/facebookresearch/fairseq/blob/main/LICENSE).

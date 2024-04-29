@@ -5,10 +5,10 @@ Description: A helper/wrapper library to aid in using openpyxl as a data structu
 
 Usage: See below. Like at the bottom.
 
-License: See main program.
+Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.03.28'
+__version__='2024.04.29'
 
 #set defaults
 #printStuff=True
@@ -61,7 +61,7 @@ class Strawberry:
         if sheetNameInWorkbook == None:
             self.spreadsheet = self.workbook.active
         else:
-            print(sheetNameInWorkbook)
+            #print(sheetNameInWorkbook)
             self.workbook.create_sheet( title = sheetNameInWorkbook , index=0 )
             #print(self.workbook.sheetnames)
             self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
@@ -95,13 +95,13 @@ class Strawberry:
             if os.path.isfile(myFileName) == True:
                 # if extension = .csv, then call importFromCSV(myFileName)
                 if myFileExtensionOnly == '.csv':
-                    self.importFromCSV(myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV,csvDialect=csvDialect)
+                    self.importFromCSV( myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV, csvDialect=csvDialect )
                 elif myFileExtensionOnly == '.xlsx':
-                    self.importFromXLSX(myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook,readOnlyMode=self.readOnlyMode)
+                    self.importFromXLSX( myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook, readOnlyMode=self.readOnlyMode )
                 elif myFileExtensionOnly == '.xls':
-                    self.importFromXLS(myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook)
+                    self.importFromXLS( myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook )
                 elif myFileExtensionOnly == '.ods':
-                    self.importFromODS(myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook)
+                    self.importFromODS( myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook )
                 else:
                     #Else the file must be a text file to instantiate a class with. Only line-by-line parsing is supported.
                     if ( myFileExtensionOnly != '.txt' ) and ( myFileExtensionOnly != '.text' ):
@@ -521,7 +521,8 @@ class Strawberry:
 
 
 """
-#Usage examples, assuming this library is in a subfolder named 'resources':
+# TODO: This section.
+# Usage examples, assuming this library is in a subfolder named 'resources':
 defaultEncoding='utf-8'
 myFileName = 'myFile.txt'
 

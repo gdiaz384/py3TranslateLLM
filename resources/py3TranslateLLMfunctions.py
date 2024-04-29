@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper library to aid in using openpyxl as a data structure.
+Description: A helper library that has many functions that py3TranslateLLM relies on.
+
+Only functions that do not use module-wide variables and have return values are listed here. Functions without return values and those that rely on module specific variables that would be cumbersome to pass around, like chocolate.Strawberry(), should still be in the main program.
 
 Usage: See below. Like at the bottom.
 
-License: See main program.
+Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.04.27'
+__version__='2024.04.29'
 
 #set defaults
 #printStuff=True
@@ -362,7 +364,8 @@ def importDictionaryFromODS(myFile, myFileEncoding):
 
 
 """
-#Usage examples, assuming this library is in a subfolder named 'resources':
+# TODO: This section.
+# Usage examples, assuming this library is in a subfolder named 'resources':
 defaultEncoding='utf-8'
 myFileName = 'myFile.txt'
 

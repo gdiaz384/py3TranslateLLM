@@ -5,13 +5,12 @@ Description: This is a small helper library to help with dealing with text encod
 
 Usage: See below. Like at the bottom.
 
-License: See main program.
+Copyright (c) 2023-2024 gdiaz384; License: See main program.
 
 """
 __version__='2024.02.27'
 
 #set defaults
-version = '0.1 2024Jan24'
 printStuff=True
 verbose=False
 debug=False

@@ -19,36 +19,45 @@ consoleEncoding='utf-8'
 import requests
 
 #wrapper class for spreadsheet data structure
-class Py3translationServerEngine:
+class KoboldCppEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None, timeout=360): 
+    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None, timeout=360, prompt=None): 
         self.sourceLanguage=sourceLanguage
         self.targetLanguage=targetLanguage
         self.supportsBatches=True
-        self.supportsHistory=False
+        self.supportsHistory=True
         self.timeout=timeout
-        self.requiresPrompt=False
+        self.requiresPrompt=True
         self.address=address
         self.port=port
-
         self.addressFull=self.address + ':' + str(self.port)
+
+        self.prompt=prompt
+        self._maxContextLength=None
+
+        if self.prompt == None:
+            print( 'Warning: self.prompt is None.' )
 
         self.reachable=False
         # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
 
         self.model=None
         self.version=None
-        print( 'Connecting to py3translationServer at ' + self.addressFull + ' ... ', end='')
+        print( 'Connecting to KoboldCpp API at ' + self.addressFull + ' ... ', end='')
         if (self.address != None) and (self.port != None):
             try:
-                self.model = requests.get( self.addressFull + '/api/v1/model', timeout=10 ).text
-                self.version = requests.get( self.addressFull + '/api/v1/version', timeout=10 ).text
+                self.model = requests.get( self.addressFull + '/api/v1/model', timeout=10 ).json()['result']
+                self.version = requests.get( self.addressFull + '/api/extra/version', timeout=10 ).json()
+                self.version = self.version['result'] + '/' + self.version['version']
+                self._maxContextLength=int(requests.get( self.addressFull + '/api/extra/true_max_context_length', timeout=10 ).json()['value'])
                 print( 'Success.')
-            #except requests.exceptions.ConnectTimeout:
-            except:
+                print( ( 'koboldcpp version=' + self.version ).encode(consoleEncoding) )
+                print( ( 'koboldcpp maxContextLength=' + str(self._maxContextLength) ).encode(consoleEncoding) )
+            except requests.exceptions.ConnectTimeout:
+            #except:
                 print( 'Failure.')
-                print( 'Unable to connect to py3translationServer. Please check the connection settings and try again.' )
+                print( 'Unable to connect to KoboldCpp API. Please check the connection settings and try again.' )
 
         if self.model != None:
             self.reachable=True
@@ -77,34 +86,42 @@ class Py3translationServerEngine:
 
         return translatedList
 
-
-    # This expects a string to translate.
-    def translate(self, untranslatedString):
+    
+    # This expects a string to translate. contextHistory should be a list.
+    def translate(self, untranslatedString, contextHistory=None):
+        #http://localhost:5001/api
         #assert string
-        return str( self.batchTranslate( [untranslatedString] )[0] ) # Lazy.
+        #reqDict={'prompt':promptString+'How are you?'}
+        #requests.post( 'http://192.168.1.100:5001/api/v1/generate',json=reqDict, timeout=120 ).json()
+        #{'results': [{'text': '\n\nBien, gracias.'}]}
 
+        # Build request.
+        requestDictionary={}
+        requestDictionary['prompt']=self.prompt+untranslatedString
+        requestDictionary['max_context_length']=self._maxContextLength
+        if contextHistory != None:
+            tempHistory=''
+            for entry in contextHistory:
+                tempHistory=tempHistory + ' ' + entry
+            requestDictionary['memory']=tempHistory[1:]
+        #else:
+        #requestDictionary['authorsnote']=
 
-class SugoiNMTEngine:
-    # Address is the protocol and the ip address or hostname of the target server.
-    # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None): 
-        self.sourceLanguage=sourceLanguage
-        self.targetLanguage=targetLanguage
-        self.supportsBatches=True
-        self.supportsHistory=False
-        self.supportsPrompt=False
-        self.requiresPrompt=False
-        self.address=address
-        self.port=port
+        # Maybe add some code here to deal with server busy messages?
+        returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, self.timeout) )
+        if returnedRequest.status_code != 200:
+            print('Unable to translate entry. ')
+            print('Status code:',returnedRequest.status_code)
+            print('Headers:',returnedRequest.headers)
+            print('Body:',returnedRequest.content)
+            return None
 
-        self.model=None
-        self.version=None
-        if (self.address != None) and (self.port != None):
-            try:
-                self.model= requests.get(self.address + ':' + self.port + '/api/v1/model',timeout=10)
-                self.version= requests.get(self.address + ':' + self.port + '/api/v1/version',timeout=10)
-            except:
-                pass
+        translatedText=returnedRequest.json()['results'][0]['text'].strip()
+        print('translatedText=',translatedText)
+        return translatedText
+
+        #return str( self.batchTranslate( [untranslatedString] )[0] ) # Lazy.
+
 
 
 

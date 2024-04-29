@@ -46,7 +46,7 @@ defaultPortForHTTPS = 443
 defaultContextHistoryLength = 6
 # This setting only affects LLMs, not NMTs.
 defaultEnableBatchesForLLMs=False
-# Valid options for defaultBatchSizeLimit are an integer or None . Sensible limits are 100-10000 depending upon hardware. In addition to this setting, translation engines also have internal limiters.
+# Valid options for defaultBatchSizeLimit are an integer or None. Sensible limits are 100-10000 depending upon hardware. In addition to this setting, translation engines also have internal limiters.
 #defaultBatchSizeLimit=None
 defaultBatchSizeLimit=1000
 defaultInputEncodingErrorHandler = 'strict'
@@ -65,7 +65,8 @@ defaultBlacklistedHeadersForCache = [ 'rawText','speaker','metadata' ] #'cache',
 defaultBackupsFolder='backups'
 defaultExportExtension='.xlsx'
 defaultCacheFileLocation=defaultBackupsFolder + '/cache' + defaultExportExtension
-
+# Cache is always saved at the end of an operation if there are any new entries, so this is only used for translations that take a very long time.
+defaultMinimumCacheSaveInterval=240 # Once every four minutes.
 
 translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
 usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEnginesAvailable+'.'
@@ -81,10 +82,12 @@ import sys                                     # End program on fail condition.
 import io                                        # Manipulate files (open/read/write/close).
 #from io import IOBase               # Test if variable is a file object (an "IOBase" object).
 #import datetime                          # Used to get current date and time.
+import time                                    # Used to write out cache no more than once every 240s.
 
 # Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes. # Update: Maybe.
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
-import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
+#import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
+import queue
 #import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests' # Update: Moved to functions.py
 
 #import openpyxl                           # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip. # Update: Moved to chocolate.py
@@ -94,6 +97,11 @@ import resources.py3TranslateLLMfunctions as py3TranslateLLMfunctions  # Moved m
 #from resources.py3TranslateLLMfunctions import * # Do not use this syntax if at all possible. The * is fine, but the 'from' breaks everything because it copies everything instead of pointing to the original resources which makes updating library variables borderline impossible.
 #import resources.translationEngines as translationEngines
 
+try:
+    import tqdm                             # Optional library to add pretty progress bars.
+    tqdmAvailable=True
+except:
+    tqdmAvailable=False
 
 #Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
 sysVersion=int(sys.version_info[1])
@@ -710,7 +718,72 @@ postDictionaryEncoding = dealWithEncoding.ofThisFile(postDictionaryFileName, pos
 postWritingToFileDictionaryEncoding = dealWithEncoding.ofThisFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding, defaultTextEncoding)
 
 
-##### Input validation is /finally/ done.  ######
+############################ Input validation is /finally/ done. Start function defintions. ############################
+
+
+timeThatCacheWasLastSaved = time.perf_counter()
+
+
+def exportCache(force=False):
+    global cache
+    global timeThatCacheWasLastSaved
+
+    if readOnlyCache == True:
+        return
+
+    if (int( time.perf_counter()  - timeThatCacheWasLastSaved) > defaultMinimumCacheSaveInterval) or (force == True):
+        cache.export(cacheFileName)
+        timeThatCacheWasLastSaved=time.perf_counter()
+
+
+# Expects two strings.
+def updateCache(untranslatedEntry, translation):
+    global cache
+    global currentCacheColumn
+    global cacheWasUpdated
+
+    if readOnlyCache == True:
+        return
+
+    # tempSearchResult can be a row number (as a string) or None if the string was not found.
+    tempSearchResult=cache.searchFirstColumn( untranslatedEntry )
+
+    #if the untranslatedEntry is not in the cache
+    if tempSearchResult == None:
+        #then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
+        cache.appendRow( [ untranslatedEntry ] )
+        # This returns the row number of the found entry as a string.
+        tempSearchResult=cache.searchFirstColumn( untranslatedEntry )
+        cache.setCellValue( currentCacheColumn + str(tempSearchResult) , translation )
+        cacheWasUpdated=True
+
+    # elif the untranslatedEntry is in the cache
+    # elif tempSearchResult != None:
+    else:
+        #, then get the appropriate cell, the currentCacheColumn + tempSearchResult.
+        currentCellAddress=currentCacheColumn + str(tempSearchResult)
+        # if the cell's value is None
+        if cache.getCellValue(currentCellAddress) == None:
+            # then replace the value
+            cache.setCellValue( currentCellAddress, translation )
+            cacheWasUpdated=True
+        # elif the cell's value is not empty
+        else:
+            # Then only update the cache if reTranslate == True
+            if reTranslate == True:
+                cache.setCellValue( currentCellAddress, translation )
+                cacheWasUpdated=True
+
+    if debug == True:
+        #cache.printAllTheThings()
+        print( ('Updated cache at row ', tempSearchResult).encode(consoleEncoding)  )
+
+    if readOnlyCache != True:
+    # TODO: Should have timer settings here so cache is not exported too often. # Update: Done.
+        exportCache()
+
+
+###################################### End function defintions. ######################################
 
 
 if (verbose == True) or (debug == True):
@@ -719,25 +792,25 @@ if (verbose == True) or (debug == True):
     print( ('sourceLanguageRaw='+str(sourceLanguageRaw)).encode(consoleEncoding) )
     print( ('targetLanguageRaw='+str(targetLanguageRaw)).encode(consoleEncoding) )
 
-#Instantiate basket of Strawberries. Start with languageCodes.csv  #Edit: Only languageCodes.csv is a Strawberry(). For the various dictionary.csv files, use Python dictionaries instead.
-#languageCodes.csv could also be a dictionary or multidimension array, but then searching through it would be annoying, so leave as a Strawberry.
-#Read in and process languageCodes.csv
-#Format specificiation for languageCodes.csv
-#Name of language in English, ISO 639 Code, ISO 639-2 Code
-#https://www.loc.gov/standards/iso639-2/php/code_list.php
-#Language list (Mostly) only languages supported by DeepL are currently listed, case insensitive.
-#Syntax:
-#The first row is entirely headers (column labels). Entries start from the 2nd row (row[1] if python list, row[2] if spreadsheet data structure):
-#row 0) [languageNameReadable, 
-#row 1) TwoLetterLanguageCodeThatIsNotAlwaysTwoLetters,
-#row 2) ThreeLetterLanguageCodeThatIsNotAlwaysThreeLetters,
-#row 3) DoesDeepLSupportThisLanguageTrueOrFalse,
-#row 4) DoesThisLanguageNeedACustomSourceLanguageTrueOrFalse (for single source language but many target language languages like EN->EN-US/EN-GB)
-#row 5) If #4 is True, then the full name source language
-#row 6) If #4 is True, then the two letter code of the source language
-#row 7) If #4 is True, then the three letter code of the source language
-#Examples for 5-7: English, EN, ENG; Portuguese, PT-PT, POR
-#Each row/entry is/has eight columns total.
+# Instantiate basket of Strawberries. Start with languageCodes.csv  #Edit: Only languageCodes.csv is a Strawberry(). For the various dictionary.csv files, use Python dictionaries instead.
+# languageCodes.csv could also be a dictionary or multidimension array, but then searching through it would be annoying, so leave as a Strawberry.
+# Read in and process languageCodes.csv
+# Format specificiation for languageCodes.csv
+# Name of language in English, ISO 639 Code, ISO 639-2 Code
+# https://www.loc.gov/standards/iso639-2/php/code_list.php
+# Language list (Mostly) only languages supported by DeepL are currently listed, case insensitive.
+# Syntax:
+# The first row is entirely headers (column labels). Entries start from the 2nd row (row[1] if python list, row[2] if spreadsheet data structure):
+# column 0) [languageNameReadable, 
+# column 1) TwoLetterLanguageCodeThatIsNotAlwaysTwoLetters,
+# column 2) ThreeLetterLanguageCodeThatIsNotAlwaysThreeLetters,
+# column 3) DoesDeepLSupportThisLanguageTrueOrFalse,
+# column 4) DoesThisLanguageNeedACustomSourceLanguageTrueOrFalse (for single source language but many target language languages like EN->EN-US/EN-GB)
+# column 5) If #4 is True, then the full name source language
+# column 6) If #4 is True, then the two letter code of the source language
+# column 7) If #4 is True, then the three letter code of the source language
+# Examples for 5-7: English, EN, ENG; Portuguese, PT-PT, POR
+# Each row/entry is/has eight columns total.
 
 #Old code:
 #languageCodesWorkbook = chocolate.importFromCSV(languageCodesFileName)
@@ -746,8 +819,9 @@ if (verbose == True) or (debug == True):
 # skip reading languageCodesFileName if mode is parseOnly.
 # Update: parseOnly mode is not really supported anymore. It should probably be renamed to dryRun mode where the purpose is to check for parsing errors in everything, including the languageCodes.csv and cache.xlsx files.
 if mode != 'parseOnly':
-    print('languageCodesFileName='+languageCodesFileName)
-    print('languageCodesEncoding='+languageCodesEncoding)
+    if verbose == True:
+        print('languageCodesFileName='+languageCodesFileName)
+        print('languageCodesEncoding='+languageCodesEncoding)
 
     languageCodesSpreadsheet=chocolate.Strawberry(myFileName=languageCodesFileName,fileEncoding=languageCodesEncoding,removeWhitespaceForCSV=True)
 
@@ -764,19 +838,19 @@ if mode != 'parseOnly':
         if (sourceLanguageCellRow == None) or (sourceLanguageCellColumn == None):
             sys.exit( ('Error: Unable to find source language \''+str(sourceLanguageRaw)+'\' in file: '+ str(languageCodesFileName)).encode(consoleEncoding) )
 
-        print( ('Using sourceLanguage \''+sourceLanguageRaw+'\' found at \''+str(sourceLanguageCellColumn)+str(sourceLanguageCellRow)+'\' of: '+languageCodesFileName).encode(consoleEncoding) )
+        print( ('Using sourceLanguage \'' + sourceLanguageRaw + '\' found at \'' + str(sourceLanguageCellColumn) + str(sourceLanguageCellRow)+'\' of: ' + languageCodesFileName).encode(consoleEncoding) )
 
-        sourceLanguageFullRow = languageCodesSpreadsheet.getRow(sourceLanguageCellRow)
+        sourceLanguageFullRow = languageCodesSpreadsheet.getRow( sourceLanguageCellRow )
         if debug == True:
-            print( str(sourceLanguageFullRow).encode(consoleEncoding) )
+            print( str( sourceLanguageFullRow ).encode(consoleEncoding) )
 
         internalSourceLanguageName=sourceLanguageFullRow[0]
         internalSourceLanguageTwoCode=sourceLanguageFullRow[1]
         internalSourceLanguageThreeCode=sourceLanguageFullRow[2]
         if debug == True:
-            print( ('internalSourceLanguageName='+internalSourceLanguageName).encode(consoleEncoding) )
-            print( ('internalSourceLanguageTwoCode='+internalSourceLanguageTwoCode).encode(consoleEncoding) )
-            print( ('internalSourceLanguageThreeCode='+internalSourceLanguageThreeCode).encode(consoleEncoding) )
+            print( ('internalSourceLanguageName=' + internalSourceLanguageName).encode(consoleEncoding) )
+            print( ('internalSourceLanguageTwoCode=' + internalSourceLanguageTwoCode).encode(consoleEncoding) )
+            print( ('internalSourceLanguageThreeCode=' + internalSourceLanguageThreeCode).encode(consoleEncoding) )
 
     #Target language is optional when using parseOnly mode.
     if targetLanguageRaw != None:
@@ -901,10 +975,12 @@ if cacheEnabled == True:
         # if the Strawberry is brand new, add header row.
         cache.appendRow( ['rawText'] )
 
-    if debug == True:
-        cache.printAllTheThings()
+    #originalNumberOfEntriesInCache=len( cache.getColumn('A') )
+    cacheWasUpdated=False
 
     # Debug code.
+    if debug == True:
+        cache.printAllTheThings()
 #    if readOnlyCache != True:
 #        cache.export(cacheFileName)
 
@@ -928,7 +1004,8 @@ if cacheEnabled == True:
                     # This should append the column letter, not the literal text, to the list.
                     validColumnLettersForCacheAnyMatch.append( cache.searchHeaders(header) )
 
-    print( ( 'Cache is available at: '+str(cacheFileName) ).encode(consoleEncoding) )
+    if verbose == True:
+        print( ( 'Cache is available at: '+str(cacheFileName) ).encode(consoleEncoding) )
 
 
 # Implement KoboldAPI first, then DeepL, .
@@ -950,13 +1027,19 @@ if mode == 'py3translationserver':
 #        print( 'translationEngine.version is None' )
 #        sys.exit(1)
 
-
 # SugoiNMT server must be reachable.
+elif mode == 'sugoi':
+    translationEngine=sugoiNMTEngine.sugoiNMTEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port)
 
-# KoboldAPI must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
+# KoboldCpp's API must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
+elif mode=='koboldcpp':
+    tempPrompt='You are an expert translator. Your task is to translate text from Japanese to English. You will be given text in Japanese. Output only the English translation. Do not add translation notes. Do not say anything else. Do not output anything else, like errors. Do not explain the translation. Translate the following:\n'
+    translationEngine=koboldCppEngine.KoboldCppEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port, prompt=tempPrompt)
+
     #if not exist model in main spreadsheet,
     #then add it to headers and return current column for model.
     #else, return current column for model.
+
 
 # DeepL has already been imported, and it must have an API key. (already checked for)
     #Must have internet access then. How to check?
@@ -1026,7 +1109,7 @@ untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
 # Debug code.
-#batchModeEnabled=False
+batchModeEnabled=False
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
@@ -1184,42 +1267,11 @@ if batchModeEnabled == True:
     # next, update the cache
     if cacheEnabled == True:
         if ( len(postTranslatedList) != 0 ) and ( readOnlyCache == False ):
-            # finalTranslatedList and untranslatedEntriesColumnFull need to be added to the cache file now.
-            counter=0
-            tempSearchResult = None
-            #for every entry
-            for untranslatedString in untranslatedEntriesColumnFull:
-                # tempSearchResult can be a row number (as a string) or None if the string was not found.
-                tempSearchResult=cache.searchFirstColumn( untranslatedString )
-                #if the untranslatedString is not in the cache
-                if tempSearchResult == None:
-                    #then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
-                    cache.appendRow( [ untranslatedString ] )
-                    # This returns the row number of the found entry as a string.
-                    tempSearchResult=cache.searchFirstColumn( untranslatedString )
-                    cache.setCellValue( currentCacheColumn + str(tempSearchResult) , finalTranslatedList[counter] )
+            # untranslatedEntriesColumnFull and finalTranslatedList need to be added to the cache file now.
 
-                # elif the untranslatedString is in the cache
-                # elif tempSearchResult != None:
-                else:
-                    #, then get the appropriate cell, the currentCacheColumn + temporaryRow.
-                    currentCellAddress=currentCacheColumn + str(tempSearchResult)
-                    # if the cell's value is None
-                    if cache.getCellValue(currentCellAddress) == None:
-                        # then replace the value
-                        cache.setCellValue( currentCellAddress, finalTranslatedList[counter] )
-                    # elif the cell's value is not empty
-                    else:
-                        # Then only update the cache if reTranslate == True
-                        if reTranslate == True:
-                            cache.setCellValue( currentCellAddress, finalTranslatedList[counter] )
-                counter += 1
+            for counter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
+                updateCache(untranslatedString,finalTranslatedList[counter])
 
-        if debug == True:
-            cache.printAllTheThings()
-        if readOnlyCache != True:
-            # Should have timer settings here so cache is not exported too often. It might be a good idea to set up a proxy function to determine that.
-            cache.export(cacheFileName)
 
 
 # Old code.
@@ -1270,9 +1322,9 @@ else:
 
     # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryLength. If contextHistoryLength== 0 then disable it. contextHistoryLength is always an integer.
     contextHistory=None
-    if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True) :
+    if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True):
         #https://docs.python.org/3.7/library/queue.html#module-queue
-        contextHistory=queue.queue( maxsize=contextHistoryLength )
+        contextHistory=queue.Queue( maxsize=contextHistoryLength )
         #To add an entry, contextHistory.put(item)
         #to remove the oldest, contextHistory.get()
         # to get every item without modifying the queue
@@ -1283,8 +1335,14 @@ else:
 
     currentRow=2  # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
 
+
+    if tqdmAvailable == False:
+        tempIterable=untranslatedEntriesColumnFull
+    if tqdmAvailable == True:
+        tempIterable=tqdm.tqdm( untranslatedEntriesColumnFull )
+
     # for every cell in A, try to translate it.
-    for untranslatedEntry in untranslatedEntriesColumnFull:
+    for untranslatedEntry in tempIterable:
         translatedEntry=None
 
         # Sanity check.
@@ -1292,12 +1350,22 @@ else:
 
         currentTranslatedCellAddress = currentMainSpreadsheetColumn + str(currentRow)
 
+
         # if the current cell contents are already translated, then just continue onto the next entry unless retranslate is specified.
         currentMainSpreadsheetCellContents = mainSpreadsheet.getCellValue( currentTranslatedCellAddress )
-        if (currentMainSpreadsheetCellContents != None) and (reTranslate != True):
-            # Update history.
-            # TODO: update contextHistory here.
+        if ( currentMainSpreadsheetCellContents != None ) and ( reTranslate != True ):
+            # Update the contextHistory queue.
+            if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True) :
+                if contextHistory.full()== True():
+                    contextHistory.get()
+                contextHistory.put( currentTranslatedCellAddress )
+
             # It is not clear where the translation already in the spreadsheet came from so do not update cache. Well, it could be determined by reading the header in the current column and looking up the same column in the cache. Will they always match perfectly or is it possible they will not match perfectly? If they always match perfectly, the model in the mainSpreadsheet and the model in cache.xlsx, then it may be possible to 
+            # if the header (translation engine) of the current column in the mainSpreadsheet matches the header (translation engine) of the cache header, they should always match, right?
+            if mainSpreadsheet.getCellValue( currentMainSpreadsheetColumn + '1' ) == cache.getCellValue( currentCacheColumn + '1' ):
+                # then update the cache with what was found in the mainSpreadsheet
+                updateCache( untranslatedEntry, currentMainSpreadsheetCellContents )
+
             currentRow += 1
             continue
 
@@ -1328,62 +1396,60 @@ else:
                             #Keep updating translatedEntry to favor the right-most translation engine.
                             translatedEntry=tempCellContents
 
-        #translationEngine.translate()
-            #pass
-        #elif (cacheEnabled != True) or (reTranslate == True):
-        #else:
-        #    translatedEntry= translationEngine.translate( translateMe )
-
         # if there is no match in the cache or cache is disabled, then the fun begins
         if translatedEntry == None:
             # remove all \n's in the line?
+
             # perform replacements specified by revertAfterTranslationDictionary
+
             # perform replacements specified by preTranslationDictionary
-            # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
-            pass
+
             # translate entry
+            # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
+
+
+            tempHistory=[]
+            for i in range( contextHistory.qsize() ):
+                tempHistory.append(contextHistory.queue[i])
+            if len(tempHistory) == 0:
+                tempHistory=None
+ 
+            translatedEntry=translationEngine.translate( untranslatedEntry,contextHistory=tempHistory )
+  
+
             # once it is back check to make sure it is not None or another error value
+            if translatedEntry == None:
+                print( ( 'Unable to translate: ' + untranslatedEntry).encode(consoleEncoding) )
+                currentRow+=1
+                continue
 
-
-        # perform replacements specified by revertAfterTranslationDictionary, in reverse
-
-
-        # add it to the dequeue, murdering the oldest entry in the dequeue
+        # History should be update before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
+        # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
+        # Add it to the dequeue, murdering the oldest entry in the dequeue.
         # Update the contextHistory queue.
-        if contextHistory.full()== True():
-            contextHistory.get()
-        contextHistory.put(translatedEntry)
+        if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True):
+            if contextHistory.full() == True:
+                #contextHistory.get()
+                # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries. Just wipe history every once in a while as a workaround.
+                contextHistory=queue.Queue( maxsize=contextHistoryLength )
+            contextHistory.put(translatedEntry)
+
+
+            # perform replacements specified by revertAfterTranslationDictionary, in reverse
 
 
         # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
         if ( cacheEnabled == True ) and ( readOnlyCache == False ):
-            # Search for the cell (already did earlier). Save if there was a hit or not. Check if None. If none, then append. If not none, then use existing row. Do not fill in untranslated text. Instead only add translated text in column currently in use by current translation engine/model.
-
-            # if the tempRowNumberForCache for the translated line us not known, then add the untranslated entry to the cache and search for it to get the correct row.
-            if tempRowNumberForCache == None:
-                # Append as new row in cache.
-                # Search the first row for that entry.
-                pass
-
-            # Add new entry using the correct column since the row is already known.
-            cache.setCellValue( currentCacheColumn + str(tempRowNumberForCache) , translatedEntry )
+            updateCache( untranslatedEntry, translatedEntry )
 
 
         # and then write cache hit to mainSpreadsheet cell
-        #mainSpreadsheet.setCellValue( , translatedEntry )
+        mainSpreadsheet.setCellValue( currentTranslatedCellAddress , translatedEntry )
 
-        # Check if the entry is current None. if entry is none
-        if mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None:
-            # then always update the entry
-            mainSpreadsheet.setCellValue(currentTranslatedCellAddress, finalTranslatedList[listCounter] )
-            #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + finalTranslatedList[listCounter] ).encode(consoleEncoding) )
-        # if entry is not none
-        #else:
-            # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
 
-            # and move on to next cell
-            currentRow+=1
-            continue
+        # and move on to next cell
+        currentRow+=1
+        continue
 
 
         #elif translatedEntry != None:
@@ -1404,7 +1470,9 @@ else:
 if debug == True:
     print('mainSpreadsheet.printAllTheThings():')
     mainSpreadsheet.printAllTheThings()
+
 mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentMainSpreadsheetColumn)
+
 
 
 
@@ -1415,8 +1483,13 @@ mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToEx
 
 # https://openpyxl.readthedocs.io/en/stable/optimized.html
 # readOnlyMode requires manually closing the spreadsheet after use.
-if readOnlyCache == True:
-    cache.close()
+if cacheEnabled==True:
+    if readOnlyCache == True:
+        cache.close()
+    elif cacheWasUpdated == True:
+        #if len( cache.getColumn('A') ) > originalNumberOfEntriesInCache:
+            # if the cache has more entries than it originally did, then always export it. # Update: Measuring this via number of untranslated entries is a heuristic, so not always accurate if entries were updated to new translation engies or entries for those translation engines where the total number of entries did not increase. Changed to just manually keep track of it getting updated or not via a boolean.
+        exportCache(force=True)
 
 print('end reached')
 sys.exit(0)
