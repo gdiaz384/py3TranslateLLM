@@ -298,7 +298,7 @@ def importDictionaryFromFile(myFile,myFileEncoding=None):
 
 #Thinking: There is normally no return, but returnDictionary=True indicates a special flag where the function will instead return a dictionary of columns 1 and 2 as key=value pairs. Perhaps this would be better off split into a seperate function? It does not utilize any of the features nor align with the intent of the Strawberry() class. In addition, Strawberry() takes up a lot of memory because openpyxl data structures take up a lot of memory (~2.5 GB for a 50MB Excel file reportedly) which may become a problem if using an LLM/NMT locally.
 #Even if importing to dictionary from .csv/.xlsx/.xls/.ods to a dictionary instead of an openpyxl data structure, the rule is that the first entry is headers, so the first key=value entry must be skipped regardless.
-def importDictionaryFromCSV(myFile, myFileEncoding,ignoreWhitespace=False):
+def importDictionaryFromCSV(myFile, myFileEncoding, ignoreWhitespace=False):
     tempDict={}
     
     #print('Hello World'.encode(consoleEncoding))

@@ -1014,6 +1014,7 @@ if cacheEnabled == True:
     # Echo request? Some firewalls block echo requests.
     # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
 
+
 # py3translationServer must be reachable Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
 if mode == 'py3translationserver':
     translationEngine=py3translationServerEngine.Py3translationServerEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port )
@@ -1033,7 +1034,17 @@ elif mode == 'sugoi':
 
 # KoboldCpp's API must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
 elif mode=='koboldcpp':
+
     tempPrompt='You are an expert translator. Your task is to translate text from Japanese to English. You will be given text in Japanese. Output only the English translation. Do not add translation notes. Do not say anything else. Do not output anything else, like errors. Do not explain the translation. Translate the following:\n'
+
+
+    tempPrompt=tempPrompt.replace('    ','')
+
+    tempPrompt=tempPrompt.replace('{sourceLanguage}',internalSourceLanguageName)
+    tempPrompt=tempPrompt.replace('{targetLanguage}',internalDestinationLanguageName)
+#    tempPrompt=tempPrompt.replace('{targetLanguage}','English')
+
+
     translationEngine=koboldCppEngine.KoboldCppEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, address=address, port=port, prompt=tempPrompt)
 
     #if not exist model in main spreadsheet,

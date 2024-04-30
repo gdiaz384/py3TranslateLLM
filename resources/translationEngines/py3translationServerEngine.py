@@ -22,7 +22,7 @@ import requests
 class Py3translationServerEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None, timeout=360): 
+    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None, timeout=360, prompt=None): 
         self.sourceLanguage=sourceLanguage
         self.targetLanguage=targetLanguage
         self.supportsBatches=True
