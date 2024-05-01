@@ -79,8 +79,9 @@ class Py3translationServerEngine:
 
 
     # This expects a string to translate.
-    def translate(self, untranslatedString):
+    def translate(self, untranslatedString,contextHistory=None):
         #assert string
+
         return str( self.batchTranslate( [untranslatedString] )[0] ) # Lazy.
 
 

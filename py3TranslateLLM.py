@@ -43,7 +43,8 @@ maximumPortNumber = 65535 #16 bit integer -1
 defaultPortForHTTP = 80
 defaultPortForHTTPS = 443
 
-defaultContextHistoryLength = 6
+# LLMs tend to hallucinate, so setting this overly high tends to corrupt the output. It should also be reset back to 0 periodically, like when it gets full, so the corruption of one bad entry does not spread too much.
+defaultContextHistoryMaxLength = 6
 # This setting only affects LLMs, not NMTs.
 defaultEnableBatchesForLLMs=False
 # Valid options for defaultBatchSizeLimit are an integer or None. Sensible limits are 100-10000 depending upon hardware. In addition to this setting, translation engines also have internal limiters.
@@ -158,7 +159,7 @@ commandLineParser.add_argument('-oc', '--overrideWithCache', help='Override any 
 commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines.', action='store_true')
 commandLineParser.add_argument('-roc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
-commandLineParser.add_argument('-hl', '--contextHistoryLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryLength), default=None, type=int)
+commandLineParser.add_argument('-hl', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryMaxLength), default=None, type=int)
 commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches. Enabling batches disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
 commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. Default='+str(defaultBatchSizeLimit), default=None, type=int)
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
@@ -202,7 +203,7 @@ overrideWithCache=commandLineArguments.overrideWithCache
 reTranslate=commandLineArguments.reTranslate
 readOnlyCache=commandLineArguments.readOnlyCache
 
-contextHistoryLength=commandLineArguments.contextHistoryLength
+contextHistoryMaxLength=commandLineArguments.contextHistoryMaxLength
 batchesEnabledForLLMs=commandLineArguments.batchesEnabledForLLMs
 batchSizeLimit=commandLineArguments.batchSizeLimit
 #lineByLineMode=commandLineArguments.lineByLineMode
@@ -655,11 +656,11 @@ elif (targetLanguageRaw != None):
         targetLanguageRaw='Spanish'
 
 
-if contextHistoryLength == None:
-    contextHistoryLength=defaultContextHistoryLength
-elif contextHistoryLength != None:
-    #if contextHistoryLength was specified, then assert that it is a number.
-    contextHistoryLength=int(contextHistoryLength)
+if contextHistoryMaxLength == None:
+    contextHistoryMaxLength=defaultContextHistoryMaxLength
+elif contextHistoryMaxLength != None:
+    #if contextHistoryMaxLength was specified, then assert that it is a number.
+    contextHistoryMaxLength=int(contextHistoryMaxLength)
 
 
 #Set encodings Last
@@ -1120,7 +1121,7 @@ untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
 # Debug code.
-batchModeEnabled=False
+#batchModeEnabled=False
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
@@ -1331,11 +1332,11 @@ else:
 # len( cache.getColumn('A') ) > 1
 
 
-    # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryLength. If contextHistoryLength== 0 then disable it. contextHistoryLength is always an integer.
+    # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength== 0 then disable it. contextHistoryMaxLength is always an integer.
     contextHistory=None
-    if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True):
+    if ( contextHistoryMaxLength != 0 ) and ( translationEngine.supportsHistory == True):
         #https://docs.python.org/3.7/library/queue.html#module-queue
-        contextHistory=queue.Queue( maxsize=contextHistoryLength )
+        contextHistory=queue.Queue( maxsize=contextHistoryMaxLength )
         #To add an entry, contextHistory.put(item)
         #to remove the oldest, contextHistory.get()
         # to get every item without modifying the queue
@@ -1366,7 +1367,7 @@ else:
         currentMainSpreadsheetCellContents = mainSpreadsheet.getCellValue( currentTranslatedCellAddress )
         if ( currentMainSpreadsheetCellContents != None ) and ( reTranslate != True ):
             # Update the contextHistory queue.
-            if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True) :
+            if ( contextHistoryMaxLength != 0 ) and ( translationEngine.supportsHistory == True) :
                 if contextHistory.full()== True():
                     contextHistory.get()
                 contextHistory.put( currentTranslatedCellAddress )
@@ -1420,8 +1421,11 @@ else:
 
 
             tempHistory=[]
-            for i in range( contextHistory.qsize() ):
-                tempHistory.append(contextHistory.queue[i])
+
+            if ( contextHistoryMaxLength != 0 ) and ( translationEngine.supportsHistory == True) :
+                for i in range( contextHistory.qsize() ):
+                    tempHistory.append(contextHistory.queue[i])
+
             if len(tempHistory) == 0:
                 tempHistory=None
  
@@ -1438,11 +1442,11 @@ else:
         # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
         # Add it to the dequeue, murdering the oldest entry in the dequeue.
         # Update the contextHistory queue.
-        if ( contextHistoryLength != 0 ) and ( translationEngine.supportsHistory == True):
+        if ( contextHistoryMaxLength != 0 ) and ( translationEngine.supportsHistory == True):
             if contextHistory.full() == True:
                 #contextHistory.get()
                 # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries. Just wipe history every once in a while as a workaround.
-                contextHistory=queue.Queue( maxsize=contextHistoryLength )
+                contextHistory=queue.Queue( maxsize=contextHistoryMaxLength )
             contextHistory.put(translatedEntry)
 
 
