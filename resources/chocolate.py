@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.04.29'
+__version__='2024.05.02'
 
 #set defaults
 #printStuff=True
@@ -68,6 +68,9 @@ class Strawberry:
         self.readOnlyMode = readOnlyMode
         self.csvDialect=csvDialect
         self.addHeaderToTextFile=addHeaderToTextFile
+        # These last two variables are only for use when chocolate.Strawberry() is being used as cache.xlsx. Ignore otherwise.
+        self.index={}
+        self.lastEntry=len(index)
 
         # Are there any use cases for creating a spreadsheet in memory without an associated file name? Since chocolate.Strawberry() is a data structure, this must be 'yes' by definition, but what is the use case for that exactly? When would it be useful to only create a spreadsheet in memory but never write it out?
         if myFileName != None:
@@ -517,7 +520,43 @@ class Strawberry:
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
+# These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with their associated row number.
+    def initializeCacheIndex(self)
+        # Build index.
+        for counter,entry in enumerate( self.getColumn('A') ):
+            # Skip adding the header.
+            if counter == 0:
+                continue
+            self.index[entry]=counter+1
+        # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds.
+        self.lastEntry=len(index)
 
+
+    def searchCache(self,myString)
+        if myString in index.keys():
+            return index[myString]
+        else:
+            return None
+
+
+    # accepts a string or a list with a single item?
+    # Are there use cases for multiple items? When would a new entry be added together with a value? Would that be when adding both the untranslated entry and translated entry together? How is that implemented?
+    def addToCache(myVar)
+        if isinstance(myVar, str):
+            # if the string does not exist
+            if searchCache(myVar) == None:
+            # then add it to the index
+return 
+
+        elif isinstance(myVar, list)
+            if searchCache(myVar[0]) == None:
+                self.appendRow(myVar)
+                index.append( myVar[0], len()  ]
+
+
+        #every time a row is appended, increment lastEntry and return
+        lastEntry+=1
+        def insert()
 
 
 """

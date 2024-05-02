@@ -6,11 +6,9 @@ py3TranslateLLM.py translates text using Neural net Machine Translation (NMT) an
 For usage, see py3TranslateLLM.py -h', README.md, and the source code below.
 
 License:
+- This .py file and the libraries under resources/ are Copyright (c) 2024 gdiaz384 ; License: GNU Affero GPL v3.
+- https://www.gnu.org/licenses/agpl-3.0.html
 - For the various libraries used, see the Readme for their licenses and project pages.
-- This .py file and the libraries under resources/ are C* gdiaz384 and licensed as GNU Affero GPL v3.
-- https://www.gnu.org/licenses/agpl-3.0.html Summary:
-- Feel free to use this program, modify it, and distribute it to an unlimited extent, but if you distribute binary files of this program outside of your organization, then please make the source code for those binaries available.
-- The imperative to make source code available also applies if using this program as part of a server if that server is publically accessible.
 """
 
 #set defaults and static variables
