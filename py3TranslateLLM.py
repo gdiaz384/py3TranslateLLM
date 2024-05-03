@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-py3TranslateLLM.py translates text using Neural net Machine Translation (NMT) and Large Language Models (LLM).
+Description: py3TranslateLLM.py translates text using Neural net Machine Translation (NMT) and Large Language Models (LLM).
 
-For usage, see py3TranslateLLM.py -h', README.md, and the source code below.
+Usage: See py3TranslateLLM.py -h', README.md, and the source code below.
 
 License:
-- This .py file and the libraries under resources/ are Copyright (c) 2024 gdiaz384 ; License: GNU Affero GPL v3.
+- This .py file and the libraries under resources/* are Copyright (c) 2024 gdiaz384 ; License: GNU Affero GPL v3.
 - https://www.gnu.org/licenses/agpl-3.0.html
-- For the various libraries used, see the Readme for their licenses and project pages.
+- Exclusion: The libraries under resources/translationEngines/* may each have different licenses.
+- For the various libraries outside of resources/, see the Readme for their licenses and project pages.
+
 """
+__version__='2024.05.03 alpha'
 
 #set defaults and static variables
-__version__='2024.04.28 alpha'
-
 #Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding = 'utf-8'
-defaultTextEncodingForKSFiles = 'shift-jis'
+defaultTextEncodingForKSFiles = 'shift-jis' # TODO: This should probably be removed since the parsing logic for .ks files was moved to a different program.
 defaultConsoleEncodingType = 'utf-8'
 
 #These default paths are relative to the location of py3TranslateLLM.py, -not- relative to the current path of the command prompt.
@@ -65,7 +66,8 @@ defaultBackupsFolder='backups'
 defaultExportExtension='.xlsx'
 defaultCacheFileLocation=defaultBackupsFolder + '/cache' + defaultExportExtension
 # Cache is always saved at the end of an operation if there are any new entries, so this is only used for translations that take a very long time.
-defaultMinimumCacheSaveInterval=240 # Once every four minutes.
+defaultMinimumCacheSaveInterval=240 # In seconds. 240 is once every four minutes.
+defaultMinimumBackupSaveInterval=240
 
 translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
 usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEnginesAvailable+'.'
@@ -81,7 +83,7 @@ import sys                                     # End program on fail condition.
 import io                                        # Manipulate files (open/read/write/close).
 #from io import IOBase               # Test if variable is a file object (an "IOBase" object).
 #import datetime                          # Used to get current date and time.
-import time                                    # Used to write out cache no more than once every 240s.
+import time                                    # Used to write out cache no more than once every 240s and also limit writes to mySpreadsheet.backup.xlsx .
 
 # Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes. # Update: Maybe.
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
@@ -623,7 +625,10 @@ if outputFileName == None:
     # If no outputFileName was specified, then set it the same as the input file. This will have the date and appropriate extension appended to it later.
     #outputFileName=fileToTranslateFileName
     #Update: Just do it here instead.
-    outputFileName=fileToTranslateFileName + '.translated.' + py3TranslateLLMfunctions.getDateAndTimeFull() + defaultExportExtension 
+    
+    #exportExtension=defaultExportExtension 
+
+    outputFileName=fileToTranslateFileName + '.translated.' + py3TranslateLLMfunctions.getDateAndTimeFull() + fileToTranslateFileExtensionOnly
 
 outputFileNameWithoutPathOrExt=pathlib.Path(outputFileName).stem
 outputFileExtensionOnly=pathlib.Path(outputFileName).suffix
@@ -647,7 +652,7 @@ if sourceLanguageRaw != None:
 
 if (targetLanguageRaw == None) and (mode != 'parseOnly'):
     sys.exit('Error: A target language must be specified if not using parseOnly mode.')
-elif (targetLanguageRaw != None):
+elif targetLanguageRaw != None:
     if targetLanguageRaw.lower() == 'english':
         targetLanguageRaw = 'English (American)'
     elif targetLanguageRaw.lower() == 'castilian':
@@ -721,6 +726,16 @@ postWritingToFileDictionaryEncoding = dealWithEncoding.ofThisFile(postWritingToF
 
 
 timeThatCacheWasLastSaved = time.perf_counter()
+timeThatBackupWasLastSaved = time.perf_counter()
+
+
+def backupMainSpreadsheet(outputName,force=False):
+    global mainSpreadsheet
+    global timeThatBackupWasLastSaved
+
+    if ( int( time.perf_counter()  - timeThatBackupWasLastSaved ) > defaultMinimumBackupSaveInterval) or (force == True):
+        mainSpreadsheet.export(outputName)
+        timeThatBackupWasLastSaved=time.perf_counter()
 
 
 def exportCache(force=False):
@@ -745,24 +760,24 @@ def updateCache(untranslatedEntry, translation):
         return
 
     # tempSearchResult can be a row number (as a string) or None if the string was not found.
-    tempSearchResult=cache.searchFirstColumn( untranslatedEntry )
+    tempSearchResult=cache.searchCache( untranslatedEntry )
 
     #if the untranslatedEntry is not in the cache
     if tempSearchResult == None:
         #then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
-        cache.appendRow( [ untranslatedEntry ] )
         # This returns the row number of the found entry as a string.
-        tempSearchResult=cache.searchFirstColumn( untranslatedEntry )
+        tempSearchResult = cache.addToCache( untranslatedEntry )
         cache.setCellValue( currentCacheColumn + str(tempSearchResult) , translation )
         cacheWasUpdated=True
 
     # elif the untranslatedEntry is in the cache
     # elif tempSearchResult != None:
     else:
-        #, then get the appropriate cell, the currentCacheColumn + tempSearchResult.
+        # then get the appropriate cell, the currentCacheColumn + tempSearchResult.
         currentCellAddress=currentCacheColumn + str(tempSearchResult)
+
         # if the cell's value is None
-        if cache.getCellValue(currentCellAddress) == None:
+        if cache.getCellValue( currentCellAddress ) == None:
             # then replace the value
             cache.setCellValue( currentCellAddress, translation )
             cacheWasUpdated=True
@@ -910,13 +925,17 @@ if verbose == True:
 # Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
 mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileEncoding=fileToTranslateEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False)
 
-#Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier.
+#Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use     backupMainSpreadsheet(outputName,force=False):
 #backupsFolder does not have / at the end
 backupsFolderWithDate=backupsFolder + '/' + py3TranslateLLMfunctions.getYearMonthAndDay()
 pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
 #mainDatabaseWorkbook.save( 'backups/' + py3TranslateLLMfunctions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
 backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFileNameWithoutPath + '.raw.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
-mainSpreadsheet.exportToXLSX( backupsFilePathWithNameAndDate )
+#mainSpreadsheet.exportToXLSX( backupsFilePathWithNameAndDate )
+backupMainSpreadsheet( backupsFilePathWithNameAndDate, force=True )
+# Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx? Alternatively, could set the option asas a default boolean toggle in the script, but that might be annoying during actual usage. TODO: Implement this as a CLI option later in order to respect the user's decision.
+backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFileNameWithoutPath + '.backup.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
+
 #print( ('Wrote backup to: ' + backupsFilePathWithNameAndDate).encode(consoleEncoding) )
 
 if debug == True:
@@ -973,6 +992,9 @@ if cacheEnabled == True:
     if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) != True:
         # if the Strawberry is brand new, add header row.
         cache.appendRow( ['rawText'] )
+
+    # Build the index from all entries in the first column.
+    cache.initializeCache() #This enables the use of searchCache() and addToCache() methods.
 
     #originalNumberOfEntriesInCache=len( cache.getColumn('A') )
     cacheWasUpdated=False
@@ -1124,7 +1146,7 @@ untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the he
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
     # if there is a limit to how large a batch can be, then the server should handle that internally.
-    # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations.
+    # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations. Implemented as batchSizeLimit , now just need to implement the batch limiting code.
     #currentMainSpreadsheetColumn
 
     translateMe=[]
@@ -1142,7 +1164,7 @@ if batchModeEnabled == True:
 
             # if entryInList/translatedData exists as a key in translationCacheDictionary,
             # if entryInList/untranslatedData exists in the cache's first column
-            tempRowForCacheMatch=cache.searchFirstColumn( untranslatedEntry )
+            tempRowForCacheMatch=cache.searchCache( untranslatedEntry )
             if tempRowForCacheMatch != None:
                 # then check if the appropriate column in the cache is a match.
                 # This will return either None or the cell's contents.
@@ -1283,12 +1305,11 @@ if batchModeEnabled == True:
                 updateCache(untranslatedString,finalTranslatedList[counter])
 
 
-
 # Old code.
 #    counter=0
 #    for rawTextEntry in untranslatedEntriesColumnFull:
 #        if cache. rawTextEntry
-#cache.searchFirstColumn('searchTerm') #can be used to check only the first column. Returns either None if not found or currentRow number if it was found.
+#cache.searchCache('searchTerm') #can be used to check only the first column. Returns either None if not found or currentRow number if it was found.
 
 
     # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
@@ -1302,7 +1323,7 @@ if batchModeEnabled == True:
         currentRow=2 # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
         for listCounter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
             #Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedEntriesColumnFull and finalTranslatedList with the same counter.
-            #tempSearchResult=cache.searchFirstColumn( untranslatedString )
+            #tempSearchResult=cache.searchCache( untranslatedString )
             assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(currentRow)) )
 
             currentTranslatedCellAddress=currentMainSpreadsheetColumn + str(currentRow)
@@ -1318,6 +1339,7 @@ if batchModeEnabled == True:
                 # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
             currentRow+=1
 
+    #backupMainSpreadsheet( backupsFilePathWithNameAndDate, force=True )
 
 #elif batchModeEnabled == False:
 else:
@@ -1360,7 +1382,6 @@ else:
 
         currentTranslatedCellAddress = currentMainSpreadsheetColumn + str(currentRow)
 
-
         # if the current cell contents are already translated, then just continue onto the next entry unless retranslate is specified.
         currentMainSpreadsheetCellContents = mainSpreadsheet.getCellValue( currentTranslatedCellAddress )
         if ( currentMainSpreadsheetCellContents != None ) and ( reTranslate != True ):
@@ -1380,9 +1401,8 @@ else:
             continue
 
         if cacheEnabled == True:
-            tempRowNumberForCache = None
            # search column A in cache for raw untranslated there is a match
-            tempRowNumberForCache=cache.searchFirstColumn( untranslatedEntry )
+            tempRowNumberForCache=cache.searchCache( untranslatedEntry )
 
         # First check if cache is enabled, and reTranslate != True. If they are, then check cache for value.
         if ( cacheEnabled == True ) and ( reTranslate != True ):
@@ -1408,7 +1428,7 @@ else:
 
         # if there is no match in the cache or cache is disabled, then the fun begins
         if translatedEntry == None:
-            # remove all \n's in the line?
+            # remove all \n's in the line? This level of preparsing should probably be left to the translation engine code itself.
 
             # perform replacements specified by revertAfterTranslationDictionary
 
@@ -1416,8 +1436,6 @@ else:
 
             # translate entry
             # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
-
-
             tempHistory=[]
 
             if ( contextHistoryMaxLength != 0 ) and ( translationEngine.supportsHistory == True) :
@@ -1436,14 +1454,14 @@ else:
                 currentRow+=1
                 continue
 
-        # History should be update before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
+        # History should be updated before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
         # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
         # Add it to the dequeue, murdering the oldest entry in the dequeue.
         # Update the contextHistory queue.
         if ( contextHistoryMaxLength != 0 ) and ( translationEngine.supportsHistory == True):
             if contextHistory.full() == True:
                 #contextHistory.get()
-                # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries. Just wipe history every once in a while as a workaround.
+                # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
                 contextHistory=queue.Queue( maxsize=contextHistoryMaxLength )
             contextHistory.put(translatedEntry)
 
@@ -1456,24 +1474,18 @@ else:
             updateCache( untranslatedEntry, translatedEntry )
 
 
-        # and then write cache hit to mainSpreadsheet cell
+        # check with postTranslationDictionary, a Python dictionary for possible updates
+
+
+        # then write translation to mainSpreadsheet cell.
         mainSpreadsheet.setCellValue( currentTranslatedCellAddress , translatedEntry )
 
+        # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
+        backupMainSpreadsheet( backupsFilePathWithNameAndDate )
 
         # and move on to next cell
         currentRow+=1
         continue
-
-
-        #elif translatedEntry != None:
-            # check with postTranslationDictionary, a Python dictionary for possible updates
-
-
-        # update mainSpreadsheet with value
-        # and move on to the next cell
-
-
-
 
 
 

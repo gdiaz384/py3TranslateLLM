@@ -16,7 +16,9 @@ verbose=False
 debug=False
 consoleEncoding='utf-8'
 
+
 import requests
+
 
 #wrapper class for spreadsheet data structure
 class Py3translationServerEngine:

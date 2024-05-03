@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods.
+Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods. If using this library for cache.xlsx where entries are unique, there are specialized functions available as well.
 
 Usage: See below. Like at the bottom.
 
@@ -57,6 +57,7 @@ class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
     def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, sheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
+        self.fileEncoding=fileEncoding
         self.workbook = openpyxl.Workbook()
         if sheetNameInWorkbook == None:
             self.spreadsheet = self.workbook.active
@@ -68,9 +69,12 @@ class Strawberry:
         self.readOnlyMode = readOnlyMode
         self.csvDialect=csvDialect
         self.addHeaderToTextFile=addHeaderToTextFile
+
         # These last two variables are only for use when chocolate.Strawberry() is being used as cache.xlsx. Ignore otherwise.
+        # Index is every entry in the first column, A with an associated pointer, as an integer, to the correct row in the main spreadsheet.
         self.index={}
-        self.lastEntry=len(index)
+        # the last entry i
+        self.lastEntry=len(self.index)
 
         # Are there any use cases for creating a spreadsheet in memory without an associated file name? Since chocolate.Strawberry() is a data structure, this must be 'yes' by definition, but what is the use case for that exactly? When would it be useful to only create a spreadsheet in memory but never write it out?
         if myFileName != None:
@@ -297,26 +301,14 @@ class Strawberry:
 
     # This searches the first column for the searchTerm and returns None if not found or the row number if it found it. 
     # Case and whitespace sensitive search.
+    # This might not be needed anymore because searching the first column is really only necessary when using chocolate.Strawberry() as cache.xlsx and self.searchCache() was implemented to optimize that use case. When processing every entry in the first column, that implies iterating over every entry anyway, so this function to help find a specific entry to process what would not be used. When is it important to find a specific entry, that is possibly a duplicate, to process outside of cache.xlsx?
     def searchFirstColumn(self, searchTerm):
-        #print('Hello, World!'.encode(consoleEncoding))
         for column in self.spreadsheet.iter_cols():
             for cell in column:
                 if cell.value == searchTerm:
                     return self._getRowAndColumnFromRawCellString(cell)[0]
             break
         return None
-
-        # Old code.
-        cellFound=None
-        for column in self.spreadsheet['A']:  #does this work? TODO: Test this.
-            for i in column:
-                if i.value == searchTerm:
-                    cellFound=i
-                    break
-            break #stop searching after first column #Hummmm.
-        if cellFound == None:
-            return None
-        return self._getRowAndColumnFromRawCellString(cellFound)[0]
 
 
     # This returns either [None, None] if there is no cell with the search term, or a list containing the [row, column], the address. Case and whitespace sensitive.
@@ -470,7 +462,6 @@ class Strawberry:
         print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-
     def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None, readOnlyMode=False):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         self.workbook=openpyxl.load_workbook(filename = fileNameWithPath, read_only=readOnlyMode)
@@ -483,6 +474,7 @@ class Strawberry:
             else:
                 self.workbook.create_sheet( title = str(sheetNameInWorkbook) , index=0 )
                 self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
+
 
     # https://openpyxl.readthedocs.io/en/stable/optimized.html
     # read_only requires closing the spreadsheet after use.
@@ -520,43 +512,49 @@ class Strawberry:
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-# These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with their associated row number.
-    def initializeCacheIndex(self)
+    # These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with their associated row number.
+    def initializeCache(self):
+        # Technically, if using readOnly mode, then a perfect hash table would provide better 'performance', but not clear how to implement that, so do not worry about it.
         # Build index.
         for counter,entry in enumerate( self.getColumn('A') ):
             # Skip adding the header.
             if counter == 0:
                 continue
+            # Otherwise, populate the index based upon the first column. The payload is the source row.
             self.index[entry]=counter+1
         # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds.
-        self.lastEntry=len(index)
+        if len(self.index) != 0:
+            self.lastEntry=len(self.index)
+        else:
+            # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry here.
+            self.lastEntry=1
 
-
-    def searchCache(self,myString)
-        if myString in index.keys():
-            return index[myString]
+    # Expects a string and searches through the current cache index. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
+    def searchCache( self, myString ):
+        if myString in self.index.keys():
+            return self.index[ myString ]
         else:
             return None
 
 
-    # accepts a string or a list with a single item?
-    # Are there use cases for multiple items? When would a new entry be added together with a value? Would that be when adding both the untranslated entry and translated entry together? How is that implemented?
-    def addToCache(myVar)
-        if isinstance(myVar, str):
-            # if the string does not exist
-            if searchCache(myVar) == None:
-            # then add it to the index
-return 
+    # accepts a string or a list with a single item? Answer: Just a string.
+    # Are there use cases for multiple items? When would a new entry be added together with a value? Would that be when adding both the untranslated entry and translated entry together? How is that implemented? Answer: The only thing known, unless it is computed dynamically, is the currentColumn in the form of a letter, B, C, D, E, F, and the value of the translated/untranslated pairs. There is no way to know which letter corresponds to which column in a list [A, B, C, D, E] without a way to translate that information, and inserting 'None' to all the unused entries would access the unused cells and expand the memory requirements pointlessly. Instead, only accept input as a string, add the string to the openpyxl spreadsheet, add the string to the index, update the self.lastEntry as needed, and return the row number the entry was added.  Also have some code to deal with duplicates added to the cache in a sane way.
+    def addToCache( self, myString ):
+        tempSearchResult = self.searchCache(myString)
+        if tempSearchResult == None:
+            # then add it to the main spreadsheet.
+            self.spreadsheet.append( [myString] )
 
-        elif isinstance(myVar, list)
-            if searchCache(myVar[0]) == None:
-                self.appendRow(myVar)
-                index.append( myVar[0], len()  ]
+            # Update the self.lastEntry as needed.
+            self.lastEntry += 1
 
+            # then add it to the index.
+            self.index[myString]=self.lastEntry
 
-        #every time a row is appended, increment lastEntry and return
-        lastEntry+=1
-        def insert()
+            # And return where it was added.
+            return self.lastEntry
+        else:
+            return tempSearchResult
 
 
 """

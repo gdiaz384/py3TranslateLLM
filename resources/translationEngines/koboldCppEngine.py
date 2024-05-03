@@ -18,8 +18,7 @@ consoleEncoding='utf-8'
 
 # https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/tree/main
 mixtral8x7bInstructModels=['mixtral-8x7b-instruct-v0.1.Q2_K', 'mixtral-8x7b-instruct-v0.1.Q3_K_M', 'mixtral-8x7b-instruct-v0.1.Q4_0', 'mixtral-8x7b-instruct-v0.1.Q4_K_M', 'mixtral-8x7b-instruct-v0.1.Q5_0', 'mixtral-8x7b-instruct-v0.1.Q5_K_M', 'mixtral-8x7b-instruct-v0.1.Q6_K', 'mixtral-8x7b-instruct-v0.1.Q8_0']
-
-# Change everything to lower case.
+# Change to lower case.
 for counter,entry in enumerate(mixtral8x7bInstructModels):
     mixtral8x7bInstructModels[counter]=entry.lower()
 
@@ -61,7 +60,7 @@ class KoboldCppEngine:
                     index=rawTranslatedText.rfind( '(' )
                     rawTranslatedText=rawTranslatedText[ :index ].strip()
 
-            # if the translation has double quotes but the source does not, then remove them.
+            # if the translation has exactly two double quotes on the edges but the source does not, then remove them.
             if ( rawTranslatedText[ 0:1 ] == '"' ) and ( rawTranslatedText[ -1: ] == '"' ) and ( rawTranslatedText.count('"') == 2 ):
                 if untranslatedText[ 0:1 ] == '「' :
                     pass
