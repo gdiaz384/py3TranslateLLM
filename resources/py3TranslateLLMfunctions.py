@@ -131,7 +131,7 @@ def readSettingsFromTextFile(fileNameWithPath, fileNameEncoding, consoleEncoding
 #        inputFileHandle.close()#Always executes, probably.
 
     #Newer, simplier syntax.
-    with open( fileNameWithPath, 'r', encoding=fileNameEncoding, errors=inputErrorHandling ) as myFileHandle:
+    with open( fileNameWithPath, 'rt', encoding=fileNameEncoding, errors=inputErrorHandling ) as myFileHandle:
         inputFileContents = myFileHandle.read()
 
     if not isinstance(inputFileContents, str):
@@ -283,7 +283,7 @@ def importDictionaryFromFile(myFile,myFileEncoding=None):
     if myFileExtensionOnly == '':
         return None
     elif myFileExtensionOnly == '.csv':
-        return importDictionaryFromCSV(myFile,myFileEncoding,ignoreWhitespace=False)
+        return importDictionaryFromCSV(myFile,myFileEncoding, ignoreWhitespace=False)
     elif myFileExtensionOnly == '.xlsx':
         return importDictionaryFromXLSX(myFile,myFileEncoding)
     elif myFileExtensionOnly == '.xls':
@@ -300,7 +300,7 @@ def importDictionaryFromFile(myFile,myFileEncoding=None):
 #Even if importing to dictionary from .csv/.xlsx/.xls/.ods to a dictionary instead of an openpyxl data structure, the rule is that the first entry is headers, so the first key=value entry must be skipped regardless.
 def importDictionaryFromCSV(myFile, myFileEncoding, ignoreWhitespace=False):
     tempDict={}
-    
+
     #print('Hello World'.encode(consoleEncoding))
     #Read entire file into memory
     #If there is an error reading the contents into memory, just close it.
@@ -327,6 +327,10 @@ def importDictionaryFromCSV(myFile, myFileEncoding, ignoreWhitespace=False):
                         line[i]=line[i].strip()
                 if line[1] == '':
                     line[1] = None
+                elif line[1].lower() == 'true':
+                    line[1] = True
+                elif line[1].lower() == 'false':
+                    line[1] = False
                 tempDict[line[0]]=line[1]
  
 #                 for i in range(len(line)):
@@ -338,6 +342,12 @@ def importDictionaryFromCSV(myFile, myFileEncoding, ignoreWhitespace=False):
 #                        tempDict=
 #                    else:
 #                        sys.exit( 'Unspecified error.'.encode(consoleEncoding) )
+
+    # if the contents of item are '' or 'none', then change to None
+    for key,item in tempDict.items():
+        if item != None:
+            if (item == '') or (item.lower() == 'none'):
+                tempDict[key]=None
 
     #tempSpreadsheet.append(line)
     #tempSpreadsheet.appendRow(line)

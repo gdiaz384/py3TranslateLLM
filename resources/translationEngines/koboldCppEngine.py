@@ -1,54 +1,95 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: This library defines various translation engines to use when translating text. The idea is to expose a semi-uniform interface. These libraries assume the data will be input as either a single string or as a batch. Batches are a single Python list where each entry is a string.
+Description: This library defines various translation engines to use when translating text. The idea is to expose a semi-uniform interface. These libraries assume the data will be input as either a single string or as a batch. Batches are a single Python list where each entry is a string. This library requires the requests library. Install using `pip install requests`.
 
 Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.04.30'
+__version__='2024.05.06'
 
 #set defaults
 #printStuff=True
 verbose=False
 debug=False
 consoleEncoding='utf-8'
+defaultTimeout=360
+# Valid options are: autocomplete, instruct, chat.
+defaultInstructionFormat='autocomplete'
+
+# For 'instruct' models, these are sequences to start and end input. Not using them results in unstable output.
+alpacaStartSequence='\n### Instruction:\n'
+alpacaEndSequence='\n### Response:\n'
+vicunaStartSequence='\nUSER: '
+vicunaEndSequence='\nASSISTANT: '
+metharmeStartSequence='<|user|>'
+metharmeEndSequence='<|model|>'
+llama2ChatStartSequence='\n[INST]'
+llama2ChatEndSequence='[/INST]\n'
+chatMLStartSequence='<|im_end|>\n<|im_start|>user\n'
+chatMLEndSequence='<|im_end|>\n<|im_start|>assistant\n'
+
+defaultInstructionFormatStartSequence=llama2ChatStartSequence
+defaultInstructionFormatEndSequence=llama2ChatEndSequence
+
+# For 'chat' models, these are sequences that mark user input and the start of the model's output. 
+defaultChatInputName='Input'
+defaultChatOutputName='Output'
+
 
 # https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/tree/main
-mixtral8x7bInstructModels=['mixtral-8x7b-instruct-v0.1.Q2_K', 'mixtral-8x7b-instruct-v0.1.Q3_K_M', 'mixtral-8x7b-instruct-v0.1.Q4_0', 'mixtral-8x7b-instruct-v0.1.Q4_K_M', 'mixtral-8x7b-instruct-v0.1.Q5_0', 'mixtral-8x7b-instruct-v0.1.Q5_K_M', 'mixtral-8x7b-instruct-v0.1.Q6_K', 'mixtral-8x7b-instruct-v0.1.Q8_0']
+# Apache 2.0 License. Copy center + patent waver.
+mixtral8x7bInstructModels=[ 'mixtral-8x7b-instruct-v0.1.Q2_K', 'mixtral-8x7b-instruct-v0.1.Q3_K_M', 'mixtral-8x7b-instruct-v0.1.Q4_0', 'mixtral-8x7b-instruct-v0.1.Q4_K_M', 'mixtral-8x7b-instruct-v0.1.Q5_0', 'mixtral-8x7b-instruct-v0.1.Q5_K_M', 'mixtral-8x7b-instruct-v0.1.Q6_K', 'mixtral-8x7b-instruct-v0.1.Q8_0' ]
+
 # Change to lower case.
 for counter,entry in enumerate(mixtral8x7bInstructModels):
     mixtral8x7bInstructModels[counter]=entry.lower()
 
+# https://huggingface.co/Qwen
+# https://huggingface.co/Qwen/Qwen1.5-32B-Chat-GGUF/tree/main
+# https://huggingface.co/Qwen/Qwen1.5-72B-Chat-GGUF/tree/main
+# Tongyi Qianwen License. Attribution required + commercial use allowed for <100M monthly users.
+qwen15_32B_chatModels=[]
+qwen15_72B_chatModels=[]
 
+
+import sys
 import requests
 
 
 class KoboldCppEngine:
-    # Insert any custom code to pre process the output text here. This is very model, prompt, and dataset specific.
+    # Insert any custom code to pre process the untranslated text here. This is very model, prompt, and dataset specific.
     # https://www.w3schools.com/python/python_strings_methods.asp
     def preProcessText(self, untranslatedText):
         #return untranslatedText
 
         # Example:
-        untranslatedText=untranslatedText.replace('\\n',' ') # Remove new lines and replace them with a single empty space.
+        untranslatedText=untranslatedText.replace('\\n',' ') # Remove hardcoded new lines and replace them with a single empty space.
         untranslatedText=untranslatedText.replace('\n',' ') # Remove new lines and replace them with a single empty space.
         untranslatedText=untranslatedText.strip()               # Remove any whitespaces along the edges.
-        untranslatedText=untranslatedText.replace('  ',' ')  # In the middle, replace any two blank spaces with a single blank space.
+        untranslatedText=untranslatedText.replace('  ',' ').replace('  ',' ')  # In the middle, replace any two blank spaces with a single blank space.
 
         return untranslatedText
 
 
     # Insert any custom code to post process the output text here. This is very model and prompt specific.
-    def postProcessText(self, rawTranslatedText, untranslatedText):
-        #return rawTranslatedText
+    def postProcessText(self, rawTranslatedText, untranslatedText, speakerName=None):
 
-        # Mixtral8x7b-Instruct example:
+        rawTranslatedText=rawTranslatedText.strip()
+
+        # if the translation has new lines, then truncate the result.
+        rawTranslatedText=rawTranslatedText.partition('\n')[0].strip()
+
+        return rawTranslatedText
+
+
+
+
+        # Mixtral8x7b-instruct example:
         if self._modelOnly in mixtral8x7bInstructModels:
-            # if the translation has new lines, then truncate the result.
-            rawTranslatedText=rawTranslatedText.partition('\n')[0]
+
 
             # if the translation has an underscore _, then truncate the result.
             if rawTranslatedText.find('_') != -1:
@@ -73,7 +114,25 @@ class KoboldCppEngine:
                 else:
                     rawTranslatedText=rawTranslatedText[ 1:-1 ]
 
+            # Remove a few blacklist starts.
+            if speakerName != None:
+                if rawTranslatedText.startswith( speakerName + ':'):
+#                    print( 'rawTextBeforeRemovingSpeaker=' + rawTranslatedText )
+                    rawTranslatedText=rawTranslatedText[ len( speakerName )+1: ].strip()
+#                    print( 'rawTextAfterRemovingSpeaker=' + rawTranslatedText )
+#                elif rawTranslatedText.startswith( speakerName ):
+#                    print( 'rawTextBeforeRemovingSpeaker=' + rawTranslatedText )
+#                    rawTranslatedText=rawTranslatedText[ len( speakerName ): ].strip()
+#                    print( 'rawTextAfterRemovingSpeaker=' + rawTranslatedText )
+            if rawTranslatedText.lower().startswith( 'translation:' ):
+                rawTranslatedText=rawTranslatedText[ len( 'translation:' ): ].strip()
+            if rawTranslatedText.lower().startswith( 'translated text:' ):
+                rawTranslatedText=rawTranslatedText[ len( 'translated text:' ): ].strip()
+            elif rawTranslatedText.lower().strip().endswith( 'note:' ):#This is more of an 'endswith() operation. string[:len('note:') ] ?
+                rawTranslatedText=rawTranslatedText.strip()[ :-len( 'note:' ) ].strip()
+
 #        elif self._modelOnly == another model:
+            # Post processing code for another model goes here.
 #        elif:
 #            pass
 
@@ -83,30 +142,74 @@ class KoboldCppEngine:
 #class KoboldCppEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None, timeout=360, prompt=None): 
-        self.sourceLanguage=sourceLanguage
-        self.targetLanguage=targetLanguage
-        self.supportsBatches=True
+    def __init__(self, sourceLanguage=None, targetLanguage=None, settings=None, characterDictionary=None): 
+
+#address=None, port=None, timeout=360, prompt=None,
+
+        # Set generic API static values for this engine.
+        self.supportsBatches=False
         self.supportsHistory=True
-        self.timeout=timeout
         self.requiresPrompt=True
         self.promptOptional=False
-        self.address=address
-        self.port=port
-        self.addressFull=self.address + ':' + str(self.port)
-        self._modelOnly=None
 
-        self.prompt=prompt
-        self._maxContextLength=None
-
-        if self.prompt == None:
-            print( 'Warning: self.prompt is None.' )
-
-        self.reachable=False
-        # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
-
+        # Set generic API variables for this engine.
+        self.reachable=False  # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
         self.model=None
         self.version=None
+
+        # Process generic input.
+        self.characterDictionary=characterDictionary
+        self.sourceLanguageList=sourceLanguage
+        # if DifferentSourceLanguage == True, then use the alternative name.
+        if self.sourceLanguageList[4] == True:
+            self.sourceLanguage=self.sourceLanguageList[5]
+        else:
+            self.sourceLanguage=self.sourceLanguageList[0]
+
+        self.targetLanguageList=targetLanguage
+        if self.targetLanguageList[4] == True:
+            self.targetLanguage=self.targetLanguageList[5]
+        else:
+            self.targetLanguage=self.targetLanguageList[0]
+
+        #debug=True
+        if debug == True:
+            print( str(settings).encode(consoleEncoding) )
+            print(self.sourceLanguage)
+            print(self.targetLanguageList)
+            print(self.targetLanguage)
+
+        # Process engine specific input and associated variables.
+        self.address=settings['address']
+        self.port=settings['port']
+        self.addressFull=self.address + ':' + str(self.port)
+        self._modelOnly=None
+        self._maxContextLength=None
+
+        if 'instructionFormat' in settings:
+            self.instructionFormat=settings['instructionFormat']
+        else:
+            self.instructionFormat=None
+        if 'timeout' in settings:
+            self.timeout=settings['timeout']
+        else:
+            self.timeout=defaultTimeout
+        if 'memory' in settings:
+            self.memory=settings['memory']
+        else:
+            self.memory=None
+
+        self.prompt=settings['prompt']
+        if self.prompt.find( r'{sourceLanguage}' ) != -1:
+            self.prompt=self.prompt.replace( r'{sourceLanguage}', self.sourceLanguage)
+
+        if self.prompt.find( r'{targetLanguage}' ) != -1:
+            self.prompt=self.prompt.replace( r'{targetLanguage}', self.targetLanguage)
+
+        if debug == True:
+            print(self.prompt)
+
+        # Update the generic API variables for this engine with the goal of defining self.reachable, a boolean, correctly.
         print( 'Connecting to KoboldCpp API at ' + self.addressFull + ' ... ', end='')
         if (self.address != None) and (self.port != None):
             try:
@@ -123,14 +226,51 @@ class KoboldCppEngine:
             except:
                 print( 'Failure.')
                 print( 'Unable to connect to KoboldCpp API. Please check the connection settings and try again.' )
+                return
 
         if self.model != None:
             self.reachable=True
 
+        #format {characterNames} using self.characterDictionary.
+        if (self.characterDictionary != None) and (self.prompt.find( r'{characterNames}' ) != -1):
+            tempCharaString=''
+            for untranslatedName,translatedName in self.characterDictionary.items():
+                tempCharaString= tempCharaString + untranslatedName + '=' + translatedName + '\n'
+            self.prompt=self.prompt.replace( r'{characterNames}' , tempCharaString )
+
+        # if the instruction format is not known, then try to figure it out from the model name.
+        # Valid instruction formats are: autocomplete (default), instruct, chat
+        if self.instructionFormat == None:
+            if self._modelOnly.lower().find('instruct') != -1:
+                self.instructionFormat='instruct'
+            elif self._modelOnly.lower().find('chat') != -1:
+                self.instructionFormat='chat'
+            else:
+                print( 'Warning: A valid instruction format was not specified and could not be detected. Using the default instruction format of: ' + defaultInstructionFormat +'. This is probably incorrect. Valid formats are: autocomplete, instruct, and chat.')
+                self.instructionFormat=defaultInstructionFormat
+
+        if self.instructionFormat == 'instruct':
+            if (self._modelOnly in mixtral8x7bInstructModels) or ( self._modelOnly.find('llama') != -1 ):
+                self._startSequence=llama2ChatStartSequence
+                self._endSequence=llama2ChatEndSequence
+            else:
+                self._startSequence=defaultInstructionFormatStartSequence
+                self._endSequence=defaultInstructionFormatEndSequence
+        elif self.instructionFormat == 'chat':
+            self._inputName=defaultChatInputName
+            self._outputName=defaultChatOutputName
+
+        # Now that the instruction format is known, 
+
+
 
     # This expects a python list where every entry is a string.
     def batchTranslate(self, untranslatedList):
-        print('Hello, world!')
+        print('Hello world!')
+        global debug
+        global verbose
+        return
+
         #debug=True
         if debug == True:
             print( 'len(untranslatedList)=' , len(untranslatedList) )
@@ -152,10 +292,16 @@ class KoboldCppEngine:
 
         return translatedList
 
-    
-    # This expects a string to translate. contextHistory should be a list. Maybe the context list should be an untranslated-translated string pair?
-    def translate(self, untranslatedString, contextHistory=None):
+
+    # This expects a string to translate. contextHistory should be a variable list of untranslated and translated pairs in sublists.
+    # [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
+    def translate(self, untranslatedString, speakerName=None, contextHistory=None):
+        global debug
+        global verbose
         # assert( type(untranslatedString) == str )
+
+        #if speakerName != None:
+        print(' speakerName='+str(speakerName))
 
         untranslatedString=self.preProcessText(untranslatedString)
 
@@ -170,40 +316,60 @@ class KoboldCppEngine:
         if contextHistory != None:
             tempHistory=''
             for entry in contextHistory:
-                tempHistory=tempHistory + ' ' + entry
+                if self.instructionFormat == 'instruct':
+                    if entry[2] == None:
+                        tempHistory=tempHistory + self._startSequence + entry[0] + self._endSequence + entry[1]
+                    else:
+                        tempHistory=tempHistory + self._startSequence + entry[2] + ': ' + entry[0] + self._endSequence + entry[2] + ': ' + entry[1]
+                elif self.instructionFormat == 'chat':
+                    tempHistory=tempHistory + self._inputName + ': ' + entry[0] + '\n' + self._outputName + ': ' + entry[1] + '\n'
+                    # TODO finish context history for chat format to include speaker.
 
         # Next build tempPrompt using history string based on {history} tag in prompt.
-        if self.prompt.find('{history}') != -1:
+        if self.prompt.find( '{history}' ) != -1:
             if contextHistory != None:
-                tempPrompt=self.prompt.replace('{history}',tempHistory[1:])
+                tempPrompt=self.prompt.replace('{history}',tempHistory)
             else:
                 tempPrompt=self.prompt.replace('{history}','')
         else:
             tempPrompt=self.prompt
-            #print('Warning: Unable to process history. Make sure {history} is in the prompt.')
+            if verbose == True:
+                print('Warning: Unable to process history. Make sure {history} is in the prompt.')
 
 #        if contextHistory == None:
 #            tempPrompt=self.prompt
+
+        # Speakers are no longer being processed like this. The name of the speaker is now integrated into the instruction 
+#        if tempPrompt.find(r'{speaker}') != -1:
+#            if speakerName != None:
+#                tempPrompt = tempPrompt.replace(r'{speaker}', ' by ' + speakerName )
+#            else:
+#                tempPrompt = tempPrompt.replace(r'{speaker}','')
 
         if tempPrompt.find('{untranslatedText}') != -1:
             tempPrompt = tempPrompt.replace('{untranslatedText}',untranslatedString)
         else:
             tempPrompt = tempPrompt + untranslatedString
 
-        # Build request.
+        # Build request.  TODO: Add default values for temperature and reptition penalties.
         requestDictionary={}
-        requestDictionary[ 'prompt' ]=tempPrompt # The prompt.
         requestDictionary[ 'max_length' ]=150 # The number of tokens to generate. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
         requestDictionary[ 'max_context_length' ]=self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
-        requestDictionary[ 'stop_sequence' ]=[ 'Translation note:', 'Note:', 'Translation notes:', '\n' ] # This should not be hardcoded.
+        if self.memory != None:
+            requestDictionary[ 'memory' ]=self.memory
+        requestDictionary[ 'prompt' ]=tempPrompt # The prompt.
+        requestDictionary[ 'stop_sequence' ]=[ 'Translation note:', 'Note:', 'Translation notes:', '[', '\n' ] # This should not be hardcoded.
         #requestDictionary[ 'authorsnote' ]= # This will be added at the end of the prompt. Highest possible priority.
-        #requestDictionary[ 'memory' ]=tempHistory[1:]
 
 #        if contextHistory != None:
 #            tempHistory=''
 #            for entry in contextHistory:
 #                tempHistory=tempHistory + ' ' + entry
         #requestDictionary['authorsnote']=
+
+        if debug == True:
+            print(requestDictionary)
+        #sys.exit()
 
         # Submit the request for translation.
         # Maybe add some code here to deal with server busy messages?
@@ -219,14 +385,14 @@ class KoboldCppEngine:
         # {'results': [{'text': '\n\nBien, gracias.'}]}
         translatedText=returnedRequest.json()['results'][0]['text'].strip()
 
-        debug = True
-        if debug == True:
+        verbose = True
+        if verbose == True:
             print( ('rawTranslatedText=' + translatedText).encode(consoleEncoding) )
 
         # Submit the text for post processing which cleans up the formatting beyond just .strip().
-        translatedText=self.postProcessText( translatedText, untranslatedString )
+        translatedText=self.postProcessText( translatedText, untranslatedString, speakerName)
 
-        if debug == True:
+        if verbose == True:
             print( ('postProcessedTranslatedText=' + translatedText).encode(consoleEncoding) )
 
         return translatedText

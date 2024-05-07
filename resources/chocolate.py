@@ -326,7 +326,7 @@ class Strawberry:
     def searchRowsCaseInsensitive(self, searchTerm):
         for row in self.spreadsheet.iter_rows():
             for cell in row:
-                if isinstance( cell.value, (str, int) ):
+                if isinstance( cell.value, str ):
                     if cell.value.lower() == str(searchTerm).lower():
                         return self._getRowAndColumnFromRawCellString(cell)
         return [None, None]
@@ -335,7 +335,7 @@ class Strawberry:
     def searchColumnsCaseInsensitive(self, searchTerm):
         for column in self.spreadsheet.iter_cols():
             for cell in column:
-                if isinstance( cell.value, (str, int) ):
+                if isinstance( cell.value, str ):
                     if cell.value.lower() == str(searchTerm).lower():
                         return self._getRowAndColumnFromRawCellString(cell)
         return [None, None]
@@ -428,17 +428,27 @@ class Strawberry:
                 # implement code related to csvDialects here. Default options are unix, excel and excel-tab
             myCsvHandle = csv.reader(myFile)
 
-            for line in myCsvHandle:
+            for listOfStrings in myCsvHandle:
                 if debug == True:
-                    print(str(line).encode(consoleEncoding))
-                #clean up whitespace for entities
-                if removeWhitespaceForCSV == True:
-                    #Not entirely sure what this for loop does or why it is needed, but just leave it alone. Was probably a bug fix for something at some point. Maybe it removes whitespace from like... , Eng,... and so forth?
-                    for i in range(len(line)):
-                        line[i]=line[i].strip()
-                #tempSpreadsheet.append(line)
-                #tempSpreadsheet.appendRow(line)
-                self.spreadsheet.append(line)
+                    print( str(listOfStrings).encode(consoleEncoding) )
+                # Clean up whitespace for entities.
+                for i in range( len(listOfStrings) ):
+                    if removeWhitespaceForCSV == True:
+                        listOfStrings[i]=listOfStrings[i].strip()
+                    # Fix types.
+                    if listOfStrings[i].lower() == 'true':
+                        listOfStrings[i]=True
+                    elif listOfStrings[i].lower() == 'false':
+                        listOfStrings[i]=False
+                    elif ( listOfStrings[i].lower() == 'none' ) or ( listOfStrings[i].lower() == '' ):
+                        listOfStrings[i]=None
+                    # Leave numbers as strings. They should not be processed anyway, so there is no need to mess with them.
+
+                    #tempSpreadsheet.append(listOfStrings)
+                    #tempSpreadsheet.appendRow(listOfStrings)
+
+
+                self.spreadsheet.append(listOfStrings)
         #return tempWorkbook
         if debug == True:
             self.printAllTheThings()
@@ -512,7 +522,7 @@ class Strawberry:
         #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
-    # These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with their associated row number.
+    # These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with its associated row number.
     def initializeCache(self):
         # Technically, if using readOnly mode, then a perfect hash table would provide better 'performance', but not clear how to implement that, so do not worry about it.
         # Build index.
@@ -522,9 +532,9 @@ class Strawberry:
                 continue
             # Otherwise, populate the index based upon the first column. The payload is the source row.
             self.index[entry]=counter+1
-        # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds.
+        # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds. # Update: Incorrect. It would be out of bounds if it was pointing to itself, but it is actually pointing to self.spreadsheet which needs the +1 in order for the pointer in the index to point to the correct cell in self.spreadsheet. Otherwise, it ends up pointing to the cell above it resulting in an off by 1 error.
         if len(self.index) != 0:
-            self.lastEntry=len(self.index)
+            self.lastEntry=len(self.index)+1
         else:
             # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry here.
             self.lastEntry=1

@@ -1,40 +1,86 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: This library defines various translation engines to use when translating text. The idea is to expose a semi-uniform interface. These libraries assume the data will be input as either a single string or as a batch. Batches are a single Python list where each entry is a string.
+Description: This library defines various translation engines to use when translating text. The idea is to expose a semi-uniform interface. These libraries assume the data will be input as either a single string or as a batch. Batches are a single Python list where each entry is a string. This library requires the requests library. Install using `pip install requests`.
 
 Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.04.29'
+__version__='2024.05.06'
 
 #set defaults
 #printStuff=True
 verbose=False
 debug=False
 consoleEncoding='utf-8'
+defaultTimeout=360
 
-
+import sys
 import requests
 
 
-#wrapper class for spreadsheet data structure
 class Py3translationServerEngine:
+    # Insert any custom code to pre process the untranslated text here. This is very model, prompt, and dataset specific.
+    # https://www.w3schools.com/python/python_strings_methods.asp
+    def preProcessText(self, untranslatedText):
+        #return untranslatedText
+
+        untranslatedText=untranslatedText.strip()               # Remove any whitespaces along the edges.
+        if untranslatedText.find( r'\n' ) != -1:
+            untranslatedText=untranslatedText.replace( r'\n',' ' ).strip() # if there are any hardcoded new lines, replace them with a single empty space.
+        if untranslatedText.find( '\n' ) != -1:
+            untranslatedText=untranslatedText.replace( '\n',' ' ).strip() # Remove new lines and replace them with a single empty space.
+        if untranslatedText.find( '  ' ) != -1:
+            untranslatedText=untranslatedText.replace( '  ',' ' ).replace( '  ', ' ' )  # In the middle, replace any two blank spaces with a single blank space.
+
+        return untranslatedText
+
+
+    # Insert any custom code to post process the output text here. This is very model and prompt specific.
+    def postProcessText(self, rawTranslatedText, untranslatedText, speakerName=None):
+
+        rawTranslatedText=rawTranslatedText.strip()
+        # if the translation has new lines, then truncate the result.
+#        if rawTranslatedText.find('\n') != -1:
+#            rawTranslatedText=rawTranslatedText.partition('\n')[0].strip()
+        if rawTranslatedText.find('<unk>') != -1:
+            rawTranslatedText=rawTranslatedText.replace('<unk>','').strip()
+        if rawTranslatedText.find( '  ' ) != -1:
+            rawTranslatedText=rawTranslatedText.replace( '  ',' ' ).replace( '  ', ' ' )  # In the middle, replace any two blank spaces with a single blank space.
+
+        # Title specific fixes go here.
+
+        return rawTranslatedText
+
+
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, address=None, port=None, timeout=360, prompt=None): 
-        self.sourceLanguage=sourceLanguage
-        self.targetLanguage=targetLanguage
+    def __init__(self, sourceLanguage=None, targetLanguage=None, characterDictionary=None, settings=None): 
+
+        # Set generic API static values for this engine.
         self.supportsBatches=True
         self.supportsHistory=False
-        self.timeout=timeout
         self.requiresPrompt=False
-        self.address=address
-        self.port=port
 
+        # Set generic API variables for this engine.
+        self.model=None
+        self.version=None
+
+        # Process generic input.
+        self.characterDictionary=characterDictionary
+        self.sourceLanguage=sourceLanguage
+        self.targetLanguage=targetLanguage
+
+        # Process engine specific input and associated variables.
+        self.address=settings['address']
+        self.port=settings['port']
         self.addressFull=self.address + ':' + str(self.port)
+        if timeout in settings:
+            self.timeout=settings['timeout']
+        else:
+            self.timeout=defaultTimeout
 
         self.reachable=False
         # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
@@ -63,12 +109,18 @@ class Py3translationServerEngine:
             print( 'len(untranslatedList)=' , len(untranslatedList) )
             print( ( 'untranslatedList=' + str(untranslatedList) ).encode(consoleEncoding) )
 
+        # strip whitespace
+        for counter,entry in enumerate(untranslatedList):
+            untranslatedList[counter]=preProcessText( entry )
+
         # https://docs.python-requests.org/en/latest/user/advanced/#timeouts
         translatedList = requests.post( self.addressFull, json = dict ([ ('content' , untranslatedList ), ('message' , 'translate sentences') ]), timeout=(10, self.timeout) ).json()
 
+        assert( len(untranslatedList) == len(translatedList) )
+
         # strip whitespace
         for counter,entry in enumerate(translatedList):
-            translatedList[counter]=entry.strip()
+            translatedList[counter] = postProcessText( entry, untranslatedList[counter] )
 
         if debug == True:
             print( ( 'translatedList=' + str(translatedList) ).encode(consoleEncoding) )
