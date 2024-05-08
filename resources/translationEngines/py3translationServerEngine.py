@@ -77,7 +77,7 @@ class Py3translationServerEngine:
         self.address=settings['address']
         self.port=settings['port']
         self.addressFull=self.address + ':' + str(self.port)
-        if timeout in settings:
+        if 'timeout' in settings:
             self.timeout=settings['timeout']
         else:
             self.timeout=defaultTimeout
@@ -111,7 +111,7 @@ class Py3translationServerEngine:
 
         # strip whitespace
         for counter,entry in enumerate(untranslatedList):
-            untranslatedList[counter]=preProcessText( entry )
+            untranslatedList[counter]=self.preProcessText( entry )
 
         # https://docs.python-requests.org/en/latest/user/advanced/#timeouts
         translatedList = requests.post( self.addressFull, json = dict ([ ('content' , untranslatedList ), ('message' , 'translate sentences') ]), timeout=(10, self.timeout) ).json()
@@ -120,7 +120,7 @@ class Py3translationServerEngine:
 
         # strip whitespace
         for counter,entry in enumerate(translatedList):
-            translatedList[counter] = postProcessText( entry, untranslatedList[counter] )
+            translatedList[counter] = self.postProcessText( entry, untranslatedList[counter] )
 
         if debug == True:
             print( ( 'translatedList=' + str(translatedList) ).encode(consoleEncoding) )
@@ -133,7 +133,7 @@ class Py3translationServerEngine:
 
 
     # This expects a string to translate.
-    def translate(self, untranslatedString,contextHistory=None):
+    def translate(self, untranslatedString, speakerName=None, contextHistory=None):
         #assert string
 
         return str( self.batchTranslate( [untranslatedString] )[0] ) # Lazy.

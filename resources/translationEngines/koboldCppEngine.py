@@ -18,6 +18,7 @@ consoleEncoding='utf-8'
 defaultTimeout=360
 # Valid options are: autocomplete, instruct, chat.
 defaultInstructionFormat='autocomplete'
+defaultTimeoutMulitplierForFirstRun=4
 
 # For 'instruct' models, these are sequences to start and end input. Not using them results in unstable output.
 alpacaStartSequence='\n### Instruction:\n'
@@ -81,6 +82,10 @@ class KoboldCppEngine:
 
         # if the translation has new lines, then truncate the result.
         rawTranslatedText=rawTranslatedText.partition('\n')[0].strip()
+
+        if speakerName != None:
+            if rawTranslatedText.startswith( speakerName + ':' ):
+                rawTranslatedText=rawTranslatedText[ len(speakerName) + 1: ].strip()
 
         return rawTranslatedText
 
@@ -185,6 +190,7 @@ class KoboldCppEngine:
         self.addressFull=self.address + ':' + str(self.port)
         self._modelOnly=None
         self._maxContextLength=None
+        self._pastFirstTranslation=False
 
         if 'instructionFormat' in settings:
             self.instructionFormat=settings['instructionFormat']
@@ -294,14 +300,20 @@ class KoboldCppEngine:
 
 
     # This expects a string to translate. contextHistory should be a variable list of untranslated and translated pairs in sublists.
-    # [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
+    # contextHistory= [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
     def translate(self, untranslatedString, speakerName=None, contextHistory=None):
         global debug
         global verbose
+
+        timeoutForFirstTranslation=None
+        if self._pastFirstTranslation == False:
+            self._pastFirstTranslation=True
+            timeoutForFirstTranslation=self.timeout * defaultTimeoutMulitplierForFirstRun
         # assert( type(untranslatedString) == str )
 
-        #if speakerName != None:
-        print(' speakerName='+str(speakerName))
+        if speakerName != None:
+            #if verbose == True:
+            print( (' speakerName='+str(speakerName)).encode(consoleEncoding) )
 
         untranslatedString=self.preProcessText(untranslatedString)
 
@@ -347,9 +359,15 @@ class KoboldCppEngine:
 #                tempPrompt = tempPrompt.replace(r'{speaker}','')
 
         if tempPrompt.find('{untranslatedText}') != -1:
-            tempPrompt = tempPrompt.replace('{untranslatedText}',untranslatedString)
+            if speakerName == None:
+                tempPrompt = tempPrompt.replace('{untranslatedText}',untranslatedString)
+            else:
+                tempPrompt = tempPrompt.replace( '{untranslatedText}', str(speakerName) + ': ' + untranslatedString)
         else:
-            tempPrompt = tempPrompt + untranslatedString
+            if speakerName == None:
+                tempPrompt = tempPrompt + untranslatedString
+            else:
+                tempPrompt = tempPrompt + str(speakerName) + ': ' + untranslatedString
 
         # Build request.  TODO: Add default values for temperature and reptition penalties.
         requestDictionary={}
@@ -373,12 +391,21 @@ class KoboldCppEngine:
 
         # Submit the request for translation.
         # Maybe add some code here to deal with server busy messages?
-        returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, self.timeout) )
-        if returnedRequest.status_code != 200:
-            print('Unable to translate entry. ')
-            print('Status code:',returnedRequest.status_code)
-            print( ('Headers:',returnedRequest.headers).encode(consoleEncoding) )
-            print( ('Body:',returnedRequest.content).encode(consoleEncoding) )
+        try:
+            if timeoutForFirstTranslation == None:
+                returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, self.timeout) )
+            else:
+                #if verbose == True:
+                print( 'timeoutForFirstTranslation=' + str( int( timeoutForFirstTranslation / 60 ) ) +' seconds' )
+                returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, timeoutForFirstTranslation) )
+            if returnedRequest.status_code != 200:
+                print('Unable to translate entry. ')
+                print('Status code:',returnedRequest.status_code)
+                print( ('Headers:',returnedRequest.headers).encode(consoleEncoding) )
+                print( ('Body:',returnedRequest.content).encode(consoleEncoding) )
+                return None
+        except:
+            print( ('Error: unable to translate the following: '+ untranslatedString ).encode(consoleEncoding) )
             return None
 
         # Extract the translated text from the request.

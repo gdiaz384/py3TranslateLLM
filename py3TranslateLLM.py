@@ -1080,7 +1080,7 @@ if mode == 'py3translationserver':
     # Build settings dictionary for this translation engine.
     settingsDictionary={}
     settingsDictionary['address']=address
-    settingsDictionary['port']=address
+    settingsDictionary['port']=port
 
     translationEngine=py3translationServerEngine.Py3translationServerEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, settings=settingsDictionary )
 
@@ -1186,7 +1186,7 @@ untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
 # Debug code.
-#batchModeEnabled=False
+batchModeEnabled=False
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()
