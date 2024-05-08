@@ -12,7 +12,7 @@ License:
 - For the various libraries outside of resources/, see the Readme for their licenses and project pages.
 
 """
-__version__='2024.05.03 alpha'
+__version__='2024.05.08 alpha'
 
 #set defaults and static variables
 #Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -67,7 +67,7 @@ defaultExportExtension='.xlsx'
 defaultCacheFileLocation=defaultBackupsFolder + '/cache' + defaultExportExtension
 # Cache is always saved at the end of an operation if there are any new entries, so this is only used for translations that take a very long time.
 defaultMinimumCacheSaveInterval=240 # In seconds. 240 is once every four minutes.
-defaultMinimumBackupSaveInterval=240
+defaultMinimumBackupSaveInterval=540 #240 # 540 is every 9 minutes
 
 translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, cacheOnly'
 usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEnginesAvailable+'.'
@@ -89,7 +89,7 @@ import time                                    # Used to write out cache no more
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
 #import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
 import queue
-#import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests' # Update: Moved to functions.py
+import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests' # Update: Moved to functions.py # Update: Also imported here because it can be useful to parse exceptions (errors) when submitting entries for translation.
 
 #import openpyxl                           # Used as the core internal data structure and to read/write xlsx files. Must be installed using pip. # Update: Moved to chocolate.py
 import resources.chocolate as chocolate # Implements openpyxl. A helper/wrapper library to aid in using openpyxl as a datastructure.
@@ -517,10 +517,10 @@ elif cacheFileName == None:
 cachePathOnly=str(pathlib.Path(cacheFileName).parent)
 
 
-py3TranslateLLMfunctions.verifyThisFileExists(fileToTranslateFileName,'fileToTranslateFileName')
+py3TranslateLLMfunctions.verifyThisFileExists(fileToTranslateFileName, fileToTranslateFileName)
 #Technically, languageCodesFileName only needs to be present if the mode is not parseOnly.
 if mode != 'parseOnly':
-    py3TranslateLLMfunctions.verifyThisFileExists(languageCodesFileName,'languageCodesFileName')
+    py3TranslateLLMfunctions.verifyThisFileExists(languageCodesFileName, languageCodesFileName)
     #The cache file does not need to exist. if it does not exist, it will be created dynamically when it is needed as a Strawberry().
 
 
@@ -547,7 +547,7 @@ if mode == 'parseOnly':
     pass
 
     # Check if valid parsing definition file exists. Example: parseKirikiri.py
-    #py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName,'parseSettingsFileName')
+    #py3TranslateLLMfunctions.verifyThisFileExists(parseSettingsFileName, parseSettingsFileName)
 
 #    if fileToTranslateIsASpreadsheet == True:
 #        sys.exit( ('parseOnly is only valid with text files. It is not valid with spreadsheets: ' + str(fileToTranslateFileName)).encode(consoleEncoding) )
@@ -581,10 +581,10 @@ if port == None:
 
 # A prompt file must be specified when using LLMs. If using koboldcpp, make sure it exists.
 if mode == 'koboldcpp':
-    py3TranslateLLMfunctions.verifyThisFileExists(promptFileName, 'promptFileName')
+    py3TranslateLLMfunctions.verifyThisFileExists(promptFileName, promptFileName)
     promptFileContents=None
     if memoryFileName != None:
-        py3TranslateLLMfunctions.verifyThisFileExists(memoryFileName,memoryFileName)
+        py3TranslateLLMfunctions.verifyThisFileExists(memoryFileName, memoryFileName)
     memoryFileContents=None
 
 
@@ -963,6 +963,7 @@ if verbose == True:
 # Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
 mainSpreadsheet=chocolate.Strawberry( fileToTranslateFileName, fileEncoding=fileToTranslateEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False)
 
+
 #Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use     backupMainSpreadsheet(outputName,force=False):
 #backupsFolder does not have / at the end
 backupsFolderWithDate=backupsFolder + '/' + py3TranslateLLMfunctions.getYearMonthAndDay()
@@ -973,7 +974,6 @@ backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFil
 backupMainSpreadsheet( backupsFilePathWithNameAndDate, force=True )
 # Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx? Alternatively, could set the option asas a default boolean toggle in the script, but that might be annoying during actual usage. TODO: Implement this as a CLI option later in order to respect the user's decision.
 backupsFilePathWithNameAndDate = backupsFolderWithDate + '/'+ fileToTranslateFileNameWithoutPath + '.backup.' + py3TranslateLLMfunctions.getDateAndTimeFull() + '.xlsx'
-
 #print( ('Wrote backup to: ' + backupsFilePathWithNameAndDate).encode(consoleEncoding) )
 
 if debug == True:
@@ -1013,7 +1013,7 @@ if mode == 'parseOnly':
 #Now need to translate stuff.
 
 # Cache should always be added. This potentially creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision to keep cache enabled despite the slight collisions.
-# Currently, cache does not consider multiple languages. It may be a good idea to specify a specific 'sheet' to load or work from based upon the source and destination 3-letter language names when initalizing it. Something like... source_target, jpn_eng, chi_eng, eng_spn
+# Currently, cache does not consider multiple languages. It may be a good idea to specify a specific 'sheet' to load or work from based upon the source and destination 3-letter language names when initalizing it. Something like... source_target, jpn_eng, chi_eng, eng_spn Update: Cache now consideres multiple languages. Each sheet in the workbook is a different sourceLanguage_targetLanguage pair marked by 3 letter words.
 
 print('cacheEnabled=',cacheEnabled)
 
@@ -1069,6 +1069,7 @@ if cacheEnabled == True:
 
 # Implement KoboldAPI first, then DeepL, .
 # Update: Implement py3translationserver, then Sugoi, then KoboldCPP's API, then DeepL API, then DeepL Web, then OpenAI's API (generic).
+# Update (again): Implement py3translationserver, then KoboldCpp, then DeepL API Free, then Google-T, then Groq + mixtral8x7b API.
 # Check current engine.
     # Echo request? Some firewalls block echo requests.
     # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
@@ -1100,7 +1101,8 @@ elif mode == 'sugoi':
 # KoboldCpp's API must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
 elif mode=='koboldcpp':
 
-    assert(promptFileContents != None)
+    #assert(promptFileContents != None)
+    assert( isinstance(promptFileContents, str) )
 
     # Build settings dictionary for this translation engine.
     settingsDictionary={}
@@ -1109,10 +1111,8 @@ elif mode=='koboldcpp':
     settingsDictionary['prompt']=promptFileContents
     if memoryFileName != None:
         settingsDictionary['memory']=memoryFileContents
-    if characterNamesDictionary != None:
-        settingsDictionary['characterDictionary']=characterNamesDictionary
 
-    translationEngine=koboldCppEngine.KoboldCppEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, settings=settingsDictionary )
+    translationEngine=koboldCppEngine.KoboldCppEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, settings=settingsDictionary, characterDictionary=characterNamesDictionary)
 
 
 
@@ -1417,6 +1417,10 @@ else:
         else:
             tempSpeakerName=None
 
+        if (tempSpeakerName != None) and (characterNamesDictionary != None): #and use character dictionary to translate character names prior to submission to translation engine == True
+            if tempSpeakerName in characterNamesDictionary:
+                tempSpeakerName=characterNamesDictionary[tempSpeakerName]
+
         # if the current cell contents are already translated, then just continue onto the next entry unless retranslate is specified.
         currentMainSpreadsheetCellContents = mainSpreadsheet.getCellValue( currentTranslatedCellAddress )
         if ( currentMainSpreadsheetCellContents != None ) and ( reTranslate != True ):
@@ -1497,15 +1501,22 @@ else:
             if len(tempHistory) == 0:
                 tempHistory=None
  
-            # Get speaker, if any.
-            tempSpeakerName=mainSpreadsheet.getRow(currentRow)[1]
-            if ( tempSpeakerName == '' ) or ( not isinstance(tempSpeakerName,str) ):
-                tempSpeakerName=None
+            # Get speaker, if any. Update: This is some code above this that performs this functionality at the start of every loop.
+#            tempSpeakerName=mainSpreadsheet.getRow(currentRow)[1]
+#            if ( tempSpeakerName == '' ) or ( not isinstance(tempSpeakerName,str) ):
+#                tempSpeakerName=None
 
-            translatedEntry=translationEngine.translate( untranslatedEntry, speakerName=tempSpeakerName, contextHistory=tempHistory )
+            try:
+                translatedEntry=translationEngine.translate( untranslatedEntry, speakerName=tempSpeakerName, contextHistory=tempHistory )
+            except Exception as exception:
+                print('Error: Internal engine error in for translationEngine=' + mode)
+                print( exception.__class__.__name__ )
+                translatedEntry=None
+                if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
+                    raise exception
   
             # once it is back check to make sure it is not None or another error value
-            if translatedEntry == None:
+            if ( translatedEntry == None ) or ( translatedEntry == '' ):
                 print( ( 'Unable to translate: ' + untranslatedEntry).encode(consoleEncoding) )
                 currentRow+=1
                 continue

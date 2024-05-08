@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.05.06'
+__version__='2024.05.08'
 
 #set defaults
 #printStuff=True
@@ -16,9 +16,10 @@ verbose=False
 debug=False
 consoleEncoding='utf-8'
 defaultTimeout=360
+defaultTimeoutMulitplierForFirstRun=4
 # Valid options are: autocomplete, instruct, chat.
 defaultInstructionFormat='autocomplete'
-defaultTimeoutMulitplierForFirstRun=4
+
 
 # For 'instruct' models, these are sequences to start and end input. Not using them results in unstable output.
 alpacaStartSequence='\n### Instruction:\n'
@@ -36,6 +37,17 @@ defaultInstructionFormatStartSequence=llama2ChatStartSequence
 defaultInstructionFormatEndSequence=llama2ChatEndSequence
 
 # For 'chat' models, these are sequences that mark user input and the start of the model's output. 
+#defaultChatInputName='Narrator'
+#defaultChatOutputName='Output'?
+# How should the name of the character who is speaking be indicated in Chat models?
+# Character's Input:
+# Character's Output:?
+# The character's name must be part of the input.
+# Character: (as input)
+# Character: (as output)?
+# And then default to Narration: (for 3rd person) or "Internal Voice" (1st person):? That information cannot be known in advance, therefore it must be hardcoded into the prompt and the user must have a way of setting it in order to automatically set up the {history} options properly in a way that are consistent with the user's input. koboldcpp_chat_chatModelInputName and koboldcpp_chat_chatModelOutputName? The names for the variables could be changed to the character speaking like in instruct models as well.
+# Could also just ignore the entire problem completely, treat the chatInputName as pure syntax only and conditionally append the speaker name. That would probably work, right? Are chat models smart enough to figure it out? Might depend a lot on prompt formatting, but that is arguably a user issue. A template can just be provided.
+
 defaultChatInputName='Input'
 defaultChatOutputName='Output'
 
@@ -47,14 +59,21 @@ mixtral8x7bInstructModels=[ 'mixtral-8x7b-instruct-v0.1.Q2_K', 'mixtral-8x7b-ins
 # Change to lower case.
 for counter,entry in enumerate(mixtral8x7bInstructModels):
     mixtral8x7bInstructModels[counter]=entry.lower()
+# Conclusion: Superb quality.
+
+# https://huggingface.co/TheBloke/japanese-stablelm-instruct-gamma-7B-GGUF
+# Apache 2.0 License. Based on Mixtral 7B + Japanese data to allow for Japanese input + instruction data.
 
 # https://huggingface.co/Qwen
 # https://huggingface.co/Qwen/Qwen1.5-32B-Chat-GGUF/tree/main
 # https://huggingface.co/Qwen/Qwen1.5-72B-Chat-GGUF/tree/main
 # Tongyi Qianwen License. Attribution required + commercial use allowed for <100M monthly users.
-qwen15_32B_chatModels=[]
-qwen15_72B_chatModels=[]
+qwen1_5_32B_chatModels=[ 'qwen1_5-32b-chat-q2_k', 'qwen1_5-32b-chat-q3_k_m', 'qwen1_5-32b-chat-q4_0', 'qwen1_5-32b-chat-q4_k_m','qwen1_5-32b-chat-q5_0', 'qwen1_5-32b-chat-q5_k_m', 'qwen1_5-32b-chat-q6_k', 'qwen1_5-32b-chat-q8_0',]
+qwen1_5_72B_chatModels=[ 'qwen1_5-72b-chat-q2_k', ' qwen1_5-72b-chat-q3_k_m', 'qwen1_5-72b-chat-q4_0', 'qwen1_5-72b-chat-q4_k_m',  'qwen1_5-72b-chat-q5_0', 'qwen1_5-72b-chat-q5_k_m', 'qwen1_5-72b-chat-q6_k', 'qwen1_5-72b-chat-q8_0' ]
 
+qwen1_5_chatModels=qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
+# Conclusion: This model seems to have been trained on a lot of Chinese data making it odd for Japanese natural language translation since the same unicode means different things due to han unification. If it does not know the English word for something, it will output the chinese symbols for it instead like 皇后 instead of queen or 排列 for 'arrange'. It will especially not output consistently especially when given mixed language data like Speaker [English]: dialogue [Japanese]. It also has this weird habit of prepending random data to the output that had nothing to do with the input. It seems especially biased toward always outputting ーー. It seems to replace ― with ー perhaps? If any of the previous lines in the prompt/history had it. It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output. If it fails at a trainslation, sometimes it will also just output the input data. For OpenCL, while it supports processing the prompt via GPU, the generation is CPU only and is especially slow. That means, it is not actually faster than Mixtral8x7b despite using the GPU. In the typical state of caching the input prompt, it is actually a lot slower (25-33% slower). Basically, it just uses more power with less useful output making this model worthless for translation tasks that do not involve translating into chinese.
+# That is A LOT of problems that make it sub-par compared to Mixtral8x7b-instruct for translation, especially Japanese -> English translation.
 
 import sys
 import requests
@@ -65,6 +84,9 @@ class KoboldCppEngine:
     # https://www.w3schools.com/python/python_strings_methods.asp
     def preProcessText(self, untranslatedText):
         #return untranslatedText
+
+        if self._modelOnly in qwen1_5_chatModels:
+            untranslatedText=untranslatedText.replace('―','')
 
         # Example:
         untranslatedText=untranslatedText.replace('\\n',' ') # Remove hardcoded new lines and replace them with a single empty space.
@@ -78,21 +100,45 @@ class KoboldCppEngine:
     # Insert any custom code to post process the output text here. This is very model and prompt specific.
     def postProcessText(self, rawTranslatedText, untranslatedText, speakerName=None):
 
+        if self._modelOnly in qwen1_5_chatModels:
+            rawTranslatedText=rawTranslatedText.replace('ー','')
+
         rawTranslatedText=rawTranslatedText.strip()
+
+        # For chat formats, strip out chatbot's name.
+        if self.instructionFormat == 'chat':
+            if rawTranslatedText.startswith( self._chatModelInputName + ':' ):
+                rawTranslatedText=rawTranslatedText[ len(self._chatModelInputName) + 1: ].strip()
+            elif rawTranslatedText.startswith( self._chatModelOutputName + ':' ):
+                rawTranslatedText=rawTranslatedText[ len( self._chatModelOutputName) + 1: ].strip()
 
         # if the translation has new lines, then truncate the result.
         rawTranslatedText=rawTranslatedText.partition('\n')[0].strip()
 
+#        if ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find('llama') != -1 ):
         if speakerName != None:
             if rawTranslatedText.startswith( speakerName + ':' ):
                 rawTranslatedText=rawTranslatedText[ len(speakerName) + 1: ].strip()
+
+        if self.characterDictionary != None:
+            for key,value in self.characterDictionary.items():
+                if rawTranslatedText.startswith( key + ':' ):
+                    rawTranslatedText=rawTranslatedText[ len(key) + 1: ].strip()
+                elif rawTranslatedText.startswith( value + ':' ):
+                    rawTranslatedText=rawTranslatedText[ len(value) + 1: ].strip()
+
+#        elif self.instructionFormat == 'chat':
+#            self._chatModelInputName=defaultChatInputName
+#            self._chatModelOutputName=defaultChatOutputName
+
+
 
         return rawTranslatedText
 
 
 
 
-        # Mixtral8x7b-instruct example:
+        # Mixtral8x7b-instruct example (old code):
         if self._modelOnly in mixtral8x7bInstructModels:
 
 
@@ -257,17 +303,21 @@ class KoboldCppEngine:
 
         if self.instructionFormat == 'instruct':
             if (self._modelOnly in mixtral8x7bInstructModels) or ( self._modelOnly.find('llama') != -1 ):
-                self._startSequence=llama2ChatStartSequence
-                self._endSequence=llama2ChatEndSequence
+                self._instructModelStartSequence=llama2ChatStartSequence
+                self._instructModelEndSequence=llama2ChatEndSequence
+            #TODO: Add more model detection schemes here.
             else:
-                self._startSequence=defaultInstructionFormatStartSequence
-                self._endSequence=defaultInstructionFormatEndSequence
+                self._instructModelStartSequence=defaultInstructionFormatStartSequence
+                self._instructModelEndSequence=defaultInstructionFormatEndSequence
         elif self.instructionFormat == 'chat':
-            self._inputName=defaultChatInputName
-            self._outputName=defaultChatOutputName
+            #if (self._modelOnly in qwen1_5_chatModels) or (): #Do different chat models prefer different chat names for input/output or can any combination always be used?
+            self._chatModelInputName=defaultChatInputName
+            self._chatModelOutputName=defaultChatOutputName
+        #elif self.instructionFormat == 'autocomplete':
+            # What should happen here?
 
         # Now that the instruction format is known, 
-
+        print('instructionFormat=' + self.instructionFormat)
 
 
     # This expects a python list where every entry is a string.
@@ -275,7 +325,7 @@ class KoboldCppEngine:
         print('Hello world!')
         global debug
         global verbose
-        return
+        return None
 
         #debug=True
         if debug == True:
@@ -299,11 +349,16 @@ class KoboldCppEngine:
         return translatedList
 
 
-    # This expects a string to translate. contextHistory should be a variable list of untranslated and translated pairs in sublists.
+    # This expects a string to translate. contextHistory should be a list of untranslated and translated pairs in sublists.
     # contextHistory= [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
     def translate(self, untranslatedString, speakerName=None, contextHistory=None):
         global debug
         global verbose
+
+        #Debug code.
+        if self._modelOnly in qwen1_5_chatModels:
+        #if history disabled... then it should not be submitted to the translation engine in the first place. Deal with it before here.
+            contextHistory=None
 
         timeoutForFirstTranslation=None
         if self._pastFirstTranslation == False:
@@ -313,7 +368,7 @@ class KoboldCppEngine:
 
         if speakerName != None:
             #if verbose == True:
-            print( (' speakerName='+str(speakerName)).encode(consoleEncoding) )
+            print( ('speakerName='+str(speakerName)).encode(consoleEncoding) )
 
         untranslatedString=self.preProcessText(untranslatedString)
 
@@ -330,23 +385,28 @@ class KoboldCppEngine:
             for entry in contextHistory:
                 if self.instructionFormat == 'instruct':
                     if entry[2] == None:
-                        tempHistory=tempHistory + self._startSequence + entry[0] + self._endSequence + entry[1]
+                        tempHistory=tempHistory + self._instructModelStartSequence + entry[0] + self._instructModelEndSequence + entry[1]
                     else:
-                        tempHistory=tempHistory + self._startSequence + entry[2] + ': ' + entry[0] + self._endSequence + entry[2] + ': ' + entry[1]
+                        tempHistory=tempHistory + self._instructModelStartSequence + entry[2] + ': ' + entry[0] + self._instructModelEndSequence + entry[2] + ': ' + entry[1]
                 elif self.instructionFormat == 'chat':
-                    tempHistory=tempHistory + self._inputName + ': ' + entry[0] + '\n' + self._outputName + ': ' + entry[1] + '\n'
-                    # TODO finish context history for chat format to include speaker.
+                    if entry[2] == None:
+                        tempHistory=tempHistory + self._chatModelInputName + ': ' + entry[0] + '\n' + self._chatModelOutputName + ': ' + entry[1] + '\n'
+                    else:
+                        tempHistory=tempHistory + self._chatModelInputName + ': ' + entry[2] + ': ' + entry[0] + '\n' + self._chatModelOutputName + ': ' + entry[2] + ': ' + entry[1] + '\n'
+                else:
+                    #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
+                    pass
 
         # Next build tempPrompt using history string based on {history} tag in prompt.
         if self.prompt.find( '{history}' ) != -1:
             if contextHistory != None:
-                tempPrompt=self.prompt.replace('{history}',tempHistory)
+                tempPrompt=self.prompt.replace( '{history}', tempHistory )
             else:
-                tempPrompt=self.prompt.replace('{history}','')
+                tempPrompt=self.prompt.replace( '{history}', '' ).replace( '\n\n', '\n' )
         else:
             tempPrompt=self.prompt
             if verbose == True:
-                print('Warning: Unable to process history. Make sure {history} is in the prompt.')
+                print( r'Warning: Unable to process history. Make sure {history} is in the prompt.' )
 
 #        if contextHistory == None:
 #            tempPrompt=self.prompt
@@ -374,9 +434,27 @@ class KoboldCppEngine:
         requestDictionary[ 'max_length' ]=150 # The number of tokens to generate. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
         requestDictionary[ 'max_context_length' ]=self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
         if self.memory != None:
-            requestDictionary[ 'memory' ]=self.memory
-        requestDictionary[ 'prompt' ]=tempPrompt # The prompt.
+            requestDictionary[ 'memory' ] = self.memory
+        requestDictionary[ 'prompt' ] = tempPrompt # The prompt.
+        requestDictionary[ 'trim_stop' ] = True
         requestDictionary[ 'stop_sequence' ]=[ 'Translation note:', 'Note:', 'Translation notes:', '[', '\n' ] # This should not be hardcoded.
+        # Add _chatModelInputName as stop sequence for chat models.
+        if self.instructionFormat == 'chat':
+            requestDictionary[ 'n' ] = 1
+            requestDictionary[ 'temperature' ] = 0.7            
+            requestDictionary[ 'rep_pen' ] = 1.1
+            requestDictionary[ 'rep_pen_range' ] = 320
+            requestDictionary[ 'rep_pen_slope' ] = 0.7
+            requestDictionary[ 'sampler_order' ] = [6,0,1,3,4,2,5]
+            requestDictionary[ 'top_p' ] = 0.92
+            requestDictionary[ 'top_k' ] = 100
+            requestDictionary[ 'top_a' ] = 0
+            requestDictionary[ 'typical' ] = 1
+            requestDictionary[ 'tfs' ] = 1
+            requestDictionary[ 'use_default_badwordsids' ] = False
+            requestDictionary[ 'quiet' ] = True
+            requestDictionary[ 'stop_sequence' ] = [ self._chatModelInputName, self._chatModelInputName + '\n', '\n' + self._chatModelOutputName ]
+
         #requestDictionary[ 'authorsnote' ]= # This will be added at the end of the prompt. Highest possible priority.
 
 #        if contextHistory != None:
@@ -391,22 +469,22 @@ class KoboldCppEngine:
 
         # Submit the request for translation.
         # Maybe add some code here to deal with server busy messages?
-        try:
-            if timeoutForFirstTranslation == None:
-                returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, self.timeout) )
-            else:
-                #if verbose == True:
-                print( 'timeoutForFirstTranslation=' + str( int( timeoutForFirstTranslation / 60 ) ) +' seconds' )
-                returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, timeoutForFirstTranslation) )
-            if returnedRequest.status_code != 200:
-                print('Unable to translate entry. ')
-                print('Status code:',returnedRequest.status_code)
-                print( ('Headers:',returnedRequest.headers).encode(consoleEncoding) )
-                print( ('Body:',returnedRequest.content).encode(consoleEncoding) )
-                return None
-        except:
-            print( ('Error: unable to translate the following: '+ untranslatedString ).encode(consoleEncoding) )
+#        try:
+        if timeoutForFirstTranslation == None:
+            returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, self.timeout) )
+        else:
+            #if verbose == True:
+            print( 'timeoutForFirstTranslation=' + str( int( timeoutForFirstTranslation / 60 ) ) +' minutes' )
+            returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, timeoutForFirstTranslation) )
+        if returnedRequest.status_code != 200:
+            print('Unable to translate entry. ')
+            print('Status code:',returnedRequest.status_code)
+            print( ('Headers:',returnedRequest.headers).encode(consoleEncoding) )
+            print( ('Body:',returnedRequest.content).encode(consoleEncoding) )
             return None
+#        except:
+#            print( ('Error: unable to translate the following: '+ untranslatedString ).encode(consoleEncoding) )
+#            return None
 
         # Extract the translated text from the request.
         # {'results': [{'text': '\n\nBien, gracias.'}]}
