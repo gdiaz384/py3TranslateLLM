@@ -12,12 +12,11 @@ License:
 - For the various libraries outside of resources/, see the Readme for their licenses and project pages.
 
 """
-__version__='2024.05.08 alpha'
+__version__='2024.05.09 alpha'
 
 #set defaults and static variables
 #Do not change the defaultTextEncoding. This is heavily overloaded.
 defaultTextEncoding = 'utf-8'
-defaultTextEncodingForKSFiles = 'shift-jis' # TODO: This should probably be removed since the parsing logic for .ks files was moved to a different program.
 defaultConsoleEncodingType = 'utf-8'
 
 #These default paths are relative to the location of py3TranslateLLM.py, -not- relative to the current path of the command prompt.
@@ -163,13 +162,17 @@ commandLineParser.add_argument('-oc', '--overrideWithCache', help='Override any 
 commandLineParser.add_argument('-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines.', action='store_true')
 commandLineParser.add_argument('-roc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file.', action='store_true')
 
+commandLineParser.add_argument('-ch', '--contextHistory', help='Toggles context history setting. Specifying this will toggle keeping track of or submitting history of previously translated entries to the translation engine. Default=Keep track of previously translated entries and submit them to the translation engines that support history to improve the quality of future translations.', action='store_false')
 commandLineParser.add_argument('-hl', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable. Not all translation engines support context. Default='+str(defaultContextHistoryMaxLength), default=None, type=int)
-commandLineParser.add_argument('-b', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches. Enabling batches disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
+
+commandLineParser.add_argument('-b', '--batches', help='Toggles if entries should be submitted for translations engines that support them. Enabling batches disables context history. Default=Batches are automatically enabled for NMTs that support batches and DeepL, but disabled for LLMs. Specifying this will disable them globally for all engines.', action='store_false')
+commandLineParser.add_argument('-bllm', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches and DeepL regardless of this setting. Enabling batches for LLMs disables context history. Default='+str(defaultEnableBatchesForLLMs), action='store_true')
 commandLineParser.add_argument('-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. Default='+str(defaultBatchSizeLimit), default=None, type=int)
 commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees.', action='store_true')
 
 commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str)
-commandLineParser.add_argument('--port', help='Specify the port for the NMT/LLM server. Example: 5001', default=None, type=str)
+commandLineParser.add_argument('-pt','--port', help='Specify the port for the NMT/LLM server. Example: 5001', default=None, type=int)
+commandLineParser.add_argument('-to','--timeout', help='Specify the maximum number of seconds each individual request can take before quiting. Example: 360', default=None, type=str)
 
 commandLineParser.add_argument('-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str(defaultInputEncodingErrorHandler) + '\'.', default=None, type=str)
 commandLineParser.add_argument('-eh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str(defaultOutputEncodingErrorHandler) + '\'.', default=None, type=str)
@@ -209,7 +212,10 @@ overrideWithCache=commandLineArguments.overrideWithCache
 reTranslate=commandLineArguments.reTranslate
 readOnlyCache=commandLineArguments.readOnlyCache
 
+contextHistory=commandLineArguments.contextHistory
 contextHistoryMaxLength=commandLineArguments.contextHistoryMaxLength
+
+batches=commandLineArguments.batches
 batchesEnabledForLLMs=commandLineArguments.batchesEnabledForLLMs
 batchSizeLimit=commandLineArguments.batchSizeLimit
 #lineByLineMode=commandLineArguments.lineByLineMode
@@ -1186,7 +1192,7 @@ untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
 
 # Debug code.
-batchModeEnabled=False
+#batchModeEnabled=False
 
 if batchModeEnabled == True:
     #translationEngine.batchTranslate()

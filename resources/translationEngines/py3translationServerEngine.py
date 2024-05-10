@@ -110,7 +110,9 @@ class Py3translationServerEngine:
             print( ( 'untranslatedList=' + str(untranslatedList) ).encode(consoleEncoding) )
 
         # strip whitespace
+        #print(untranslatedList)
         for counter,entry in enumerate(untranslatedList):
+            #print( str(entry).encode(consoleEncoding) )
             untranslatedList[counter]=self.preProcessText( entry )
 
         # https://docs.python-requests.org/en/latest/user/advanced/#timeouts

@@ -68,7 +68,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 2024.04.29 alpha`
+`Current version: 2024.05.09 alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 
@@ -193,6 +193,10 @@ Variable name | Description | Examples
         - See: `py3TranslateLLM --help` and the **Parameters** enumeration below for valid values.
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
     - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
+
+#### Known Bugs:
+
+- Sometimes some of the entries in cache.xlsx become corrupt due to misalignment. It is not clear when or why that occurs but may be related to blank lines in the source, or not using a header perhaps? Since it happens intermittently, the bug has not been sucessfullly reproduced yet. That means it is difficult to fix. If this occurs, delete any empty lines in the source.xlsx, delete the data for the misaligned entries in the cached, not the entries themselves, and try again. As a temporary workaround if entries are coming out misaligned, it is also possible to disable cache by using the `--cache` `-c` toggle CLI option. If you can sucessfully reproduce this issue, please [open an issue] and let me know how so that it can be fixed.
 
 ### Concept art:
 
