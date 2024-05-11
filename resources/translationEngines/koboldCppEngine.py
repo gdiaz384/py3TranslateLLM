@@ -72,7 +72,7 @@ qwen1_5_32B_chatModels=[ 'qwen1_5-32b-chat-q2_k', 'qwen1_5-32b-chat-q3_k_m', 'qw
 qwen1_5_72B_chatModels=[ 'qwen1_5-72b-chat-q2_k', ' qwen1_5-72b-chat-q3_k_m', 'qwen1_5-72b-chat-q4_0', 'qwen1_5-72b-chat-q4_k_m',  'qwen1_5-72b-chat-q5_0', 'qwen1_5-72b-chat-q5_k_m', 'qwen1_5-72b-chat-q6_k', 'qwen1_5-72b-chat-q8_0' ]
 
 qwen1_5_chatModels=qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
-# Conclusion: This model seems to have been trained on a lot of Chinese data making it odd for Japanese natural language translation since the same unicode means different things due to han unification. If it does not know the English word for something, it will output the chinese symbols for it instead like 皇后 instead of queen or 排列 for 'arrange'. It will especially not output consistently especially when given mixed language data like Speaker [English]: dialogue [Japanese]. It also has this weird habit of prepending random data to the output that had nothing to do with the input. It seems especially biased toward always outputting ーー. It seems to replace ― with ー perhaps? If any of the previous lines in the prompt/history had it. It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output. If it fails at a trainslation, sometimes it will also just output the input data. For OpenCL, while it supports processing the prompt via GPU, the generation is CPU only and is especially slow. That means, it is not actually faster than Mixtral8x7b despite using the GPU. In the typical state of caching the input prompt, it is actually a lot slower (25-33% slower). Basically, it just uses more power with less useful output making this model worthless for translation tasks that do not involve translating into chinese.
+# Conclusion: This model seems to have been trained on a lot of Chinese data making it odd for Japanese natural language translation since the same unicode means different things due to han unification. If it does not know the English word for something, it will output the chinese symbols for it instead like 皇后 instead of 'queen' or 排列 for 'arrange'. It will especially not output consistently especially when given mixed language data like Speaker [English]: dialogue [Japanese]. It also has this weird habit of prepending random data to the output that had nothing to do with the input. It seems especially biased toward always outputting ーー. It seems to replace ― with ー perhaps? If any of the previous lines in the prompt/history had it. It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output. If it fails at a trainslation, sometimes it will also just output the input data. For OpenCL, while it supports processing the prompt via GPU, the generation is CPU only and is especially slow. That means, it is not actually faster than Mixtral8x7b despite using the GPU. In the typical state of caching the input prompt, it is actually a lot slower (25-33% slower). Basically, it just uses more power with less useful output making this model worthless for translation tasks that do not involve translating into chinese.
 # That is A LOT of problems that make it sub-par compared to Mixtral8x7b-instruct for translation, especially Japanese -> English translation.
 
 import sys
@@ -293,7 +293,7 @@ class KoboldCppEngine:
         # if the instruction format is not known, then try to figure it out from the model name.
         # Valid instruction formats are: autocomplete (default), instruct, chat
         if self.instructionFormat == None:
-            if self._modelOnly.lower().find('instruct') != -1:
+            if (self._modelOnly in mixtral8x7bInstructModels) or (self._modelOnly.find('instruct') != -1) or (self._modelOnly.find('mixtral') != -1 ):
                 self.instructionFormat='instruct'
             elif self._modelOnly.lower().find('chat') != -1:
                 self.instructionFormat='chat'
@@ -302,7 +302,7 @@ class KoboldCppEngine:
                 self.instructionFormat=defaultInstructionFormat
 
         if self.instructionFormat == 'instruct':
-            if (self._modelOnly in mixtral8x7bInstructModels) or ( self._modelOnly.find('llama') != -1 ):
+            if (self._modelOnly in mixtral8x7bInstructModels) or ( self._modelOnly.find('llama') != -1 ) or (self._modelOnly.find('mixtral') != -1 ):
                 self._instructModelStartSequence=llama2ChatStartSequence
                 self._instructModelEndSequence=llama2ChatEndSequence
             #TODO: Add more model detection schemes here.
@@ -354,6 +354,8 @@ class KoboldCppEngine:
     def translate(self, untranslatedString, speakerName=None, contextHistory=None):
         global debug
         global verbose
+
+        #print( 'contextHistory='+str(contextHistory))
 
         #Debug code.
         if self._modelOnly in qwen1_5_chatModels:
@@ -439,6 +441,7 @@ class KoboldCppEngine:
         requestDictionary[ 'trim_stop' ] = True
         requestDictionary[ 'stop_sequence' ]=[ 'Translation note:', 'Note:', 'Translation notes:', '[', '\n' ] # This should not be hardcoded.
         # Add _chatModelInputName as stop sequence for chat models.
+        # Was debug code for qwen. Did not work out.
         if self.instructionFormat == 'chat':
             requestDictionary[ 'n' ] = 1
             requestDictionary[ 'temperature' ] = 0.7            
@@ -469,12 +472,13 @@ class KoboldCppEngine:
 
         # Submit the request for translation.
         # Maybe add some code here to deal with server busy messages?
+        # This should accept a keyboard interupt, send a quit generating stuff message to the server, and then propogate the interupt to the calling module using raise.
 #        try:
         if timeoutForFirstTranslation == None:
             returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, self.timeout) )
         else:
             #if verbose == True:
-            print( 'timeoutForFirstTranslation=' + str( int( timeoutForFirstTranslation / 60 ) ) +' minutes' )
+            print( ' timeoutForFirstTranslation=' + str( int( timeoutForFirstTranslation / 60 ) ) +' minutes' )
             returnedRequest=requests.post(self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=(10, timeoutForFirstTranslation) )
         if returnedRequest.status_code != 200:
             print('Unable to translate entry. ')
