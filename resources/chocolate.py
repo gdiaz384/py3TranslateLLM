@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods. If using this library for cache.xlsx where entries are unique, there are specialized functions available as well.
+Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods. If using this library for cache.xlsx, where entries are unique, there are specialized functions available as well.
 
 Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.05.02'
+__version__='2024.05.23'
 
 #set defaults
 #printStuff=True
@@ -159,6 +159,8 @@ class Strawberry:
         #myInputCell=str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
         myInputCell=self._getCellAddressFromRawCellString(myInputCellRaw)
         index=0
+        # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.utils.cell.html
+        # So apparently, there is a proper way to do this as openpyxl.utils.cell.coordinate_from_string('AB25') -> ('B',12). #TODO: Update this later.
         for i in range(10): #Magic number.
             try:
                 int(myInputCell[index:index+1])
@@ -202,16 +204,21 @@ class Strawberry:
         return myList
 
 
-    # Returns a list with the contents of the column specified (by letter). 
+    # Returns a list with the contents of the column specified (by letter).
     # Should return None for any blank entry as in: ['pie', None, 'lots of pies']
     def getColumn(self, columnLetter):
+
+        # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.utils.cell.html
+        if isinstance( columnLetter, int) == True:
+            # Convert an integer to a column letter (3 -> 'C') so that the calling code does not have to care.
+            columnLetter = openpyxl.utils.cell.get_column_letter(columnLetter)
+
         myList=[]
         for cell in self.spreadsheet[columnLetter]:  # Update: Would the built in iterators also work here?
             #print(str(mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',',end='')
             #myList[i]=mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value  #Doesn't work due to out of index error. Use append() method.
             myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
         return myList
-        #print("Hello, world!")
 
 
     # Helper function that changes the data for a row in mySpreadsheet to what is specified in a python List []
@@ -234,7 +241,7 @@ class Strawberry:
             #spreadsheet[_getCellAddressFromRawCellString(spreadsheet.cell(row=int(rowLocation), column=i+1))]=newRowList[i]
 
             #A more direct way of doing the same thing is to use .value without () on the cell after the cell reference.
-            self.spreadsheet.cell(row=int(rowLocation), column=i+1).value=newRowList[i]
+            self.spreadsheet.cell( row=int(rowLocation), column=i+1 ).value=newRowList[i]
         #return myWorkbook
 
     #Example: replaceRow(7,newRow)
@@ -247,17 +254,25 @@ class Strawberry:
         #x = openpyxl.utils.column_index_from_string('A')   #returns 1 as an int
         #y= openpyxl.utils.get_column_letter(1)   #returns 'A'
         #Example: mySpreadsheet.cell(row=3, column=openpyxl.utils.column_index_from_string('B')).value='pies'
+        if isinstance( columnLetter, str) == True:
+            try:
+                tempColumnNumber=int( columnLetter )
+            except:
+                tempColumnNumber=openpyxl.utils.column_index_from_string( columnLetter.upper() )
+        else:
+            # This needs to be an int. Crash if it is not.
+            tempColumnNumber=int( columnLetter )
 
         if debug == True:
-            print(( 'Replacing column \''+columnLetter+'\' with the following contents:').encode(consoleEncoding))
-            print(str(newColumnInAList).encode(consoleEncoding))
+            print( ( 'Replacing column \'' + columnLetter + '\' with the following contents:' ).encode(consoleEncoding) )
+            print( str( newColumnInAList ).encode(consoleEncoding) )
 
-        for i in range(len(newColumnInAList)):
+        for i in range( len(newColumnInAList) ):
             #Syntax for assignment is: mySpreadsheet['A4'] = 'pie''
             #Rows begin with 1, not 0, so add 1 to the reference row, but not to source list since list starts references at 0.
-            self.spreadsheet.cell(row=int(i+1), column=openpyxl.utils.column_index_from_string(columnLetter.upper())).value=newColumnInAList[i]
+            self.spreadsheet.cell( row=int( i+1 ), column=tempColumnNumber ).value=newColumnInAList[ i ]
 
-    #Example: replaceColumn('B',newColumn,)
+    #Example: replaceColumn('B',newColumnList)
 
 
     # Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
@@ -402,7 +417,7 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath,myFileNameEncoding=defaultTextFileEncoding,removeWhitespaceForCSV=True,csvDialect=None):
+    def importFromCSV(self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True,csvDialect=None):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
@@ -534,10 +549,10 @@ class Strawberry:
             self.index[entry]=counter+1
         # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds. # Update: Incorrect. It would be out of bounds if it was pointing to itself, but it is actually pointing to self.spreadsheet which needs the +1 in order for the pointer in the index to point to the correct cell in self.spreadsheet. Otherwise, it ends up pointing to the cell above it resulting in an off by 1 error.
         if len(self.index) != 0:
-            self.lastEntry=len(self.index)+1
+            self.lastEntry = len(self.index) + 1
         else:
             # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry here.
-            self.lastEntry=1
+            self.lastEntry = 1
 
     # Expects a string and searches through the current cache index. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
     def searchCache( self, myString ):

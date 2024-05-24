@@ -72,8 +72,14 @@ qwen1_5_32B_chatModels=[ 'qwen1_5-32b-chat-q2_k', 'qwen1_5-32b-chat-q3_k_m', 'qw
 qwen1_5_72B_chatModels=[ 'qwen1_5-72b-chat-q2_k', ' qwen1_5-72b-chat-q3_k_m', 'qwen1_5-72b-chat-q4_0', 'qwen1_5-72b-chat-q4_k_m',  'qwen1_5-72b-chat-q5_0', 'qwen1_5-72b-chat-q5_k_m', 'qwen1_5-72b-chat-q6_k', 'qwen1_5-72b-chat-q8_0' ]
 
 qwen1_5_chatModels=qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
-# Conclusion: This model seems to have been trained on a lot of Chinese data making it odd for Japanese natural language translation since the same unicode means different things due to han unification. If it does not know the English word for something, it will output the chinese symbols for it instead like 皇后 instead of 'queen' or 排列 for 'arrange'. It will especially not output consistently especially when given mixed language data like Speaker [English]: dialogue [Japanese]. It also has this weird habit of prepending random data to the output that had nothing to do with the input. It seems especially biased toward always outputting ーー. It seems to replace ― with ー perhaps? If any of the previous lines in the prompt/history had it. It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output. If it fails at a trainslation, sometimes it will also just output the input data. For OpenCL, while it supports processing the prompt via GPU, the generation is CPU only and is especially slow. That means, it is not actually faster than Mixtral8x7b despite using the GPU. In the typical state of caching the input prompt, it is actually a lot slower (25-33% slower). Basically, it just uses more power with less useful output making this model worthless for translation tasks that do not involve translating into chinese.
-# That is A LOT of problems that make it sub-par compared to Mixtral8x7b-instruct for translation, especially Japanese -> English translation.
+# Problems: This model seems to have been trained on a lot of Chinese data making it odd for Japanese natural language translation since the same unicode means different things due to han unification.
+# If it does not know the English word for something, it will output the chinese symbols for it instead like 皇后 instead of 'queen' or 排列 for 'arrange'. It will not consistently output only the target language especially when given mixed language data like Speaker [English]: dialogue [Japanese].
+# It also has this weird habit of prepending random data to the output that had nothing to do with the input which makes it impossible to use history since the results get corrupt right away. It seems especially biased toward always outputting ーー. It seems to replace ― with ー perhaps? If any of the previous lines in the prompt/history had it.
+# - It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output or produce output with only blank spaces.
+# If it fails at a trainslation, sometimes it will also just output the input data.
+# For OpenCL, while it supports processing the prompt via GPU, the generation is CPU only and is especially slow. That means, it is not actually faster than Mixtral8x7b despite using the GPU. In the typical state of caching the input prompt, it is actually a lot slower (25-33% slower).
+# Conclusion: That is A LOT of problems that make it sub-par compared to Mixtral8x7b-instruct for translation, especially Japanese -> English translation. Basically, it just uses more power with less useful output making this model worthless for translation tasks that do not involve translating into Chinese.
+# Update: The commercial only qwenLarge model performs fine, but the 32B model is no-go even at q8_0. 72B is untested. So this might just be a quantization issue with the inferior qwen models.
 
 import sys
 import requests
@@ -193,7 +199,7 @@ class KoboldCppEngine:
 #class KoboldCppEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, settings=None, characterDictionary=None): 
+    def __init__(self, sourceLanguage=None, targetLanguage=None, characterDictionary=None, settings={} ):
 
 #address=None, port=None, timeout=360, prompt=None,
 
@@ -293,6 +299,7 @@ class KoboldCppEngine:
         # if the instruction format is not known, then try to figure it out from the model name.
         # Valid instruction formats are: autocomplete (default), instruct, chat
         if self.instructionFormat == None:
+            # This is not entirely correct. There are some mixtral and llama models that are not instruct models. How is it possible to tell them apart except for a whitelist?
             if (self._modelOnly in mixtral8x7bInstructModels) or (self._modelOnly.find('instruct') != -1) or (self._modelOnly.find('mixtral') != -1 ):
                 self.instructionFormat='instruct'
             elif self._modelOnly.lower().find('chat') != -1:
@@ -302,7 +309,7 @@ class KoboldCppEngine:
                 self.instructionFormat=defaultInstructionFormat
 
         if self.instructionFormat == 'instruct':
-            if (self._modelOnly in mixtral8x7bInstructModels) or ( self._modelOnly.find('llama') != -1 ) or (self._modelOnly.find('mixtral') != -1 ):
+            if ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find('llama') != -1 ) or ( self._modelOnly.find('mixtral') != -1 ):
                 self._instructModelStartSequence=llama2ChatStartSequence
                 self._instructModelEndSequence=llama2ChatEndSequence
             #TODO: Add more model detection schemes here.

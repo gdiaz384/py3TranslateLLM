@@ -431,12 +431,22 @@ translationEngines/* | Required. | Handles logic for translation services. | Inc
 [xlwt](//pypi.org/project/xlwt/) | Optional. | Provides writing to Microsoft Excel Document (.xls). | `pip install xlwt` | 1.3.0
 [odfpy](//pypi.org/project/odfpy) | Optional. | Provides interoperability for Open Document Spreadsheet (.ods). | `pip install odfpy` | 1.4.1
 [tdqm](//pypi.org/project/tqdm) | Optional. | Adds progress bar to CLI. | `pip install tdqm` | 0.0.1
+[pykakasi](//codeberg.org/miurahr/pykakasi) | Optional. | Fast, simple, and lightweight JPN->Romaji dictionary. | `pip install pykakasi` | 0.0.1
+[cutlet](//github.com/polm/cutlet) | Optional. | Accurate JPN->Romaji dictionary with MeCab support. | `cpip install cutlet` | 0.0.1
 
 Libraries can also require other libraries.
 
 - deepl-python requires: `requests`, `charset-normalizer`, `idna`, `urllib3`, `certifi`.
 - odfpy requires: `defusedxml`.
 - openpyxl has `defusedxml` as an optional library.
+- cutlet requires [fugashi](//github.com/polm/fugashi) to tokenize contents based upon the [MeCab](//taku910.github.io/mecab) tokenizer using a dictionary like [unidic-py](//github.com/polm/unidic-py), [unidic-lite](//github.com/polm/unidic-lite), [ipadic-py](//github.com/polm/ipadic-py), [jumandic-py](//github.com/polm/jumandic-py).
+    - Alternative MeCab wrappers:
+    - https://github.com/SamuraiT/mecab-python3
+    - https://github.com/WorksApplications/sudachi.rs and https://github.com/WorksApplications/SudachiPy
+    - Korean versions:
+    - https://github.com/NoUnique/pymecab-ko
+    - https://konlpy.org/en/latest/
+
 - py3TranslateLLM and the libraries above also use libraries from the Python standard library. For an enumeration of those, check the source code.
 
 ###  Guide: Installing and managing Python library versions with `pip`:

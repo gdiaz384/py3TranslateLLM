@@ -12,7 +12,7 @@ License:
 - For the various libraries outside of resources/, see the Readme for their licenses and project pages.
 
 """
-__version__='2024.05.09 alpha'
+__version__='2024.05.23 alpha'
 
 #set defaults and static variables
 #Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -40,6 +40,8 @@ minimumPortNumber = 1
 maximumPortNumber = 65535 #16 bit integer -1
 defaultPortForHTTP = 80
 defaultPortForHTTPS = 443
+validPykakasiRomajiFormats=[ 'hepburn', 'kunrei', 'passport', 'hira', 'kana' ]
+validCutletRomajiFormats=[ 'hepburn', 'kunrei', 'nihon', 'kunreisiki', 'nihonsiki' ]
 
 # LLMs tend to hallucinate, so setting this overly high tends to corrupt the output. It should also be reset back to 0 periodically, like when it gets full, so the corruption of one bad entry does not spread too much.
 defaultContextHistoryMaxLength = 6
@@ -65,10 +67,10 @@ defaultBackupsFolder='backups'
 defaultExportExtension='.xlsx'
 defaultCacheFileLocation=defaultBackupsFolder + '/cache' + defaultExportExtension
 # Cache is always saved at the end of an operation if there are any new entries, so this is only used for translations that take a very long time.
-defaultMinimumCacheSaveInterval=240 # In seconds. 240 is once every four minutes.
+defaultMinimumCacheSaveInterval=240 # In seconds. 240 is once every four minutes which means that, at most, only four minutes worth of processing time should be lost due to a program or translation engine error.
 defaultMinimumBackupSaveInterval=540 #240 # 540 is every 9 minutes
 
-translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, cacheOnly'
+translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, pykakasi, cutlet, cacheOnly'
 usageHelp=' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+translationEnginesAvailable+'.'
 
 
@@ -172,8 +174,12 @@ commandLineParser.add_argument('-r', '--resume', help='Attempt to resume previou
 
 commandLineParser.add_argument('-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str)
 commandLineParser.add_argument('-pt','--port', help='Specify the port for the NMT/LLM server. Example: 5001', default=None, type=int)
-commandLineParser.add_argument('-to','--timeout', help='Specify the maximum number of seconds each individual request can take before quiting. Example: 360', default=None, type=str)
+commandLineParser.add_argument('-to','--timeout', help='Specify the maximum number of seconds each individual request can take before quiting. Example: 360', default=None, type=int)
 
+# Put engine specific settings here.
+commandLineParser.add_argument('-rf','--romajiFormat', help='Only used for pykakashi and cutlet. pykakashi can use hepburn, kunrei, passport, hira, kana. Passport is a hepburn variant. See: codeberg.org/miurahr/pykakasi Cutlet can use hepburn, kunrei, nihon. See: github.com/polm/cutlet Default=Use engine default which is hepburn.', default=None, type=str)
+
+# TODO: Add option to disable saving backups. Seems like a terrible idea to me, but the user's preferences take priority.
 commandLineParser.add_argument('-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str(defaultInputEncodingErrorHandler) + '\'.', default=None, type=str)
 commandLineParser.add_argument('-eh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str(defaultOutputEncodingErrorHandler) + '\'.', default=None, type=str)
 
@@ -223,6 +229,8 @@ resume=commandLineArguments.resume
 
 address=commandLineArguments.address  #Must be reachable. How to test for that?
 port=commandLineArguments.port                #Port should be conditionaly guessed. If no port specified and an address was specified, then try to guess port as either 80, 443, or default settings depending upon protocol and translationEngine selected.
+
+romajiFormat=commandLineArguments.romajiFormat
 
 inputErrorHandling=commandLineArguments.inputErrorHandling
 outputErrorHandling=commandLineArguments.outputErrorHandling
@@ -453,6 +461,7 @@ if (verbose == True) or (debug == True):
 mode=None
 implemented=False
 #validate input from command line options
+# This section should probably be updated with more helpful error messages like what to do if the engines did not import correctly. pip install pykakasi ...etc
 if translationEngine == None:
     sys.exit( ( 'Error: Please specify a translation engine. ' + usageHelp ).encode(consoleEncoding) )
 elif ( translationEngine.lower()=='parseonly' ):
@@ -481,6 +490,18 @@ elif ( translationEngine.lower()=='sugoi' ):
     #Sugoi has a default port association and only supports Jpn->Eng translations, so having a dedicated entry for it is still useful for input validation, especially since it only supports a subset of the py3translationserver API.
     import resources.translationEngines.sugoiEngine as sugoiEngine
     implemented=True
+elif ( translationEngine.lower()=='pykakasi' ):
+    mode='pykakasi'
+    import resources.translationEngines.pykakasiEngine as pykakasiEngine
+    implemented=True
+    if cacheEnabled == True:
+        print( 'Info: Disabling cache for local pykakasi library.')
+        cacheEnabled=False # Since pykakasi is a local library with a fast dictionary, enabling cache would only make things slower.
+elif ( translationEngine.lower()=='cutlet' ):
+    mode='cutlet'
+    import resources.translationEngines.cutletEngine as cutletEngine
+    implemented=False
+    #cacheEnabled=False # Is enabling cache worth it for cutlet?
 else:
     sys.exit(('\n Error. Invalid translation engine specified: "' + translationEngine + '"' + usageHelp).encode(consoleEncoding))
 
@@ -641,6 +662,29 @@ if (mode == 'deepl_api_free') or (mode == 'deepl_api_pro'):
     # Syntax: os.environ['CT2_VERBOSE'] = '1'
 
 
+
+if ( mode == 'pykakasi' ) and ( romajiFormat != None ):
+    romajiFormat = romajiFormat.lower()
+    if romajiFormat in validPykakasiRomajiFormats:
+        pass
+    else:
+        print( ('Warning: romajiFormat \'' + romajiFormat + '\' is not valid with pykakasi. Reverting to default.').encode(consoleEncoding) )
+        romajiFormat=None
+
+
+if ( mode == 'cutlet' ) and ( romajiFormat != None ):
+    romajiFormat = romajiFormat.lower()
+    if romajiFormat in validCutletRomajiFormats:
+        pass
+    else:
+        print( ('Warning: romajiFormat \''+ romajiFormat + '\' is not valid with cutlet. Reverting to default.').encode(consoleEncoding) )
+        romajiFormat=None
+    if romajiFormat == 'kunreisiki':
+        romajiFormat = 'kunrei'
+    elif romajiFormat == 'nihonsiki':
+        romajiFormat = 'nihon'
+
+
 if outputFileName == None:
     # If no outputFileName was specified, then set it the same as the input file. This will have the date and appropriate extension appended to it later.
     #outputFileName=fileToTranslateFileName
@@ -770,6 +814,7 @@ def exportCache(force=False):
         return
 
     if ( int( time.perf_counter() - timeThatCacheWasLastSaved ) > defaultMinimumCacheSaveInterval) or ( force == True ):
+        # TODO: In order to minimize the chances of corruption, this should write cache to a temporary file name before quickly replacing the target file afterwards.
         cache.export( cacheFileName )
         timeThatCacheWasLastSaved = time.perf_counter()
 
@@ -786,13 +831,13 @@ def updateCache(untranslatedEntry, translation):
     # tempSearchResult can be a row number (as a string) or None if the string was not found.
     tempSearchResult=cache.searchCache( untranslatedEntry )
 
-    #if the untranslatedEntry is not in the cache
+    # if the untranslatedEntry is not in the cache
     if tempSearchResult == None:
-        #then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
+        # then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
         # This returns the row number of the found entry as a string.
         tempSearchResult = cache.addToCache( untranslatedEntry )
         cache.setCellValue( currentCacheColumn + str(tempSearchResult) , translation )
-        # So, the idea here is to limit the number of times cacheWasUpdated will be set to True which can be tens of thousands of times in a very short span of time which could potentially trigger a memory write out operation that many times depending upon how sub-programmer level caching is handled. Since CPUs are fast, and CPUs have cache for frequently used variables, this should be faster than writing out to main memory. Whether or not this opimization actually makes sense depends on hardware.
+        # So, the idea here is to limit the number of times cacheWasUpdated will be set to True which can be tens of thousands of times in a very short span of time which could potentially trigger a memory write out operation that many times depending upon how sub-programmer level caching is handled. Since CPUs are fast, and CPUs have cache for frequently used variables, this should be faster than writing out to main memory. Whether or not this optimization actually makes sense depends a lot on hardware.
         if cacheWasUpdated == False:
             cacheWasUpdated=True
 
@@ -1089,7 +1134,7 @@ if mode == 'py3translationserver':
     settingsDictionary['address']=address
     settingsDictionary['port']=port
 
-    translationEngine=py3translationServerEngine.Py3translationServerEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, settings=settingsDictionary )
+    translationEngine=py3translationServerEngine.Py3translationServerEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, characterDictionary=characterNamesDictionary, settings=settingsDictionary )
 
     #Check if the server is reachable. If not, then exit. How? The py3translationServer should have both the version and model available at http://localhost:14366/api/v1/model and version, and should have been set during initalization, so verify they are not None.
     # Update: Moved this code inside the translation engine itself and made it accessible as translationEngine.reachable which is a boolean, which is checked below.
@@ -1118,9 +1163,23 @@ elif mode=='koboldcpp':
     if memoryFileName != None:
         settingsDictionary['memory']=memoryFileContents
 
-    translationEngine=koboldCppEngine.KoboldCppEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, settings=settingsDictionary, characterDictionary=characterNamesDictionary)
+    translationEngine=koboldCppEngine.KoboldCppEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, characterDictionary=characterNamesDictionary, settings=settingsDictionary )
 
+elif mode == 'pykakasi':
+    # Build settings dictionary for this translation engine.
+    settingsDictionary={}
+    if romajiFormat != None:
+        settingsDictionary[ 'romajiFormat' ] = romajiFormat
 
+    translationEngine=pykakasiEngine.PyKakasiEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, characterDictionary=characterNamesDictionary, settings=settingsDictionary)
+
+elif mode == 'cutlet':
+    # Build settings dictionary for this translation engine.
+    settingsDictionary={}
+    if romajiFormat != None:
+        settingsDictionary[ 'romajiFormat' ] = romajiFormat
+
+    translationEngine=cutletEngine.CutletEngine( sourceLanguage=sourceLanguageFullRow, targetLanguage=targetLanguageFullRow, characterDictionary=characterNamesDictionary, settings=settingsDictionary)
 
 
 # DeepL has already been imported, and it must have an API key. (already checked for)
