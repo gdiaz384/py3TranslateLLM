@@ -10,13 +10,13 @@ PyKakasi is designed to be light weight, simple, stupid and low footprint. It do
 When you need a better quality, please choice MeCab or other modern tokenizer. When you need light weight and speed or portability but correctness is second, pykakasi is for you." -miurahr https://codeberg.org/miurahr/pykakasi/issues/157
 
 https://pykakasi.readthedocs.io/en/latest/api.html
-Despite the 'old' 1.2 API being depreciated in pykakasi 2.1, the 'new' API just does not work right. It consistently messes up punctuation and trunkates the output after the first word making it completely unusable.
+Despite the 'old' 1.2 API being depreciated in pykakasi 2.1, the 'new' API just does not work right. It consistently messes up punctuation and trunkates the output after the first word making it completely unusable. Always use the old API.
 
 Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: GNU AGPLv3.
 This plugin uses the pykakasi library that is copyright (C) 2010-2024 by Hiroshi Miura and contributors.
-GNU GPLv3 License: https://codeberg.org/miurahr/pykakasi/src/branch/master/COPYING
+pykakasi is licensed as GNU GPLv3: https://codeberg.org/miurahr/pykakasi/src/branch/master/COPYING
 See the source code for additional details: https://codeberg.org/miurahr/pykakasi
 """
 __version__='2024.05.23'

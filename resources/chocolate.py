@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.05.23'
+__version__='2024.05.25'
 
 #set defaults
 #printStuff=True
@@ -124,26 +124,26 @@ class Strawberry:
 
 
     # Expects a Python list.
-    def appendRow(self,newRow):
-        self.spreadsheet.append(newRow)
+    def appendRow( self, newRow ):
+        self.spreadsheet.append( newRow )
 
 
-    #def appendColumn(self, newColumn) #Does not seem to be needed. Data is just not processed that way.
+    #def appendColumn(self, newColumn) #Does not seem to be needed. Data is just not processed that way. Maybe the people who use pandas would appreciate it? Well, if they use pandas, then they should use pandas instead. #notmyproblemyet
 
 
     # This sets the value of the cell based upon the cellAddress in the form of 'A4'.
-    def setCellValue(self, cellAddress,value):
+    def setCellValue( self, cellAddress, value ):
         self.spreadsheet[cellAddress]=value
 
 
     # This retuns the value of the cell based upon the cellAddress in the form of 'A4'.
-    def getCellValue(self, cellAddress):
+    def getCellValue( self, cellAddress ):
         return self.spreadsheet[cellAddress].value
 
 
     # Full name of this function is _getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
     # This functions would return 'B5' from: <Cell 'Sheet'.B5>
-    def _getCellAddressFromRawCellString(self, myInputCellRaw):
+    def _getCellAddressFromRawCellString( self, myInputCellRaw ):
         #print('raw cell data='+str(myInputCellRaw))
         #myInputCellRaw=str(myInputCellRaw)
         #Basically, split the string according to . and then split it again according to > to get back only the CellAddress
@@ -153,7 +153,7 @@ class Strawberry:
 
     # This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
     # such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
-    def _getRowAndColumnFromRawCellString(self, myInputCellRaw):
+    def _getRowAndColumnFromRawCellString( self, myInputCellRaw ):
         #print('raw cell data='+str(myInputCellRaw))
         #basically, split the string according to . and then split it again according to > to get back only the CellAddress
         #myInputCell=str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
@@ -277,7 +277,7 @@ class Strawberry:
 
     # Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
     # Aside: To determine the row, the column, or both from the raw cell address, call self._getRowAndColumnFromRawCellString(rawCellAddress)
-    def searchHeaders(self, searchTerm):
+    def searchHeaders( self, searchTerm ):
         for row in self.spreadsheet.iter_rows():
             for cell in row:
                 if cell.value == searchTerm:
@@ -373,6 +373,7 @@ class Strawberry:
     # Export spreadsheet to file, write it to the file system, based upon constructor settings, path, and file extension in the path.
     def export(self, outputFileNameWithPath=None, fileEncoding=defaultTextFileEncoding, columnToExportForTextFiles='A'):
         outputFileNameOnly, outputFileExtensionOnly = os.path.splitext( str(outputFileNameWithPath) )
+        pathlib.Path( str(pathlib.Path(outputFileNameWithPath).parent) ).mkdir( parents = True, exist_ok = True )
         if outputFileExtensionOnly == '.csv':
             #Should probably try to handle the path in a sane way.
             self.exportToCSV(outputFileNameWithPath, fileEncoding=self.fileEncoding,csvDialect=self.csvDialect)

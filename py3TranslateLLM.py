@@ -980,18 +980,27 @@ if characterNamesDictionaryFileName != None:
 #The value entry in key=value in the revertAfterTranslationDictionary can be '' or None. Basically, this signifies that key contains a string that, if at the start of a line, means that line should not be ignored for paragraph consideration, but that it also should not be altered when submitting text for translation.
 if revertAfterTranslationDictionaryFileName != None:
     revertAfterTranslationDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(revertAfterTranslationDictionaryFileName, revertAfterTranslationDictionaryEncoding)
+else:
+    revertAfterTranslationDictionary=None
 
 # Read in pre dictionary.
 if preDictionaryFileName != None:
     preDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(preDictionaryFileName, preDictionaryEncoding)
+else:
+    preDictionary = None
 
 # Read in post dictionary.
 if postDictionaryFileName != None:
     postDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(postDictionaryFileName, postDictionaryEncoding)
+else:
+    postDictionary = None
 
 # Read in afterWritingToFile dictionary.
 if postWritingToFileDictionaryFileName != None:
     postWritingToFileDictionary = py3TranslateLLMfunctions.importDictionaryFromFile(postWritingToFileDictionaryFileName, postWritingToFileDictionaryEncoding)
+else:
+    postWritingToFileDictionary=None
+
 
 if verbose == True:
     print( ('characterNamesDictionary='+str(characterNamesDictionary)).encode(consoleEncoding) )
@@ -1248,12 +1257,40 @@ else:
 
 
 untranslatedEntriesColumnFull=mainSpreadsheet.getColumn('A')
+
+if debug == True:
+    # Debug code.
+    for counter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
+        assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(counter+1)) )
+        #print('pie')
+    #print('pie0')
+    print( len(untranslatedEntriesColumnFull) )
+
 untranslatedEntriesColumnFull.pop(0) #This removes the header and returns the header.
+
+if debug == True:
+    print( len(untranslatedEntriesColumnFull) )
+    # Debug code.
+    for counter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
+        assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(counter+2)) )
+
+    currentRow=2 
+    for listCounter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
+        try:
+            assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(currentRow)) )
+        except:
+            print( 'Mismatch:')
+            print( ('untranslatedString='+str(untranslatedString) ).encode(consoleEncoding) )
+            print( ('mainSpreadsheet.getCellValue(A'+ str(currentRow) + ')=' + mainSpreadsheet.getCellValue( 'A' + str(currentRow)) ).encode(consoleEncoding) )
+            raise
+        currentRow+=1
+
 
 # Debug code.
 #batchModeEnabled=False
 
 if batchModeEnabled == True:
+
     #translationEngine.batchTranslate()
     # if there is a limit to how large a batch can be, then the server should handle that internally.
     # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations. Implemented as batchSizeLimit , now just need to implement the batch limiting code.
@@ -1265,6 +1302,7 @@ if batchModeEnabled == True:
     if cacheEnabled == True:
         tempList=cache.getColumn('A')
         cacheHitCounter=0
+
     if ( cacheEnabled == True ) and ( reTranslate != True ) and ( len(tempList) > 1 ):
         # Implement cache here. Create a list that will store the raw entry, whether there was a cache hit, and the value from the cache.
         # if there was not a cache hit, then add to a different list that will store the entries to translate as a batch.
@@ -1338,7 +1376,8 @@ if batchModeEnabled == True:
     # if the cache is not enabled, if the user specified to reTranslate all lines, if the cache is too small, then skip
     #elif ( cacheEnabled != True ) or ( reTranslate == True ) or ( len(cache.getColumn('A')) <=1 ):
     else:
-        translateMe=untranslatedEntriesColumnFull
+        # Without copy(), this just creates a pointer to the original list, which means modifying the second list will also modify the original list which is not intended behavior here.
+        translateMe=untranslatedEntriesColumnFull.copy()
 
     postTranslatedList = []
     if debug==True:
@@ -1346,12 +1385,37 @@ if batchModeEnabled == True:
     # Only attempt to translate entries if there was at least one entry not found in the cache.
     if len(translateMe) > 0:
 
+        # Perform replacements specified by revertAfterTranslationDictionary.
+        if revertAfterTranslationDictionary != None:
+            for index,entry in enumerate(translateMe):
+                for key,item in revertAfterTranslationDictionary.items():
+                    if translateMe[index].find( key ) != -1:
+                        translateMe[index]=translateMe[index].replace( key, item )
+
+        # Perform replacements specified by preDictionary.
+        if preDictionary != None:
+            for index,entry in enumerate(translateMe):
+                for key,items in preDictionary.items():
+                    if translateMe[index].find( key ) != -1:
+                        translateMe[index]=translateMe[index].replace( key, item )
+
         # There should probably be batch size limiter logic here.
         # TODO: Implement it here.
 
         postTranslatedList = translationEngine.batchTranslate( translateMe )
+
     if debug==True:
-        print( ( 'postTranslatedList=' + str(postTranslatedList) ).encode(consoleEncoding) )
+        print( ( 'postTranslatedListRaw=' + str(postTranslatedList) ).encode(consoleEncoding) )
+
+    # Perform replacements specified by revertAfterTranslationDictionary, in reverse.
+    if revertAfterTranslationDictionary != None:
+        for index,entry in enumerate(translateMe):
+            for key,item in revertAfterTranslationDictionary.items():
+                if translateMe[index].find( item ) != -1:
+                    translateMe[index]=translateMe[index].replace( item, key )
+
+        if debug==True:
+            print( ( 'postTranslatedListAfterRevertAfterTranslationDictionaryChanges=' + str(postTranslatedList) ).encode(consoleEncoding) )
 
     finalTranslatedList=[]
     if cacheEnabled == True:
@@ -1403,8 +1467,19 @@ if batchModeEnabled == True:
         if ( len(postTranslatedList) != 0 ) and ( readOnlyCache == False ):
             # untranslatedEntriesColumnFull and finalTranslatedList need to be added to the cache file now.
 
-            for counter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
-                updateCache(untranslatedString,finalTranslatedList[counter])
+            for counter,untranslatedString in enumerate( untranslatedEntriesColumnFull ):
+                updateCache( untranslatedString, finalTranslatedList[counter] )
+
+    # Check with postDictionary, a Python dictionary for possible updates.
+    if postDictionary != None:
+        #print( 'pie2' )
+        for counter,entry in enumerate(finalTranslatedList):
+            for key,item in postDictionary.items():
+                #print( 'key=', key, 'item=', item )
+                if finalTranslatedList[counter].find( key ) != -1:
+                    if debug == True:
+                        print( ( 'found key=' + key + ' at line=' + str(counter) ).encode(consoleEncoding) )
+                    finalTranslatedList[counter]=finalTranslatedList[counter].replace( key, item )
 
     # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
     if overrideWithCache == True:
@@ -1421,6 +1496,12 @@ if batchModeEnabled == True:
             assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(currentRow)) )
 
             currentTranslatedCellAddress=currentMainSpreadsheetColumn + str(currentRow)
+
+            # Check with postDictionary, a Python dictionary for possible updates.
+#            if postDictionary != None:
+#                for key,items in postDictionary.items():
+#                    if finalTranslatedList[listCounter].find( key ) != -1:
+#                        finalTranslatedList[listCounter]=finalTranslatedList[listCounter].replace( key, item )
 
             #print(currentTranslatedCellAddress,end='')
             # Check if the entry is current None. if entry is none
@@ -1553,7 +1634,11 @@ else:
                     if untranslatedEntry.find( key ) != -1:
                         untranslatedEntry=untranslatedEntry.replace( key, item )
 
-            # Perform replacements specified by preTranslationDictionary.
+            # Perform replacements specified by preDictionary.
+            if preDictionary != None:
+                for key,items in preDictionary.items():
+                    if untranslatedEntry.find( key ) != -1:
+                        untranslatedEntry=untranslatedEntry.replace( key, item )
 
             # translate entry
             # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
@@ -1608,9 +1693,9 @@ else:
         if ( cacheEnabled == True ) and ( readOnlyCache == False ):
             updateCache( rawUntranslatedEntry, translatedEntry )
 
-        # check with postTranslationDictionary, a Python dictionary for possible updates
-        if postTranslationDictionary != None:
-            for key,items in postTranslationDictionary.items():
+        # Check with postDictionary, a Python dictionary for possible updates.
+        if postDictionary != None:
+            for key,items in postDictionary.items():
                 if translatedEntry.find( key ) != -1:
                     translatedEntry=translatedEntry.replace( key, item )
 

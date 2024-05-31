@@ -2,19 +2,21 @@
 
 # py3TranslateLLM.py
 
-py3TranslateLLM.py uses Artificial Intelligence (AI) to translate text files.
+py3TranslateLLM.py uses Artificial Intelligence (AI) to translate files.
 
 More specifically, this Python program is a CLI wrapper for the following translation engines:
 
-- KoboldCPP API, [Large Language Model (LLM) -  Wiki](//en.wikipedia.org/wiki/Large_language_model).
-- DeepL API (Free), [Neural net Machine Translation (NMT) - Wiki](//en.wikipedia.org/wiki/Neural_machine_translation).
+- [KoboldCpp API](//github.com/LostRuins/koboldcpp).
+- [py3translationServer](//github.com/gdiaz384/py3translationServer).
+- [DeepL API (Free)](https://www.deepl.com/pro-api).
 
 And provides interoperability for the following formats:
 
 - Comma separated value text documents (.csv).
 - Microsoft Excel 2007+ (.xlsx).
+- Plain text.
 
-The focus is the spreadsheet formats, but a built in customizable parser supports inputs and replacements into arbitrary text files.
+The focus is on producing the highest quality local [Large Language Model (LLM)](//en.wikipedia.org/wiki/Large_language_model) translations possible, but there is also support for batches using [Neural net Machine Translation (NMT)](//en.wikipedia.org/wiki/Neural_machine_translation)s and certain cloud translation APIs.
 
 ## Support is planned for:
 
@@ -27,22 +29,24 @@ The focus is the spreadsheet formats, but a built in customizable parser support
     - OpenDocument spreadsheet (.ods).
 - Generic OpenAI compatible web servers.
     - Example: https://github.com/vllm-project/vllm
+- Certain cloud based NMT translation engines: Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
+    - Use software like [this](//github.com/JustFrederik/aiotranslator) for now.
 
 Not Planned:
 
-- OpenAI's GPT. Instead consider:
-    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports both v3.5 and v4.0 LLM models.
-- Sugoi's DeepL, Sugoi Translator Premium, Sugoi Papago.
-- Most other cloud based NMT translation engines: Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
-    - Use [Translator++](//dreamsavior.net/download) or other software like [this] for those.
 - Microsoft Excel 95 (.xls).
     - This might end up being supported anyway.
+- Sugoi's DeepL, Sugoi Translator Premium, Sugoi Papago.
+- Parsing arbitrary file types. Only spreadsheets and plain text files are natively supported.
+    - To support arbitrary input (.doc, .srt, .epub, .ks, .json) see [Regarding Scope](#regarding-scope).
 
 Undetermined if:
 
-- py3TranslateLLM should incorporate any cloud based LLMs.
-    - If so, which ones that can be used for translation are expected to be long lived and have unlimited use APIs?
+- Which cloud based LLMs py3TranslateLLM should incorporate.
+    - Which ones that can be used for translation are expected to be long lived and have unlimited use APIs?
     - Or is web hooking any of them worthwhile?
+- OpenAI's GPT. For now, consider:
+    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports OpenAI's LLM models like v3.5 Turbo, v4.0 Turbo.
 - py3TranslateLLM should (unofficially) work on older Python versions like 3.4.
     - Older than 3.4 might be tricky because
         - `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4.
@@ -64,7 +68,7 @@ Undetermined if:
 - Notes:
     - The size of the model is also the RAM requirements to load it into memory.
     - The more it fits into GPU memory (VRAM), the better the performance.
-    - Not all models listed on leaderboard are compatible with KoboldCPP. See KoboldCPP's [documentation](//github.com/LostRuins/koboldcpp/wiki) for compatible model formats.
+    - Not all models listed on leaderboard are compatible with KoboldCpp. See KoboldCpp's [documentation](//github.com/LostRuins/koboldcpp/wiki) for compatible model formats.
 
 ## Installation guide
 
@@ -431,8 +435,8 @@ translationEngines/* | Required. | Handles logic for translation services. | Inc
 [xlwt](//pypi.org/project/xlwt/) | Optional. | Provides writing to Microsoft Excel Document (.xls). | `pip install xlwt` | 1.3.0
 [odfpy](//pypi.org/project/odfpy) | Optional. | Provides interoperability for Open Document Spreadsheet (.ods). | `pip install odfpy` | 1.4.1
 [tdqm](//pypi.org/project/tqdm) | Optional. | Adds progress bar to CLI. | `pip install tdqm` | 0.0.1
-[pykakasi](//codeberg.org/miurahr/pykakasi) | Optional. | Fast, simple, and lightweight JPN->Romaji dictionary. | `pip install pykakasi` | 0.0.1
-[cutlet](//github.com/polm/cutlet) | Optional. | Accurate JPN->Romaji dictionary with MeCab support. | `cpip install cutlet` | 0.0.1
+[pykakasi](//codeberg.org/miurahr/pykakasi) | Optional. | Fast, simple, and lightweight JPN->Romaji dictionary based on [Kakasi](http://kakasi.namazu.org). | `pip install pykakasi` | 2.2.1
+[cutlet](//github.com/polm/cutlet) | Optional. | Accurate JPN->Romaji dictionary with [MeCab](//taku910.github.io/mecab) support. | `pip install cutlet` | n/a
 
 Libraries can also require other libraries.
 
