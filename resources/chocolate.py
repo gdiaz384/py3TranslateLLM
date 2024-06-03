@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.05.25'
+__version__='2024.06.01'
 
 #set defaults
 #printStuff=True
@@ -24,6 +24,7 @@ inputErrorHandling='strict'
 import os.path                            # Extract extension from filename, and test if file exists.
 import pathlib                             # For pathlib.Path() Override file in file system with another and create subfolders.
 import sys                                   # End program on fail condition.
+#import random                             # Used to create random numbers. 
 import openpyxl                          # Used as the core internal data structure and also to read/write xlsx files.
 import csv                                   # Read and write to csv files. Example: Read in 'resources/languageCodes.csv'
 try:
@@ -56,19 +57,22 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, sheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, worksheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
         self.fileEncoding=fileEncoding
         self.workbook = openpyxl.Workbook()
-        if sheetNameInWorkbook == None:
+        if worksheetNameInWorkbook == None:
             self.spreadsheet = self.workbook.active
+            self.worksheetName=self.spreadsheet.title
         else:
-            #print(sheetNameInWorkbook)
-            self.workbook.create_sheet( title = sheetNameInWorkbook , index=0 )
+            self.worksheetName=worksheetNameInWorkbook
+            #print(worksheetNameInWorkbook)
+            self.workbook.create_sheet( title = self.worksheetName , index=0 )
             #print(self.workbook.sheetnames)
-            self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
+            self.spreadsheet = self.workbook[ self.worksheetName ]
         self.readOnlyMode = readOnlyMode
         self.csvDialect=csvDialect
         self.addHeaderToTextFile=addHeaderToTextFile
+        #self.randomNumber=int( random.random() * 500000 )
 
         # These last two variables are only for use when chocolate.Strawberry() is being used as cache.xlsx. Ignore otherwise.
         # Index is every entry in the first column, A with an associated pointer, as an integer, to the correct row in the main spreadsheet.
@@ -143,24 +147,30 @@ class Strawberry:
 
     # Full name of this function is _getCellAddressFromRawCellString, but was shortened for legibility. Edit: Made it longer again.
     # This functions would return 'B5' from: <Cell 'Sheet'.B5>
-    def _getCellAddressFromRawCellString( self, myInputCellRaw ):
+#    def _getCellAddressFromRawCellString( self, myInputCellRaw ):
         #print('raw cell data='+str(myInputCellRaw))
         #myInputCellRaw=str(myInputCellRaw)
         #Basically, split the string according to . and then split it again according to > to get back only the CellAddress
-        return str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
+#        return str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
         #return [currentRow, currentColumn
 
 
-    # This function returns a list containing 2 strings that represent a row and column extracted from input Cell address
+    # This function returns a tuple containing 2 strings that represent a row and column extracted from input Cell address
     # such as returning ['5', 'B'] from: <Cell 'Sheet'.B5>   It also works for complicated cases like AB534.
     def _getRowAndColumnFromRawCellString( self, myInputCellRaw ):
         #print('raw cell data='+str(myInputCellRaw))
         #basically, split the string according to . and then split it again according to > to get back only the CellAddress
-        #myInputCell=str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
-        myInputCell=self._getCellAddressFromRawCellString(myInputCellRaw)
+        myInputCell=str(myInputCellRaw).split('.', maxsplit=1)[1].split('>')[0]
+        #myInputCell=self._getCellAddressFromRawCellString(myInputCellRaw)
+ 
+       # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.utils.cell.html
+        # So apparently, there is a proper way to do this as openpyxl.utils.cell.coordinate_from_string('AB25') -> ('AB',25).
+        column,row=openpyxl.utils.cell.coordinate_from_string( myInputCell )
+        # Swap order. Maybe this should be swapped back? Humm.
+        return ( str(row), column )
+
+        # Old code:
         index=0
-        # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.utils.cell.html
-        # So apparently, there is a proper way to do this as openpyxl.utils.cell.coordinate_from_string('AB25') -> ('B',12). #TODO: Update this later.
         for i in range(10): #Magic number.
             try:
                 int(myInputCell[index:index+1])
@@ -194,11 +204,22 @@ class Strawberry:
         #print(rowNumber)
         #return spreadsheet[rowNumber] #returns the raw cell addresses instead of the values.
         #returns the values in a list
+
+        if isinstance( rowNumber, str) == True:
+            rowNumber=int(rowNumber)
+
         myList=[]
         for cell in self.spreadsheet[rowNumber]:
             if debug == True:
-                print( (str(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',').encode(consoleEncoding),end='')
-            myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
+                #print( (str(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',').encode(consoleEncoding),end='')
+                print( ( str(cell.value) + ',').encode(consoleEncoding), end='')
+            #myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
+            myList.append( cell.value )
+
+        #lengthOfHeader=len( self.spreadsheet[1] )
+        #assert( len(myList) == lengthOfHeader )
+        assert( len(myList) == len(self.spreadsheet[1]) )
+
         if debug == True:
             print('')
         return myList
@@ -214,10 +235,23 @@ class Strawberry:
             columnLetter = openpyxl.utils.cell.get_column_letter(columnLetter)
 
         myList=[]
-        for cell in self.spreadsheet[columnLetter]:  # Update: Would the built in iterators also work here?
+        # Update: Would the built in iterators also work here? #Yes, but then how does the iterator/code know not to process undesired columns? Would have to process every column until the right one is found. 
+        for cell in self.spreadsheet[columnLetter]:
             #print(str(mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value)+',',end='')
             #myList[i]=mySpreadsheet[self._getCellAddressFromRawCellString(cell)].value  #Doesn't work due to out of index error. Use append() method.
-            myList.append(self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value)
+            #myList.append( self.spreadsheet[self._getCellAddressFromRawCellString(cell)].value )
+            # v4.
+            myList.append( cell.value )
+
+        # Attempt 2.
+#        for column in self.spreadsheet.iter_cols():
+#            for cell in column:
+#                if cell.value == searchTerm:
+#                    return self._getRowAndColumnFromRawCellString(cell)[0]
+#            break
+
+        assert( len(myList) == len(self.spreadsheet['A']) )
+
         return myList
 
 
@@ -376,7 +410,7 @@ class Strawberry:
         pathlib.Path( str(pathlib.Path(outputFileNameWithPath).parent) ).mkdir( parents = True, exist_ok = True )
         if outputFileExtensionOnly == '.csv':
             #Should probably try to handle the path in a sane way.
-            self.exportToCSV(outputFileNameWithPath, fileEncoding=self.fileEncoding,csvDialect=self.csvDialect)
+            self.exportToCSV(outputFileNameWithPath, fileEncoding=self.fileEncoding, csvDialect=self.csvDialect)
         elif outputFileExtensionOnly == '.xlsx':
             self.exportToXLSX(outputFileNameWithPath)
         elif outputFileExtensionOnly == '.xls':
@@ -418,7 +452,7 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True,csvDialect=None):
+    def importFromCSV(self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True, csvDialect=None):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
@@ -541,12 +575,16 @@ class Strawberry:
     # These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with its associated row number.
     def initializeCache(self):
         # Technically, if using readOnly mode, then a perfect hash table would provide better 'performance', but not clear how to implement that, so do not worry about it.
+        #tempDict={}
         # Build index.
         for counter,entry in enumerate( self.getColumn('A') ):
+            #tempDict[entry]=None
             # Skip adding the header.
             if counter == 0:
                 continue
             # Otherwise, populate the index based upon the first column. The payload is the source row.
+            if ( entry == None ) or ( entry == '' ):
+                raise Exception( 'Unable to initalize cache due to None or empty string values in cache.' )
             self.index[entry]=counter+1
         # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds. # Update: Incorrect. It would be out of bounds if it was pointing to itself, but it is actually pointing to self.spreadsheet which needs the +1 in order for the pointer in the index to point to the correct cell in self.spreadsheet. Otherwise, it ends up pointing to the cell above it resulting in an off by 1 error.
         if len(self.index) != 0:
@@ -554,10 +592,20 @@ class Strawberry:
         else:
             # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry here.
             self.lastEntry = 1
+        assert( len(self.index)
 
     # Expects a string and searches through the current cache index. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
     def searchCache( self, myString ):
-        if myString in self.index.keys():
+        if myString == None:
+            print( 'Warning: Cannot use searchCache to search for myString=None.' )
+            return None
+        elif not isinstance(myString, str):
+            myString=str(myString)
+
+        if myString.strip() == '':
+            print( 'Warning: Cannot use searchCache to search for myString=empty string.' )
+            return None
+        elif myString in self.index.keys():
             return self.index[ myString ]
         else:
             return None
@@ -566,6 +614,16 @@ class Strawberry:
     # accepts a string or a list with a single item? Answer: Just a string.
     # Are there use cases for multiple items? When would a new entry be added together with a value? Would that be when adding both the untranslated entry and translated entry together? How is that implemented? Answer: The only thing known, unless it is computed dynamically, is the currentColumn in the form of a letter, B, C, D, E, F, and the value of the translated/untranslated pairs. There is no way to know which letter corresponds to which column in a list [A, B, C, D, E] without a way to translate that information, and inserting 'None' to all the unused entries would access the unused cells and expand the memory requirements pointlessly. Instead, only accept input as a string, add the string to the openpyxl spreadsheet, add the string to the index, update the self.lastEntry as needed, and return the row number the entry was added.  Also have some code to deal with duplicates added to the cache in a sane way.
     def addToCache( self, myString ):
+        if myString == None:
+            print( 'Warning: Cannot use addToCache to update myString=None.' )
+            return None
+        elif not isinstance(myString, str):
+            myString=str(myString)
+
+        if myString.strip() == '':
+            print( 'Warning: Cannot use addToCache to search for myString=empty string.' )
+            return None
+
         tempSearchResult = self.searchCache(myString)
         if tempSearchResult == None:
             # then add it to the main spreadsheet.
@@ -582,8 +640,44 @@ class Strawberry:
         else:
             return tempSearchResult
 
-
 """
+    def deduplicateCache(self):
+        # Algorithim for merging multiple files:
+        # Must match: sheet's name (sheet.title), and coreHeader
+        # coreHeader does not really need to match in terms of being in A1. Could just use A1 from first spreadsheet as coreHeader and then search for it in other spreadsheets. However, it must be present.
+        # for every sheet of the same name, sheet.title in all of the workbooks, turn it into database {} where the coreHeader is used as the master key for all values.
+        # The values themselves always consist of one dictionary.
+        # That one row specific value dictionary contains header=valueForRow mappings for every column except for the coreHeader column.
+        # Once every sheet has been turned into a database for that sheet.title, merge all the databases for the same sheet.title
+        # With the data finally merged and the backup database{} for a sheet complete, delete any existing sheet.title in the main workbook. Do not delete the existing workbook.
+        # Create a new worksheet with the same name.
+        # Add the values into the worksheet.
+        # delete database
+        # move on to next spreadsheet name
+
+        # Obtain header values. Use header in first cell A1 as core index.
+        # coreHeader=self.spreadsheet['A1']
+        self.index={}
+        database={}
+
+        tempDatabase = getDatabaseFromSpreadsheet( self.spreadsheet, self.spreadsheet['A'][0].value )
+
+        #dictionary={}
+        #dictionary has key derived from coreHeader. data itself is the rest of the headers and the data
+        for every untranslated entry
+        valueDictionary={key:value,key:value}
+        dictionary['untranslatedstring']
+        dictionary['untranslatedstring']=
+
+
+# This function takes a spreadsheet and returns a specially formatted Python dictionary 
+def getDatabaseFromSpreadsheet(mySpreadsheet, key)
+
+
+
+currentRow, enumerate()
+
+
 # TODO: This section.
 # Usage examples, assuming this library is in a subfolder named 'resources':
 defaultEncoding='utf-8'

@@ -32,6 +32,7 @@ defaultChineseLanguage = 'Chinese (simplified)'
 # Valid options are 'Portuguese (European)' or 'Portuguese (Brazilian)'
 defaultPortugueseLanguage = 'Portuguese (European)'
 
+validSpreadsheetExtensions=[ '.csv', '.xlsx', '.xls', '.ods', '.tsv' ]
 defaultAddress = 'http://localhost'
 defaultKoboldCppPort = 5001
 defaultPy3translationServerPort = 14366
@@ -67,7 +68,8 @@ defaultBackupsFolder='backups'
 defaultExportExtension='.xlsx'
 defaultCacheFileLocation=defaultBackupsFolder + '/cache' + defaultExportExtension
 # Cache is always saved at the end of an operation if there are any new entries, so this is only used for translations that take a very long time.
-defaultMinimumCacheSaveInterval=240 # In seconds. 240 is once every four minutes which means that, at most, only four minutes worth of processing time should be lost due to a program or translation engine error.
+defaultMinimumCacheSaveInterval=300 # In seconds. 240 is once every four minutes which means that, at most, only four minutes worth of processing time should be lost due to a program or translation engine error. 300 if 5 min.
+#defaultMinimumCacheSaveInterval=60 # For debugging.
 defaultMinimumBackupSaveInterval=540 #240 # 540 is every 9 minutes
 
 translationEnginesAvailable='parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, pykakasi, cutlet, cacheOnly'
@@ -82,6 +84,7 @@ import os, os.path                        # Extract extension from filename, and
 import pathlib                               # Works.   #dir(pathlib) does list 'Path', so just always use as pathlib.Path Constructor is pathlib.Path(mystring). Remember to convert it back to a string if printing it out.
 import sys                                     # End program on fail condition.
 import io                                        # Manipulate files (open/read/write/close).
+import random                           # Used to get a random number. Used when writing out cache to write it to a temporary file.
 #from io import IOBase               # Test if variable is a file object (an "IOBase" object).
 #import datetime                          # Used to get current date and time.
 import time                                    # Used to write out cache no more than once every 240s and also limit writes to mySpreadsheet.backup.xlsx .
@@ -318,7 +321,8 @@ if py3TranslateLLMfunctions.checkIfThisFileExists(scriptSettingsFileFullNameAndP
     print( ('Settings file found. Reading settings from: '+scriptSettingsFileNameOnly).encode(tempConsoleEncoding) )
     scriptSettingsDictionary=py3TranslateLLMfunctions.readSettingsFromTextFile(scriptSettingsFileFullNameAndPath, defaultTextEncoding, consoleEncoding=tempConsoleEncoding) #Other settings can be specified, but are basically completely unknown at this point, so just use hardcoded defaults instead.
 
-
+# TODO Important: Update this logic to not favor booleans in the .ini over the ones specified at the CLI.
+# Also rewrite this to accept unknown generic user-specified variables by putting them in a dictionary. Send that dictionary to the translationEngine in case it is useful there. This potentially half-makes sense for API keys and engine specific variables so that the main program does not have to worry about them. Does that make sense, or should main program always worry about engine specific variables in order to validate them? Are there any examples of engine variables that main program should not validate besides API keys?
 if scriptSettingsDictionary != None:
     # For every entry in dictionary, if the variable referenced by the key's value (current variable's value in script) == None, then set key equal to dictionary's.
     # There is no way to say the above in Python. Batch yes, Python no.
@@ -533,15 +537,17 @@ py3TranslateLLMfunctions.checkIfThisFolderExists(myVar)
 if languageCodesFileName == None:
     languageCodesFileName = currentScriptPathOnly + '/' + defaultLanguageCodesFile
 
-if cacheFileName != None:
+
+if cacheFileName == None:
+    cacheFileName = currentScriptPathOnly + '/' + defaultCacheFileLocation
+elif cacheFileName != None:
     # if a cache file was specified, then verify the extension is .xlsx # Update: Shouldn't .csv also work? CSV would be harder for user to edit but might take less space on disk. Need to check.
-    if (pathlib.Path(str(cacheFileName)).suffix) != '.xlsx' and (pathlib.Path(str(cacheFileName)).suffix != '.csv'):
-        print( ('\n Error: cacheFile must have a spreadsheet extension: '+ pathlib.Path(str(cacheFileName)).suffix).encode(consoleEncoding) )
+    if not pathlib.Path( str(cacheFileName) ).suffix in validSpreadsheetExtensions:
+        print( ('\n Error: cacheFile must have a spreadsheet extension instead of \''+ pathlib.Path( str(cacheFileName) ).suffix +'\'').encode(consoleEncoding) )
         print( ( 'cacheFile: \'' + str(cacheFileName)).encode(consoleEncoding) )
         sys.exit(1)
-elif cacheFileName == None:
-    cacheFileName = currentScriptPathOnly + '/' + defaultCacheFileLocation
-cachePathOnly=str(pathlib.Path(cacheFileName).parent)
+
+cacheFilePathOnly=str(pathlib.Path(cacheFileName).parent)
 
 
 py3TranslateLLMfunctions.verifyThisFileExists(fileToTranslateFileName, fileToTranslateFileName)
@@ -554,18 +560,28 @@ if mode != 'parseOnly':
 #sys.exit( ('\n Error: Please specify a valid input file. \n' + usageHelp).encode(consoleEncoding) )
 
 
-if fileToTranslateFileExtensionOnly == '.csv':
-    fileToTranslateIsASpreadsheet=True
-elif fileToTranslateFileExtensionOnly == '.xlsx':
-    fileToTranslateIsASpreadsheet=True
-elif fileToTranslateFileExtensionOnly == '.xls':
-    fileToTranslateIsASpreadsheet=True
-elif fileToTranslateFileExtensionOnly == '.ods':
+if fileToTranslateFileExtensionOnly in validSpreadsheetExtensions:
     fileToTranslateIsASpreadsheet=True
 else:
     fileToTranslateIsASpreadsheet=False
-    print( ( 'Error: Unrecognized extension for a spreadsheet: ' + str(fileToTranslateFileExtensionOnly) ).encode(consoleEncoding) )
-    sys.exit(1)
+    # if the extension is not .txt or .text
+    if not ( ( fileToTranslateFileExtensionOnly == '.txt' ) or ( fileToTranslateFileExtensionOnly == '.text' ) ):
+        print( ( 'Warning: Unrecognized extension for a spreadsheet: ' + str(fileToTranslateFileExtensionOnly) ).encode(consoleEncoding) )
+        #sys.exit(1)
+
+# Old code.
+#if fileToTranslateFileExtensionOnly == '.csv':
+#    fileToTranslateIsASpreadsheet=True
+#elif fileToTranslateFileExtensionOnly == '.xlsx':
+#    fileToTranslateIsASpreadsheet=True
+#elif fileToTranslateFileExtensionOnly == '.xls':
+#    fileToTranslateIsASpreadsheet=True
+#elif fileToTranslateFileExtensionOnly == '.ods':
+#    fileToTranslateIsASpreadsheet=True
+#else:
+#    fileToTranslateIsASpreadsheet=False
+#    print( ( 'Error: Unrecognized extension for a spreadsheet: ' + str(fileToTranslateFileExtensionOnly) ).encode(consoleEncoding) )
+#    sys.exit(1)
 
 
 # Either a raw.unparsed.txt must be specified or a raw.untranslated.csv if selecting one of the other engines.
@@ -662,7 +678,6 @@ if (mode == 'deepl_api_free') or (mode == 'deepl_api_pro'):
     # Syntax: os.environ['CT2_VERBOSE'] = '1'
 
 
-
 if ( mode == 'pykakasi' ) and ( romajiFormat != None ):
     romajiFormat = romajiFormat.lower()
     if romajiFormat in validPykakasiRomajiFormats:
@@ -689,13 +704,12 @@ if outputFileName == None:
     # If no outputFileName was specified, then set it the same as the input file. This will have the date and appropriate extension appended to it later.
     #outputFileName=fileToTranslateFileName
     #Update: Just do it here instead.
-    
     #exportExtension=defaultExportExtension 
-
     outputFileName=fileToTranslateFileName + '.translated.' + py3TranslateLLMfunctions.getDateAndTimeFull() + fileToTranslateFileExtensionOnly
 
 outputFileNameWithoutPathOrExt=pathlib.Path(outputFileName).stem
 outputFileExtensionOnly=pathlib.Path(outputFileName).suffix
+
 
 if sourceLanguageRaw == None:
     sourceLanguageRaw = defaultSourceLanguage
@@ -809,13 +823,26 @@ def backupMainSpreadsheet(outputName,force=False):
 def exportCache(force=False):
     global cache
     global timeThatCacheWasLastSaved
+    global cacheWasUpdated
+    global cacheFilePathOnly
 
-    if readOnlyCache == True:
+    if ( readOnlyCache == True ) or ( cacheWasUpdated == False ):
         return
 
-    if ( int( time.perf_counter() - timeThatCacheWasLastSaved ) > defaultMinimumCacheSaveInterval) or ( force == True ):
-        # TODO: In order to minimize the chances of corruption, this should write cache to a temporary file name before quickly replacing the target file afterwards.
-        cache.export( cacheFileName )
+    if ( int( time.perf_counter() - timeThatCacheWasLastSaved ) > defaultMinimumCacheSaveInterval ) or ( force == True ):
+
+        #Syntax: randomNumber = int( random.random() * 500000 )
+        # randomNumber = random.randrange(0,500000)
+        temporaryFileNameAndPath=cacheFilePathOnly + '/' + 'cache.temp.' + str( random.randrange(0, 500000) ) + pathlib.Path(str(cacheFileName)).suffix
+        cache.export(temporaryFileNameAndPath)
+
+        if py3TranslateLLMfunctions.checkIfThisFileExists(temporaryFileNameAndPath) == True:
+            #Replace any existing cache with the temporary one.
+            pathlib.Path(temporaryFileNameAndPath).replace( cacheFileName )
+            #print( ('Wrote cache to disk at: ' + cacheFileName).encode(consoleEncoding) )
+        else:
+            print( ('Warning: Error writing temporary cache file at:' + temporaryFileNameAndPath).encode(consoleEncoding) )
+
         timeThatCacheWasLastSaved = time.perf_counter()
 
 
@@ -1081,11 +1108,11 @@ if cacheEnabled == True:
     #First, initialize cache.xlsx file under backups/
     # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header row of course. Multiple columns with each one as a different translation engine.
     #if the path for cache does not exist, then create it.
-    pathlib.Path( cachePathOnly ).mkdir( parents = True, exist_ok = True )
+    pathlib.Path( cacheFilePathOnly ).mkdir( parents = True, exist_ok = True )
 
     # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
     # Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
-    cache=chocolate.Strawberry( myFileName = cacheFileName, fileEncoding = defaultTextEncoding, sheetNameInWorkbook = internalSourceLanguageThreeCode + '_' + internalDestinationLanguageThreeCode, readOnlyMode = readOnlyCache )
+    cache=chocolate.Strawberry( myFileName = cacheFileName, fileEncoding = defaultTextEncoding, worksheetNameInWorkbook = internalSourceLanguageThreeCode + '_' + internalDestinationLanguageThreeCode, readOnlyMode = readOnlyCache )
 
     if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) != True:
         # if the Strawberry is brand new, add header row.
@@ -1429,7 +1456,7 @@ if batchModeEnabled == True:
                     finalTranslatedList.append( entry[2] )
             # if cache was empty prior to submitting entries, then it will still be empty here. Only the header will be returned len( ~cache )==1, then there is nothing to merge, so set the output to the postTranslatedList.
             elif len( cache.getColumn('A') ) <= 1:
-                finalTranslatedList=postTranslatedList
+                finalTranslatedList=postTranslatedList.copy()
             else:
                 counter=0
                 # Need to merge processed items, postTranslatedList, with tempRequestList for finalTranslatedList.
@@ -1450,7 +1477,7 @@ if batchModeEnabled == True:
         #if reTranslate == True, then len(tempRequestList) == 0, so do not bother trying to read entries from it. Just set output to postTranslatedList.
         #elif reTranslate == True:
         else:
-            finalTranslatedList=postTranslatedList
+            finalTranslatedList=postTranslatedList.copy()
 
         if debug == True:
             print( 'len(finalTranslatedList)=' + str(len(finalTranslatedList)) )
@@ -1458,7 +1485,7 @@ if batchModeEnabled == True:
 
     #elif cacheEnabled != True:
     else:
-        finalTranslatedList=postTranslatedList
+        finalTranslatedList=postTranslatedList.copy()
 
     assert( len(finalTranslatedList) == len(untranslatedEntriesColumnFull) )
 
@@ -1485,10 +1512,14 @@ if batchModeEnabled == True:
     if overrideWithCache == True:
         finalTranslatedList.insert( 0, translationEngine.model ) # Put header back. This returns None.
         mainSpreadsheet.replaceColumn( currentMainSpreadsheetColumn , finalTranslatedList ) # Batch replace the entire column.
-
     #if overrideWithCache != True:
     else:
         # Consider each entry individually.
+
+        #print('pie pie')
+        #print('len(untranslatedEntriesColumnFull)=',len(untranslatedEntriesColumnFull) )
+        #print('reTranslate=',reTranslate)
+
         currentRow=2 # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
         for listCounter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
             #Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedEntriesColumnFull and finalTranslatedList with the same counter.
@@ -1505,13 +1536,14 @@ if batchModeEnabled == True:
 
             #print(currentTranslatedCellAddress,end='')
             # Check if the entry is current None. if entry is none
-            if mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None:
+            if ( mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None ) or ( reTranslate == True ):
                 # then always update the entry
                 mainSpreadsheet.setCellValue(currentTranslatedCellAddress, finalTranslatedList[listCounter] )
                 #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + finalTranslatedList[listCounter] ).encode(consoleEncoding) )
             # if entry is not none
             #else:
                 # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
+                # reTraslate could still be True, but in that case update 
             currentRow+=1
 
     #backupMainSpreadsheet( backupsFilePathWithNameAndDate, force=True )
@@ -1520,6 +1552,10 @@ if batchModeEnabled == True:
 else:
     # Process each entry individually.
     #currentMainSpreadsheetColumn
+
+    #if debug == True:
+    #print('BATCH MODE DISABLED.')
+    #print('reTranslate=',reTranslate)
 
 #    if cacheEnabled == True:
 #        tempList=cache.getColumn('A') ) > 1
@@ -1579,20 +1615,25 @@ else:
 
             # It is not clear where the translation already in the spreadsheet came from so do not update cache. Well, it could be determined by reading the header in the current column and looking up the same column in the cache. Will they always match perfectly or is it possible they will not match perfectly? If they always match perfectly, the model in the mainSpreadsheet and the model in cache.xlsx, then it may be possible to 
             # if the header (translation engine) of the current column in the mainSpreadsheet matches the header (translation engine) of the cache header, they should always match, right?
-            if mainSpreadsheet.getCellValue( currentMainSpreadsheetColumn + '1' ) == cache.getCellValue( currentCacheColumn + '1' ):
-                # then update the cache with what was found in the mainSpreadsheet
-                updateCache( rawUntranslatedEntry, currentMainSpreadsheetCellContents )
+            if cacheEnabled == True:
+                if mainSpreadsheet.getCellValue( currentMainSpreadsheetColumn + '1' ) == cache.getCellValue( currentCacheColumn + '1' ):
+                    # then update the cache with what was found in the mainSpreadsheet
+                    updateCache( rawUntranslatedEntry, currentMainSpreadsheetCellContents )
 
             currentRow += 1
             continue
+        #elif ( currentMainSpreadsheetCellContents == None ) or ( reTranslate == True ):
+        #else:
+            # else if retranslate is specified
 
         if cacheEnabled == True:
            # search column A in cache for raw untranslated there is a match
             tempRowNumberForCache=cache.searchCache( rawUntranslatedEntry )
+            if debug == True:
+                cache.printAllTheThings()
+                print( 'tempRowNumberForCache='+str(tempRowNumberForCache) )
 
         if debug == True:
-            cache.printAllTheThings()
-            print( 'tempRowNumberForCache='+str(tempRowNumberForCache) )
             print( 'rawUntranslatedEntry='+rawUntranslatedEntry )
             #sys.exit()
 
@@ -1620,6 +1661,8 @@ else:
                         if tempCellContents != None:
                             #Keep updating translatedEntry to favor the right-most translation engine.
                             translatedEntry=tempCellContents
+        #elif ( cacheEnabled != True ) or ( reTranslate == True ):
+        #else:
 
         # if there is no match in the cache or cache is disabled, then the fun begins
         if translatedEntry == None:
