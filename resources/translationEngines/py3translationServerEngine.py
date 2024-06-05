@@ -97,6 +97,9 @@ class Py3translationServerEngine:
             except:
                 print( 'Failure.')
                 print( 'Unable to connect to py3translationServer. Please check the connection settings and try again.' )
+        else:
+            print( 'Failure.')
+            print( 'Unable to connect to py3translationServer. Please specify a valid address and port before trying again. The address must have the correct protocol.' )
 
         if self.model != None:
             self.reachable=True

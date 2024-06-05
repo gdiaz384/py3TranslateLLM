@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.06.01'
+__version__='2024.06.04'
 
 #set defaults
 #printStuff=True
@@ -57,18 +57,19 @@ else:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method and they all still refer to the same object.
-    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, worksheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
+    def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, spreadsheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
+        # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.workbook.workbook.html
         self.fileEncoding=fileEncoding
         self.workbook = openpyxl.Workbook()
-        if worksheetNameInWorkbook == None:
+        if spreadsheetNameInWorkbook == None:
             self.spreadsheet = self.workbook.active
-            self.worksheetName=self.spreadsheet.title
+            self.spreadsheetName=self.spreadsheet.title
         else:
-            self.worksheetName=worksheetNameInWorkbook
-            #print(worksheetNameInWorkbook)
-            self.workbook.create_sheet( title = self.worksheetName , index=0 )
+            self.spreadsheetName=spreadsheetNameInWorkbook
+            #print(spreadsheetNameInWorkbook)
+            self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
             #print(self.workbook.sheetnames)
-            self.spreadsheet = self.workbook[ self.worksheetName ]
+            self.spreadsheet = self.workbook[ self.spreadsheetName ]
         self.readOnlyMode = readOnlyMode
         self.csvDialect=csvDialect
         self.addHeaderToTextFile=addHeaderToTextFile
@@ -76,6 +77,7 @@ class Strawberry:
 
         # These last two variables are only for use when chocolate.Strawberry() is being used as cache.xlsx. Ignore otherwise.
         # Index is every entry in the first column, A with an associated pointer, as an integer, to the correct row in the main spreadsheet.
+        # Every item in the cache must be unique, not None, and not an empty string ''.
         self.index={}
         # the last entry i
         self.lastEntry=len(self.index)
@@ -86,7 +88,7 @@ class Strawberry:
                 #Actually, the encoding might be None for the binary spreadsheet files. No. Then they should have their encodings specified at the command prompt or settings.ini file or get set to the default value. No reason to bother checking this then.
             #    sys.exit( ('Please specify an encoding for: ' + myFileName).encode(consoleEncoding) )
 
-            #Then find the extension of the file.
+            # Then find the extension of the file.
             myFileNameOnly, myFileExtensionOnly = os.path.splitext(myFileName)
 
             # if there is no extension, then crash.
@@ -108,11 +110,11 @@ class Strawberry:
                 if myFileExtensionOnly == '.csv':
                     self.importFromCSV( myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV, csvDialect=csvDialect )
                 elif myFileExtensionOnly == '.xlsx':
-                    self.importFromXLSX( myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook, readOnlyMode=self.readOnlyMode )
+                    self.importFromXLSX( myFileName, fileEncoding, sheetNameInWorkbook=spreadsheetNameInWorkbook, readOnlyMode=self.readOnlyMode )
                 elif myFileExtensionOnly == '.xls':
-                    self.importFromXLS( myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook )
+                    self.importFromXLS( myFileName, fileEncoding, sheetNameInWorkbook=spreadsheetNameInWorkbook )
                 elif myFileExtensionOnly == '.ods':
-                    self.importFromODS( myFileName, fileEncoding, sheetNameInWorkbook=sheetNameInWorkbook )
+                    self.importFromODS( myFileName, fileEncoding, sheetNameInWorkbook=spreadsheetNameInWorkbook )
                 else:
                     #Else the file must be a text file to instantiate a class with. Only line-by-line parsing is supported.
                     if ( myFileExtensionOnly != '.txt' ) and ( myFileExtensionOnly != '.text' ):
@@ -424,25 +426,64 @@ class Strawberry:
 
 
     # Supports line by line parsing only. Header should already be part of text file.
-    def importFromTextFile(self, fileNameWithPath,fileEncoding=defaultTextFileEncoding,addHeaderToTextFile=False):
+    def importFromTextFile(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, addHeaderToTextFile=False):
         if addHeaderToTextFile == True:
             self.appendRow( [ 'rawText', 'reserved', 'metadata' ] )
         # Open file as text file with specified encoding and input error handler.
-        with open( fileNameWithPath, 'r', newline='', encoding=fileEncoding, errors=inputErrorHandling ) as myFileHandle:
+        with open( fileNameWithPath, 'rt', newline='', encoding=fileEncoding, errors=inputErrorHandling ) as myFileHandle:
         # Create a list from every line and append that list to the current spreadsheet.
-            lines = myFileHandle.readline()
-            for counter,line in enumerate(lines):
+            fileContents = myFileHandle.read().splitlines() #readlines() does not work right. It returns a single string with lots of \n, so do not bother. read()+splitlines() works as intended.
+            for counter,line in enumerate(fileContents):
                 if line.strip() != '':
                     self.appendRow( [  line,'', counter ] )
 
 
     #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
     #if columnToExport == None: then dynamically calculate what should be exported. Only the translated line furthest to the right is valid to export, along with any untranslated lines.
-    # Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output then? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines of there is no translated line for that row.
+    # Honestly, exporting to text files does not really make sense unless line-by-line mode was enabled. Maybe remove all \n's from the output then? The translated lines should not have them, so just do not reinsert them and remove them from the source untranslated lines if there is no translated line for that row. Is that sane behavior though? Just leave the data alone as-is. Fundamentally, it is the user's responsibility to format their data before they export it, not this function that handles the actual exporting.
     # When is this useful? What is the use case? It always makes more sense to export as .csv right? Otherwise, a specific column will need to be chosen and that should probably be exposed in the CLI. Otherwise, should a mixed mode be supported? Like exporting the right-most entry in the spreadsheet data structure?
+    # That is probably the use case that makes the most sense. Translating a plain .txt file and exporting it as a .txt file. Doing spreadsheet -> .txt file exports makes less sense.
     def exportToTextFile(self, fileNameWithPath, columnToExport=None, fileEncoding=defaultTextFileEncoding):
-        print('Hello World'.encode(consoleEncoding))
-        #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
+        #print('Hello World'.encode(consoleEncoding))
+        totalLengthOfSpreadsheet=len( getColumn('A') )
+        if ( columnToExport == None ) and ( totalLengthOfSpreadsheet <=3 ):
+            # The user did not translate anything, so just export the extracted data.
+            columnToExport='A'
+        if isinstance( columnToExport, int ):
+            columnToExport=openpyxl.utils.cell.get_column_letter(columnToExport)
+        # Is this logic correct? Probably.
+        if ( columnToExport != None ) and ( not isinstance( columnToExport, str ) ):
+            print( 'Error: Unknown column to export for spreadsheet. Must be a column or None.'+str(type(columnToExport)) )
+            return
+
+        with open( fileNameWithPath, 'wt', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myFileHandle:
+            if isinstance( columnToExport, str):
+                # then pull the correct column and write out as-is.
+                tempColumn=self.getColumn(columnToExport)
+                for counter,data in enumerate(tempColumn):
+                    if ( self.addHeaderToTextFile == True ) and ( counter+1 == 1 ):
+                        # then skip first row.
+                        continue
+                    # This does not handle new lines in a sane way if there is a new line in data, but whatever. User's problem. If the lines are not formatted correctly, then they should format them correctly instead of or before exporting as a .txt file.
+                    myFileHandle.write(data + '\n')
+            # elif columnToExport == None:
+            else:
+                # then the fun begins.
+                for rowNumber in range( totalLengthOfSpreadsheet ):
+                    if ( self.addHeaderToTextFile == True ) and ( rowNumber+1 == 1 ):
+                        # then skip first row.
+                        continue
+                    tempRow=getRow( rowNumber+1 )
+                    tempString=tempRow[0]
+                    for counter,cell in enumerate( tempRow ):
+                        if ( counter > 2 ) and ( cell != None ) and ( cell != '' ):
+                            tempString=cell
+                    if tempString == None:
+                        print('Unspecified error.')
+                        return
+                    # This does not handle new lines correctly if there is a new line in tempString.
+                    myFileHandle.write(tempString + '\n')
+        print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
 
 
     #TODO:
@@ -525,7 +566,6 @@ class Strawberry:
     def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None, readOnlyMode=False):
         print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
         self.workbook=openpyxl.load_workbook(filename = fileNameWithPath, read_only=readOnlyMode)
-        #print('pie')
         if sheetNameInWorkbook == None:
             self.spreadsheet=self.workbook.active
         else:
@@ -534,6 +574,7 @@ class Strawberry:
             else:
                 self.workbook.create_sheet( title = str(sheetNameInWorkbook) , index=0 )
                 self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
+        self.spreadsheetName=self.spreadsheet.title
 
 
     # https://openpyxl.readthedocs.io/en/stable/optimized.html
@@ -577,6 +618,7 @@ class Strawberry:
         # Technically, if using readOnly mode, then a perfect hash table would provide better 'performance', but not clear how to implement that, so do not worry about it.
         #tempDict={}
         # Build index.
+        self.index={}
         for counter,entry in enumerate( self.getColumn('A') ):
             #tempDict[entry]=None
             # Skip adding the header.
@@ -584,15 +626,22 @@ class Strawberry:
                 continue
             # Otherwise, populate the index based upon the first column. The payload is the source row.
             if ( entry == None ) or ( entry == '' ):
-                raise Exception( 'Unable to initalize cache due to None or empty string values in cache.' )
+                raise Exception( 'Unable to initalize cache due to None or empty string values in cache.\nTip: Use cache.rebuildCache() to remove the empty items before trying to initializeCache().' )
             self.index[entry]=counter+1
         # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds. # Update: Incorrect. It would be out of bounds if it was pointing to itself, but it is actually pointing to self.spreadsheet which needs the +1 in order for the pointer in the index to point to the correct cell in self.spreadsheet. Otherwise, it ends up pointing to the cell above it resulting in an off by 1 error.
         if len(self.index) != 0:
             self.lastEntry = len(self.index) + 1
         else:
-            # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry here.
+            # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry from 0 to 1 here.
             self.lastEntry = 1
-        assert( len(self.index)
+        # If this fails, then it should check a variable that if set tries to deduplicate the cache.
+        try:
+            assert( len(self.index)+1 == len(self.getColumn('A')) )
+        except:
+            print('len(self.index)+1=',len(self.index) )
+            print('len(self.getColumn(A))=',len(self.getColumn('A')))
+            print( 'Error: Spreadsheet has duplicate items. Cannot use as cache.\nTip: Use cache.rebuildCache() to remove the duplicate items before trying to initializeCache(). Adding new entries while duplicates exist will corrupt the cache.')
+            raise
 
     # Expects a string and searches through the current cache index. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
     def searchCache( self, myString ):
@@ -640,10 +689,10 @@ class Strawberry:
         else:
             return tempSearchResult
 
-"""
-    def deduplicateCache(self):
-        # Algorithim for merging multiple files:
-        # Must match: sheet's name (sheet.title), and coreHeader
+
+    def rebuildCache(self, coreHeader=None, extraStrawberryToMerge=None):
+        # Algorithim for merging (deduplicating) multiple files:
+        # Must match: sheet's name (sheet.title, self.spreadsheetNameInWorkbook), and coreHeader
         # coreHeader does not really need to match in terms of being in A1. Could just use A1 from first spreadsheet as coreHeader and then search for it in other spreadsheets. However, it must be present.
         # for every sheet of the same name, sheet.title in all of the workbooks, turn it into database {} where the coreHeader is used as the master key for all values.
         # The values themselves always consist of one dictionary.
@@ -660,30 +709,211 @@ class Strawberry:
         self.index={}
         database={}
 
-        tempDatabase = getDatabaseFromSpreadsheet( self.spreadsheet, self.spreadsheet['A'][0].value )
+        if coreHeader == None:
+            coreHeader=self.spreadsheet['A1'].value
 
-        #dictionary={}
-        #dictionary has key derived from coreHeader. data itself is the rest of the headers and the data
-        for every untranslated entry
-        valueDictionary={key:value,key:value}
-        dictionary['untranslatedstring']
-        dictionary['untranslatedstring']=
+        # tempDatabase has keys derived from coreHeader. data itself is the rest of the headers and the data
+        #tempDatabase={ key:value, key:value} where the keys are untranslated strings, one string per row, and the values are another dictionary.
+        # The key:value pairs in that other dictionary are header=dataForThatRow
+        # The actual return value is a tuple (headers, database) which is returned that way to reliably get back the original headers instead of having to sort through the data to derive them.
+        tempDatabase = self._getDatabaseFromSpreadsheet( self.spreadsheet, coreHeader )
+        if tempDatabase == None:
+            print('Unspecified error turning spreadsheet into database while rebuilding cache. No work done. Exiting.')
+            return
+        assert isinstance(tempDatabase, tuple)
+
+        headersList=tempDatabase[0]
+        headers={}
+        # This de-duplicates the headers. Not a good idea actually. Duplicate headers are invalid because it is not clear how to process them, so do it anyway and error out earlier than this if there are duplicate headers.
+        for i in headersList:
+            headers[i]=None
+        # The duplicates should have already been removed.
+        assert( len(headersList) == len(headers) )
+        tempDatabase=tempDatabase[1]
+
+        # This cycles through the data to get the row headers as a dictionary {}, but the row headers will not be added for a particular item if the translation for a particular item, if that exact cell for that untranslatedString, is None. 
+        # That means the header for that item will not exist in that particular rowDictionary, but it might exist in other ones. That makes it difficult to derive the total number of headers in the data, the names of those headers, and their default order.
+        # As a workaround, adjust the return value to always return the full list of headers and just assume the tempDatabase is not corrupt.
+#        for rowDictionary in tempDatabase.values():
+#            for header in rowDictionary.keys():
+#                headers[header] = None
+#            break
+#        print('headers=',end='')
+#        for header in headers.keys():
+#            print( str(header)+',',end='' )
+#        print('')
+
+        #if extraStrawberryToMerge != None:
+            # The spreadsheetName property must match for the strawberries to be merged.
+            #if not self.spreadsheet.spreadsheetName == extraStrawberryToMerge.spreadsheetName:
+                #print('Unable to merge due to different spreadsheet names.')
+                # return or rebuild index anyway?
+            #else:
+                # The spreadsheet in the workbook should be returned by the name of the sheet, self.spreadsheet.title
+                # But if passing in the strawberry, it is accessed using the spreadsheet variable.
+                #strawberryToMergeDatabase = self._getDatabaseFromSpreadsheet( extraStrawberryToMerge.spreadsheet, coreHeader )
+
+                # Doing a generic dict1.update(dict2) will override all conflicting keys with the values in dict2. Basically, it will resolve conflicts, but also delete half the cache for those entries. Not ideal behavior.
+                #tempDatabase.update(strawberryToMergeDatabase)
+
+                # To merge two dictionaries where each dictionary has a key={dictionary}, 1) iterate through the keys of the second one. 2) If the key appears in the first one, 3) then pull both value dictionaries, 4) merge them, and 5) if necessary, update the dictionary in the key={dictionary} in the first dictionary.
+                # Fancy merge code goes here.
+
+                #Update headersDictionary.
+                #for entry in strawberryToMergeDatabase.keys():
+                #    for header in entry.keys():
+                #        headers[header] = None
+                #     break
+
+        # Delete the existing active spreadsheet in the main workbook. Do not delete the existing workbook.
+        self.workbook.remove(self.spreadsheet)
+
+        # Create a new worksheet with the same name.
+        # This does not seem to be creating the new spreadsheet with the same name as the old spreadsheet. #Update: Fixed.        self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
+        #print(self.workbook.sheetnames)
+        self.spreadsheet = self.workbook[ self.spreadsheetName ]
+
+        # Add the values into the worksheet.
+        # This needs to construct a list [] in the correct order. The first item in the list is the untranslatedEntry and/or the rowDictionary[coreHeader]=value They shoud be the same. The second item is the item specified by the headers dictionary.
+        # Add headers.
+        #tempList=[]
+        #for globalHeader in headers.keys():
+        #    tempList.append( globalHeader )
+        #self.appendRow(tempList)
+        # Add headers faster.
+        self.appendRow( headersList )
+        # Sanity check.
+        assert( coreHeader == self.getCellValue( 'A1' ) == self.spreadsheet[ 'A1' ].value )
+
+        #for every untranslated entry
+        for untranslatedEntry,rowDictionary in tempDatabase.items():
+            # Sanity check.
+            assert( untranslatedEntry == rowDictionary[coreHeader] )
+            # Build the correct row in a list with the order of the data specified by the headers.
+            tempList = [ untranslatedEntry ]
+            for globalHeader in headers.keys():
+                # if the data from the coreHeader is added, then the resulting list will have a duplicate, so prevent that.
+                if globalHeader != coreHeader:
+                    if (globalHeader in rowDictionary):
+                        tempList.append( rowDictionary[globalHeader] )
+                    else:
+                        tempList.append( None )
+            self.appendRow(tempList)
+
+        # Delete database.
+        del tempDatabase
 
 
-# This function takes a spreadsheet and returns a specially formatted Python dictionary 
-def getDatabaseFromSpreadsheet(mySpreadsheet, key)
+    # This function takes a spreadsheet and returns a specially formatted Python dictionary. If the key does not appear, it returns None.
+    def _getDatabaseFromSpreadsheet(self, mySpreadsheet, key):
+        if ( mySpreadsheet == None ) or ( key == None ):
+            return None
+
+        headers=[]
+        for entry in mySpreadsheet[1]:
+            headers.append(entry.value)
+        print( ( 'initial headers=' + str(headers) ).encode(consoleEncoding) )
+        print( 'len(headers)=', len(headers) )
+        if len(headers) == 0:
+            return None
+
+        headersDictionary={}
+        for i in headers:
+            headersDictionary[i]=None
+        if len(headersDictionary) != len(headers):
+            print( 'Duplicate headers found. Unable to make sense of data. Exiting.' )
+            return None
+
+        keyColumnAsNumber=None
+        for counter,entry in enumerate(headers):
+            if entry == key:
+                keyColumnAsNumber=counter+1 #Columns are letters, not numbers, but number 1 will map to column A, 2 to B, and so forth so add 1 to convert the header's index as a list to a column index as a number.
+                break
+        if keyColumnAsNumber == None:
+            print( 'Error: The column header chosen as an index could not be found in the spreadsheet headers: '+str(key) )
+            return None
+
+        if keyColumnAsNumber != 1:
+            # Then it is column B or similar. Move contents to Column A.
+            #Add a new column.
+            #print('pie')
+            mySpreadsheet.insert_cols(1)
+            #Copy values from old column.
+            for column in sheet.iter_cols(min_row=keyColumnAsNumber+1, max_row=keyColumnAsNumber+1, values_only=True):
+                for counter,cell in enumerate(column):
+                    #self.spreadsheet[cellAddress]=value
+                    mySpreadsheet[ 'A' + str( counter+1)]=cell
+            #Delete old column.
+            mySpreadsheet.delete_cols( keyColumnAsNumber+1 )
+            # Fix headers.
+            headers=[]
+            for entry in mySpreadsheet[1]:
+                headers.append(entry.value)
+            # Sanity checks.
+            for counter,entry in enumerate(headers):
+                if entry == key:
+                    keyColumnAsNumber=counter+1
+                    break
+            assert( keyColumnAsNumber == 1)
+            assert( headers[0] == key == mySpreadsheet['A1'].value )
+
+        tempDatabase={}
+        # tempDatabase['headers']=headers #Workaround. Nevermind. Do this properly.
+        # Now the coreHeader is always in A1 and columnA values can be used as keys in tempDatabase. Time to create a dictionary of header:value pairs for each row in order to eventually assign
+        # tempDatabase[ ColumnARowDataAsKey ]=rowDictionaryContainingHeaderAndValuePairs
+
+        #for i in range( len(headers) ):
+        #    tempDictionary={}
+        for rowCounter,row in enumerate( mySpreadsheet.iter_rows(values_only=True) ):
+            #skip header
+            if rowCounter==0:
+                continue
+
+            rowKey=mySpreadsheet[ 'A'+ str(rowCounter+1) ].value
+            if rowKey == None:
+                print( ('Null key found at row '+ str(rowCounter+1) + '.' ).encode(consoleEncoding) )
+                continue
+            elif rowKey.strip() == '':
+                print( ('Empty string key found at row '+ str(rowCounter+1) + '.').encode(consoleEncoding) )
+                continue
+
+            if rowKey in tempDatabase.keys():
+                print( ('Duplicate key found at row '+ str(rowCounter+1) + ': '+ rowKey).encode(consoleEncoding) )
+
+            tempRowDict={}
+            for columnCounter,cell in enumerate( row ):
+                if ( cell != None ) and ( cell != '' ):
+                    tempRowDict[ headers[columnCounter] ]=cell 
+
+            tempDatabase[ rowKey ]=tempRowDict
+
+        print( 'len(mySpreadsheet[A]) before rebuilding=', len(mySpreadsheet['A']) )
+        print( 'len(tempDatabase) after rebuilding=', len(tempDatabase) )
+
+        # This cycles through the data to get the row headers, but the row headers will not be added for a particular item if that item is None. 
+        # That means the header for that item will not exist in that particular rowDictionary, but it might exist in other ones. That makes it difficult to derive the total number of headers in the data, the names of those headers, and their default order.
+        # As a workaround, adjust the return value to always return the full list of headers and assume the tempDatabase is not corrupt.
+#        print( 'tempDatabaseHeaders=',end='')
+        #counter=0
+#        for rowDictionary in tempDatabase.values():
+#            for key in rowDictionary.keys():
+#                print(str(key) + ',',end='')
+#            print('')
+#            break
+        # return a tuple of the headers in the dataset, and the raw dataset itself.
+        return (headers, tempDatabase)
 
 
-
-currentRow, enumerate()
-
+"""
 
 # TODO: This section.
 # Usage examples, assuming this library is in a subfolder named 'resources':
 defaultEncoding='utf-8'
 myFileName = 'myFile.txt'
 
-import chocolate
+#import sys,pathlib
+#sys.path.append( str( pathlib.Path( __file__ ).resolve().parent) )
+import resources.chocolate as chocolate
 
 spreadsheet=chocolate.Strawberry()
 

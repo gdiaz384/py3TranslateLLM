@@ -884,6 +884,7 @@ def updateCache(untranslatedEntry, translation):
         else:
             # Then only update the cache if reTranslate == True
             if reTranslate == True:
+                #print( 'Updated cache')
                 cache.setCellValue( currentCellAddress, translation )
                 if cacheWasUpdated == False:
                     cacheWasUpdated=True
@@ -893,7 +894,7 @@ def updateCache(untranslatedEntry, translation):
         print( ('Updated cache at row ', tempSearchResult).encode(consoleEncoding)  )
 
     if readOnlyCache != True:
-    # TODO: Should have timer settings here so cache is not exported too often. # Update: Done.
+    # TODO: Should have timer settings here so cache is not exported too often. # Update: Done. # Update2: Added fancy replacement logic too.
         exportCache()
 
 
@@ -1112,14 +1113,18 @@ if cacheEnabled == True:
 
     # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
     # Initalize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
-    cache=chocolate.Strawberry( myFileName = cacheFileName, fileEncoding = defaultTextEncoding, worksheetNameInWorkbook = internalSourceLanguageThreeCode + '_' + internalDestinationLanguageThreeCode, readOnlyMode = readOnlyCache )
+    cache=chocolate.Strawberry( myFileName = cacheFileName, fileEncoding = defaultTextEncoding, spreadsheetNameInWorkbook = internalSourceLanguageThreeCode + '_' + internalDestinationLanguageThreeCode, readOnlyMode = readOnlyCache )
 
     if py3TranslateLLMfunctions.checkIfThisFileExists(cacheFileName) != True:
         # if the Strawberry is brand new, add header row.
         cache.appendRow( ['rawText'] )
 
     # Build the index from all entries in the first column.
+    # TODO: This should be more flexible. If there is an error initalizing it, then call cache.rebuildCache() and try again.
+    # However, that might be a mistake if the user specified the wrong option or file by mistake, so require user confirmation via a CLI flag for this exact action.
+    # if cli option not enabled
     cache.initializeCache() #This enables the use of searchCache() and addToCache() methods.
+    # else, do a try: except: block that includes rebuilding it.
 
     #originalNumberOfEntriesInCache=len( cache.getColumn('A') )
     cacheWasUpdated=False
@@ -1773,9 +1778,10 @@ mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToEx
 
 # https://openpyxl.readthedocs.io/en/stable/optimized.html
 # readOnlyMode requires manually closing the spreadsheet after use.
-if cacheEnabled==True:
+if cacheEnabled == True:
     if readOnlyCache == True:
         cache.close()
+    # There is a bug where cacheWasUpdated is getting set to True even if it is never updated sometimes.
     elif cacheWasUpdated == True:
         exportCache(force=True)
 
