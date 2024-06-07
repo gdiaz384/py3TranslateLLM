@@ -11,6 +11,7 @@ When you need a better quality, please choice MeCab or other modern tokenizer. W
 
 https://pykakasi.readthedocs.io/en/latest/api.html
 Despite the 'old' 1.2 API being depreciated in pykakasi 2.1, the 'new' API just does not work right. It consistently messes up punctuation and trunkates the output after the first word making it completely unusable. Always use the old API.
+Also note that roman->hira/kana conversions are not supported.
 
 Usage: See below. Like at the bottom.
 
@@ -162,8 +163,9 @@ class PyKakasiEngine:
                 self.kakasi.setMode('a',None)
 
             elif (self.romajiFormat == 'hira'):
+                #print('pie')
                 # Convert all the things, but...
-                self.kakasi.setMode('H',None) # Hiragana.
+                #self.kakasi.setMode('H',None) # Hiragana.
                 self.kakasi.setMode('K','H') # Katakana.
                 self.kakasi.setMode('J','H') # Kanji.
                 self.kakasi.setMode('E','H') # E is full length roman characters. This converts them back to half length.
@@ -172,7 +174,7 @@ class PyKakasiEngine:
             elif (self.romajiFormat == 'kana'):
                 # Convert all the things, but...
                 self.kakasi.setMode('H','K') # Hiragana.
-                self.kakasi.setMode('K',None) # Katakana.
+                #self.kakasi.setMode('K',None) # Katakana.
                 self.kakasi.setMode('J','K') # Kanji.
                 self.kakasi.setMode('E','K') # E is full length roman characters. This converts them back to half length.
                 self.kakasi.setMode('a','K') # Normal half-length roman characters.

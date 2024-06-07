@@ -16,7 +16,7 @@ And provides interoperability for the following formats:
 - Microsoft Excel 2007+ (.xlsx).
 - Plain text.
 
-The focus is on producing the highest quality local [Large Language Model (LLM)](//en.wikipedia.org/wiki/Large_language_model) translations possible, but there is also support for batches using [Neural net Machine Translation (NMT)](//en.wikipedia.org/wiki/Neural_machine_translation)s and certain cloud translation APIs.
+The focus is on producing the highest quality local [Large Language Model (LLM)](//en.wikipedia.org/wiki/Large_language_model) translations possible, but there is also support for batches using [Neural net Machine Translation (NMT)](//en.wikipedia.org/wiki/Neural_machine_translation) models and certain cloud translation APIs.
 
 ## Support is planned for:
 
@@ -72,7 +72,7 @@ Undetermined if:
 
 ## Installation guide
 
-`Current version: 2024.05.09 alpha`
+`Current version: 2024.06.06 alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 
@@ -455,7 +455,7 @@ Libraries can also require other libraries.
 
 ###  Guide: Installing and managing Python library versions with `pip`:
 
-- [pip Usage Guide](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide) - Wiki.
+- [pip Usage Guide](//github.com/gdiaz384/py3TranslateLLM/wiki/pip-Usage-Guide).
 
 ## Licenses:
 

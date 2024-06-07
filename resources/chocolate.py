@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.06.04'
+__version__='2024.06.06'
 
 #set defaults
 #printStuff=True
@@ -252,7 +252,14 @@ class Strawberry:
 #                    return self._getRowAndColumnFromRawCellString(cell)[0]
 #            break
 
-        assert( len(myList) == len(self.spreadsheet['A']) )
+        try:
+            assert( len(myList) == len(self.spreadsheet['A']) )
+        except:
+            print('len(myList)', len(myList))
+            print('len(self.spreadsheet[A])', len(self.spreadsheet['A']))
+            print('columnLetter=',columnLetter)
+            print('type(columnLetter)=',type(columnLetter))
+            raise
 
         return myList
 

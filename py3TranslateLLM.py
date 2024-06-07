@@ -12,7 +12,7 @@ License:
 - For the various libraries outside of resources/, see the Readme for their licenses and project pages.
 
 """
-__version__='2024.05.23 alpha'
+__version__='2024.06.06 alpha'
 
 #set defaults and static variables
 #Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -811,7 +811,7 @@ timeThatCacheWasLastSaved = time.perf_counter()
 timeThatBackupWasLastSaved = time.perf_counter()
 
 
-def backupMainSpreadsheet(outputName,force=False):
+def backupMainSpreadsheet(outputName, force=False):
     global mainSpreadsheet
     global timeThatBackupWasLastSaved
 
@@ -1766,7 +1766,7 @@ if debug == True:
     print('mainSpreadsheet.printAllTheThings():')
     mainSpreadsheet.printAllTheThings()
 
-mainSpreadsheet.export(outputFileName,fileEncoding=outputFileEncoding,columnToExportForTextFiles=currentMainSpreadsheetColumn)
+mainSpreadsheet.export(outputFileName, fileEncoding=outputFileEncoding, columnToExportForTextFiles=currentMainSpreadsheetColumn)
 
 
 
@@ -1787,6 +1787,7 @@ if cacheEnabled == True:
 
 print('end reached')
 sys.exit(0)
+
 """
 # Concept Art:
 

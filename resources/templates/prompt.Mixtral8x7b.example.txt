@@ -8,5 +8,6 @@ Translated text__テキスト_Note: Translation note.
 With sparkling eyes that seemed to be enjoying everything, she surveyed her reliable subordinates.__すべてを楽しんでいるかのようなきらめく瞳で、頼りになる部下たちを見渡す。__Note: The gender was not clear from the text, so it was inferred from previously translated entries.
 "The catch is the start of fishing. The real thing is about to begin."__「アタリは釣りの始まりよ。本番はこれから、釣りあげてナンボよ」__Note: The {sourceLanguage} fishing term that was used refers to the moment when a fish bites the bait.
 Just as the dozen or so people on the bridge were getting excited, a voice called out, "Quiet!"__ブリッジに詰める十数人が、わっと沸き立ちかけたとき、「静かに」と声が上がった。__Note: The {sourceLanguage} phrase describes the people as if they are boiling like water. As a result, "Quiet!" was translated with an exclamation point for emphasis.
-These are the previously translated entries: {history}
+These are the previously translated entries:
+{history}
 Now, translate the next entry. {untranslatedText}[/INST]
