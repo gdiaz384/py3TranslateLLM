@@ -30,4 +30,5 @@ Slovenian, SL, SLV, True, False
 Spanish, ES, SPA, True, False
 Swedish, SV, SWE, True, False
 Turkish, TR, TUR, True, False
+Unknown, UN, UNK, False, False
 Ukrainian, UK, UKR, True, False

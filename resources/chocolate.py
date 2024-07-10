@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods. If using this library for cache.xlsx, where entries are unique, there are specialized functions available as well.
+Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods.
+If using this library for cache.xlsx, where entries are unique, there are specialized functions available as well.
 
 Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
-
 """
-__version__='2024.06.06'
+__version__='2024.07.05'
 
 #set defaults
 #printStuff=True
@@ -44,19 +44,16 @@ except:
     odfpyLibraryIsAvailable=False
 
 #Using the 'namereplace' error handler for text encoding requires Python 3.5+, so use an older one if necessary.
-sysVersion=int(sys.version_info[1])
-if sysVersion >= 5:
+if sys.version_info.minor >= 5:
     outputErrorHandling='namereplace'
-elif sysVersion < 5:
+elif sys.version_info.minor < 5:
     outputErrorHandling='backslashreplace'    
-else:
-    sys.exit('Unspecified error.'.encode(consoleEncoding))
 
 
 #wrapper class for spreadsheet data structure
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
-    # Quirk: It can be different string/word for each method and they all still refer to the same object.
+    # Quirk: It can be different string/word for each method, and they all still refer to the same object.
     def __init__(self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, spreadsheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None):
         # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.workbook.workbook.html
         self.fileEncoding=fileEncoding
@@ -71,8 +68,8 @@ class Strawberry:
             #print(self.workbook.sheetnames)
             self.spreadsheet = self.workbook[ self.spreadsheetName ]
         self.readOnlyMode = readOnlyMode
-        self.csvDialect=csvDialect
-        self.addHeaderToTextFile=addHeaderToTextFile
+        self.csvDialect = csvDialect
+        self.addHeaderToTextFile = addHeaderToTextFile
         #self.randomNumber=int( random.random() * 500000 )
 
         # These last two variables are only for use when chocolate.Strawberry() is being used as cache.xlsx. Ignore otherwise.
@@ -439,10 +436,10 @@ class Strawberry:
         # Open file as text file with specified encoding and input error handler.
         with open( fileNameWithPath, 'rt', newline='', encoding=fileEncoding, errors=inputErrorHandling ) as myFileHandle:
         # Create a list from every line and append that list to the current spreadsheet.
-            fileContents = myFileHandle.read().splitlines() #readlines() does not work right. It returns a single string with lots of \n, so do not bother. read()+splitlines() works as intended.
+            fileContents = myFileHandle.read().splitlines() #readlines() does not work right. It returns a single string with lots of \n, so do not bother. read() + splitlines() works as intended.
             for counter,line in enumerate(fileContents):
                 if line.strip() != '':
-                    self.appendRow( [  line,'', counter ] )
+                    self.appendRow( [ line, None, counter ] )
 
 
     #columnToExport to export can be a string or an int. if string, then represents name of column. If int, represents the column in the Strawberry() data structure. The int must be converted to a letter before exporting it.
@@ -668,16 +665,16 @@ class Strawberry:
 
 
     # accepts a string or a list with a single item? Answer: Just a string.
-    # Are there use cases for multiple items? When would a new entry be added together with a value? Would that be when adding both the untranslated entry and translated entry together? How is that implemented? Answer: The only thing known, unless it is computed dynamically, is the currentColumn in the form of a letter, B, C, D, E, F, and the value of the translated/untranslated pairs. There is no way to know which letter corresponds to which column in a list [A, B, C, D, E] without a way to translate that information, and inserting 'None' to all the unused entries would access the unused cells and expand the memory requirements pointlessly. Instead, only accept input as a string, add the string to the openpyxl spreadsheet, add the string to the index, update the self.lastEntry as needed, and return the row number the entry was added.  Also have some code to deal with duplicates added to the cache in a sane way.
+    # Are there use cases for multiple items? When would a new entry be added together with a value? Would that be when adding both the untranslated entry and translated entry together? How is that implemented? Answer: The only thing known, unless it is computed dynamically, is the currentColumn in the form of a letter, B, C, D, E, F, and the value of the translated/untranslated pairs. There is no way to know which letter corresponds to which column in a list [A, B, C, D, E] without a way to translate that information, and inserting 'None' to all the unused entries would access the unused cells and expand the memory requirements pointlessly. Instead, only accept input as a string, add the string to the openpyxl spreadsheet, add the string to the index, update the self.lastEntry as needed, and return the row number the entry was added. Also have some code to deal with duplicates added to the cache in a sane way.
     def addToCache( self, myString ):
         if myString == None:
-            print( 'Warning: Cannot use addToCache to update myString=None.' )
+            print( 'Warning: Cannot use addToCache to add myString=None.' )
             return None
         elif not isinstance(myString, str):
             myString=str(myString)
 
         if myString.strip() == '':
-            print( 'Warning: Cannot use addToCache to search for myString=empty string.' )
+            print( 'Warning: Cannot use addToCache to add myString=empty string.' )
             return None
 
         tempSearchResult = self.searchCache(myString)
@@ -776,7 +773,8 @@ class Strawberry:
         self.workbook.remove(self.spreadsheet)
 
         # Create a new worksheet with the same name.
-        # This does not seem to be creating the new spreadsheet with the same name as the old spreadsheet. #Update: Fixed.        self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
+        # This does not seem to be creating the new spreadsheet with the same name as the old spreadsheet. #Update: Fixed.
+        # self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
         #print(self.workbook.sheetnames)
         self.spreadsheet = self.workbook[ self.spreadsheetName ]
 

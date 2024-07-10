@@ -11,11 +11,11 @@ Copyright (c) 2024 gdiaz384; License: See main program.
 __version__='2024.05.06'
 
 #set defaults
-#printStuff=True
-verbose=False
-debug=False
-consoleEncoding='utf-8'
-defaultTimeout=360
+#printStuff = True
+verbose = False
+debug = False
+consoleEncoding = 'utf-8'
+defaultTimeout = 360
 
 import sys
 import requests
@@ -63,6 +63,8 @@ class Py3translationServerEngine:
         self.supportsBatches=True
         self.supportsHistory=False
         self.requiresPrompt=False
+        self.promptOptional=False
+        self.supportsSummary=False
 
         # Set generic API variables for this engine.
         self.model=None

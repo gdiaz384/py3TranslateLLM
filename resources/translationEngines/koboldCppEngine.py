@@ -11,14 +11,14 @@ Copyright (c) 2024 gdiaz384; License: See main program.
 __version__='2024.05.08'
 
 #set defaults
-#printStuff=True
-verbose=False
-debug=False
-consoleEncoding='utf-8'
-defaultTimeout=360
-defaultTimeoutMulitplierForFirstRun=4
+#printStuff = True
+verbose = False
+debug = False
+consoleEncoding = 'utf-8'
+defaultTimeout = 360
+defaultTimeoutMulitplierForFirstRun = 4
 # Valid options are: autocomplete, instruct, chat.
-defaultInstructionFormat='autocomplete'
+defaultInstructionFormat = 'autocomplete'
 
 
 # For 'instruct' models, these are sequences to start and end input. Not using them results in unstable output.
@@ -70,12 +70,11 @@ for counter,entry in enumerate(mixtral8x7bInstructModels):
 # Tongyi Qianwen License. Attribution required + commercial use allowed for <100M monthly users.
 qwen1_5_32B_chatModels=[ 'qwen1_5-32b-chat-q2_k', 'qwen1_5-32b-chat-q3_k_m', 'qwen1_5-32b-chat-q4_0', 'qwen1_5-32b-chat-q4_k_m','qwen1_5-32b-chat-q5_0', 'qwen1_5-32b-chat-q5_k_m', 'qwen1_5-32b-chat-q6_k', 'qwen1_5-32b-chat-q8_0',]
 qwen1_5_72B_chatModels=[ 'qwen1_5-72b-chat-q2_k', ' qwen1_5-72b-chat-q3_k_m', 'qwen1_5-72b-chat-q4_0', 'qwen1_5-72b-chat-q4_k_m',  'qwen1_5-72b-chat-q5_0', 'qwen1_5-72b-chat-q5_k_m', 'qwen1_5-72b-chat-q6_k', 'qwen1_5-72b-chat-q8_0' ]
-
 qwen1_5_chatModels=qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
 # Problems: This model seems to have been trained on a lot of Chinese data making it odd for Japanese natural language translation since the same unicode means different things due to han unification.
 # If it does not know the English word for something, it will output the chinese symbols for it instead like 皇后 instead of 'queen' or 排列 for 'arrange'. It will not consistently output only the target language especially when given mixed language data like Speaker [English]: dialogue [Japanese].
 # It also has this weird habit of prepending random data to the output that had nothing to do with the input which makes it impossible to use history since the results get corrupt right away. It seems especially biased toward always outputting ーー. It seems to replace ― with ー perhaps? If any of the previous lines in the prompt/history had it.
-# - It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output or produce output with only blank spaces.
+# It also seems to output its own stop token right away? Banning the stop token and determining stop tokens manually seems necessary to get it to output anything at all, especially at the API level but often times it will still refuse to produce any output or produce output with only blank spaces.
 # If it fails at a trainslation, sometimes it will also just output the input data.
 # For OpenCL, while it supports processing the prompt via GPU, the generation is CPU only and is especially slow. That means, it is not actually faster than Mixtral8x7b despite using the GPU. In the typical state of caching the input prompt, it is actually a lot slower (25-33% slower).
 # Conclusion: That is A LOT of problems that make it sub-par compared to Mixtral8x7b-instruct for translation, especially Japanese -> English translation. Basically, it just uses more power with less useful output making this model worthless for translation tasks that do not involve translating into Chinese.
@@ -137,16 +136,12 @@ class KoboldCppEngine:
 #            self._chatModelInputName=defaultChatInputName
 #            self._chatModelOutputName=defaultChatOutputName
 
-
-
         return rawTranslatedText
 
 
-
-
-        # Mixtral8x7b-instruct example (old code):
+        # Old code:
+        # Mixtral8x7b-instruct example:
         if self._modelOnly in mixtral8x7bInstructModels:
-
 
             # if the translation has an underscore _, then truncate the result.
             if rawTranslatedText.find('_') != -1:
@@ -182,11 +177,11 @@ class KoboldCppEngine:
 #                    rawTranslatedText=rawTranslatedText[ len( speakerName ): ].strip()
 #                    print( 'rawTextAfterRemovingSpeaker=' + rawTranslatedText )
             if rawTranslatedText.lower().startswith( 'translation:' ):
-                rawTranslatedText=rawTranslatedText[ len( 'translation:' ): ].strip()
+                rawTranslatedText = rawTranslatedText[ len( 'translation:' ): ].strip()
             if rawTranslatedText.lower().startswith( 'translated text:' ):
-                rawTranslatedText=rawTranslatedText[ len( 'translated text:' ): ].strip()
+                rawTranslatedText = rawTranslatedText[ len( 'translated text:' ): ].strip()
             elif rawTranslatedText.lower().strip().endswith( 'note:' ):#This is more of an 'endswith() operation. string[:len('note:') ] ?
-                rawTranslatedText=rawTranslatedText.strip()[ :-len( 'note:' ) ].strip()
+                rawTranslatedText = rawTranslatedText.strip()[ :-len( 'note:' ) ].strip()
 
 #        elif self._modelOnly == another model:
             # Post processing code for another model goes here.
@@ -201,13 +196,12 @@ class KoboldCppEngine:
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
     def __init__(self, sourceLanguage=None, targetLanguage=None, characterDictionary=None, settings={} ):
 
-#address=None, port=None, timeout=360, prompt=None,
-
         # Set generic API static values for this engine.
         self.supportsBatches=False
         self.supportsHistory=True
         self.requiresPrompt=True
         self.promptOptional=False
+        self.supportsSummary=True
 
         # Set generic API variables for this engine.
         self.reachable=False  # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
@@ -249,15 +243,15 @@ class KoboldCppEngine:
         else:
             self.instructionFormat=None
         if 'timeout' in settings:
-            self.timeout=settings['timeout']
+            self.timeout=settings[ 'timeout' ]
         else:
             self.timeout=defaultTimeout
         if 'memory' in settings:
-            self.memory=settings['memory']
+            self.memory=settings[ 'memory' ]
         else:
             self.memory=None
 
-        self.prompt=settings['prompt']
+        self.prompt=settings[ 'prompt' ]
         if self.prompt.find( r'{sourceLanguage}' ) != -1:
             self.prompt=self.prompt.replace( r'{sourceLanguage}', self.sourceLanguage)
 
@@ -265,7 +259,7 @@ class KoboldCppEngine:
             self.prompt=self.prompt.replace( r'{targetLanguage}', self.targetLanguage)
 
         if debug == True:
-            print(self.prompt)
+            print( self.prompt )
 
         # Update the generic API variables for this engine with the goal of defining self.reachable, a boolean, correctly.
         print( 'Connecting to KoboldCpp API at ' + self.addressFull + ' ... ', end='')
@@ -317,14 +311,23 @@ class KoboldCppEngine:
                 self._instructModelStartSequence=defaultInstructionFormatStartSequence
                 self._instructModelEndSequence=defaultInstructionFormatEndSequence
         elif self.instructionFormat == 'chat':
-            #if (self._modelOnly in qwen1_5_chatModels) or (): #Do different chat models prefer different chat names for input/output or can any combination always be used?
+            #if (self._modelOnly in qwen1_5_chatModels) or ():
+            # Do different chat models prefer different chat names for input/output or can any combination always be used?
             self._chatModelInputName=defaultChatInputName
             self._chatModelOutputName=defaultChatOutputName
         #elif self.instructionFormat == 'autocomplete':
             # What should happen here?
 
         # Now that the instruction format is known, 
-        print('instructionFormat=' + self.instructionFormat)
+        print( 'instructionFormat=' + self.instructionFormat )
+
+
+    def getSummary(self, untranslatedList):
+        # Update memory to not include {sceneSummary}.
+        if self.memory != None:
+            tempMemory=self.memory.replace( '{sceneSummary}', '' )
+        else:
+            tempMemory=''
 
 
     # This expects a python list where every entry is a string.
@@ -332,28 +335,9 @@ class KoboldCppEngine:
         print('Hello world!')
         global debug
         global verbose
+
         return None
-
-        #debug=True
-        if debug == True:
-            print( 'len(untranslatedList)=' , len(untranslatedList) )
-            print( ( 'untranslatedList=' + str(untranslatedList) ).encode(consoleEncoding) )
-
-        # https://docs.python-requests.org/en/latest/user/advanced/#timeouts
-        translatedList = requests.post( self.addressFull, json = dict ([ ('content' , untranslatedList ), ('message' , 'translate sentences') ]), timeout=(10, self.timeout) ).json()
-
-        # strip whitespace
-        for counter,entry in enumerate(translatedList):
-            translatedList[counter]=entry.strip()
-
-        if debug == True:
-            print( ( 'translatedList=' + str(translatedList) ).encode(consoleEncoding) )
-
-        # print(len(untranslatedList))
-        # print(len(translatedList))
-        assert( len(untranslatedList) == len(translatedList) )
-
-        return translatedList
+        #return translatedList
 
 
     # This expects a string to translate. contextHistory should be a list of untranslated and translated pairs in sublists.
@@ -377,9 +361,9 @@ class KoboldCppEngine:
 
         if speakerName != None:
             #if verbose == True:
-            print( ('speakerName='+str(speakerName)).encode(consoleEncoding) )
+            print( ( 'speakerName=' + str(speakerName) ).encode(consoleEncoding) )
 
-        untranslatedString=self.preProcessText(untranslatedString)
+        untranslatedString = self.preProcessText( untranslatedString )
 
         # Syntax:
         # http://localhost:5001/api
@@ -438,7 +422,7 @@ class KoboldCppEngine:
             else:
                 tempPrompt = tempPrompt + str(speakerName) + ': ' + untranslatedString
 
-        # Build request.  TODO: Add default values for temperature and reptition penalties.
+        # Build request.  TODO: Add default values for temperature, <=0.7, and reptition penalties.
         requestDictionary={}
         requestDictionary[ 'max_length' ]=150 # The number of tokens to generate. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
         requestDictionary[ 'max_context_length' ]=self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
@@ -506,7 +490,7 @@ class KoboldCppEngine:
             print( ('rawTranslatedText=' + translatedText).encode(consoleEncoding) )
 
         # Submit the text for post processing which cleans up the formatting beyond just .strip().
-        translatedText=self.postProcessText( translatedText, untranslatedString, speakerName)
+        translatedText=self.postProcessText( translatedText, untranslatedString, speakerName )
 
         if verbose == True:
             print( ('postProcessedTranslatedText=' + translatedText).encode(consoleEncoding) )

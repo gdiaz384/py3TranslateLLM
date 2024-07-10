@@ -23,10 +23,13 @@ See the source code for additional details: https://codeberg.org/miurahr/pykakas
 __version__='2024.05.23'
 
 #set defaults
-#printStuff=True
-verbose=False
-debug=False
-consoleEncoding='utf-8'
+#printStuff = True
+verbose = False
+debug = False
+consoleEncoding = 'utf-8'
+
+validPykakasiRomajiFormats = [ 'hepburn', 'kunrei', 'passport', 'hira', 'kana' ]
+validCutletRomajiFormats = [ 'hepburn', 'kunrei', 'nihon', 'kunreisiki', 'nihonsiki' ]
 
 # romajiFormat can be 'hepburn', 'kunrei', 'passport' # Technically, 'hira' and 'kana' are valid as well.
 defaultRomajiFormat='hepburn'
@@ -104,6 +107,8 @@ class PyKakasiEngine:
         self.supportsBatches=True
         self.supportsHistory=False
         self.requiresPrompt=False
+        self.promptOptional=False
+        self.supportsSummary=False
 
         # Set generic API variables for this engine.
         self.model=None
@@ -239,6 +244,29 @@ class PyKakasiEngine:
 
 
 """
+TODO: Integrate this code above.
+if ( userInput[ 'mode' ] == 'pykakasi' ) and ( userInput[ 'romajiFormat' ] != None ):
+    userInput[ 'romajiFormat' ] = userInput[ 'romajiFormat' ].lower()
+
+    if userInput[ 'romajiFormat' ] in validPykakasiRomajiFormats:
+        pass
+    else:
+        print( ( 'Warning: romajiFormat \'' + userInput[ 'romajiFormat' ] + '\' is not valid with pykakasi. Reverting to default.' ).encode(consoleEncoding) )
+        userInput[ 'romajiFormat' ] = None
+
+
+if ( userInput[ 'mode' ] == 'cutlet' ) and ( userInput[ 'romajiFormat' ] != None ):
+    userInput[ 'romajiFormat' ] = userInput[ 'romajiFormat' ].lower()
+    if userInput[ 'romajiFormat' ] in validCutletRomajiFormats:
+        pass
+    else:
+        print( ( 'Warning: romajiFormat \'' + userInput[ 'romajiFormat' ] + '\' is not valid with cutlet. Reverting to default.' ).encode(consoleEncoding) )
+        userInput[ 'romajiFormat' ] = None
+    if userInput[ 'romajiFormat' ] == 'kunreisiki':
+        userInput[ 'romajiFormat' ] = 'kunrei'
+    elif userInput[ 'romajiFormat' ] == 'nihonsiki':
+        userInput[ 'romajiFormat' ] = 'nihon'
+
 Usage and concept art:
 # TODO: This section.
 
