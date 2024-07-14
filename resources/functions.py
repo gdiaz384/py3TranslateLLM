@@ -34,7 +34,10 @@ linesThatBeginWithThisAreComments = '#'
 assignmentOperatorInSettingsFile = '='
 inputErrorHandling = 'strict'
 #outputErrorHandling = 'namereplace'
-domainToResolveForInternetConnectivity = 'lumen.com'
+# Why yahoo? They are unlikely to go anywhere any time soon.
+#domainWithoutProtocolToResolveForInternetConnectivity='yahoo.com'
+domainWithProtocolToResolveForInternetConnectivity = 'https://yahoo.com'
+defaultTimeout=10
 
 translationEngines = 'parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
 usageHelp = '\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+ translationEngines + '.'
@@ -267,9 +270,10 @@ def getDateAndTimeFull():
 
 # Returns True if internet is available. Returns false otherwise.
 def checkIfInternetIsAvailable():
-    # TODO: Update this with some timeout method.
+    # TODO: Update this with some timeout method. Update: After some research, threading timeouts are overkill and unreliable, and request timeouts are good enough.
     try:
-        myRequest = socket.getaddrinfo( domainToResolveForInternetConnectivity, 443 )
+        #myRequest = socket.getaddrinfo( domainWithoutProtocolToResolveForInternetConnectivity, 443 )
+        requests.get( domainWithProtocolToResolveForInternetConnectivity , allow_redirects=True, timeout=(5, defaultTimeout) )
         return True
     except:
         return False
@@ -293,6 +297,8 @@ def importDictionaryFromFile( myFile, encoding=defaultTextFileEncoding ):
     else:
         print( ( 'Warning: Unrecognized extension for file: ' + str( myFile ) ).encode(consoleEncoding) )
         return None
+        # Alternatively, this could assume it is dealing with a text file that conforms to the key=value pairs syntax that also has # as comments. These files should also return dictionaries or None if there are any malformed entries. However, since that is less clear, a Warning: should probably be printed here since this code is not really meant to be called this way. Then again, having flexible code is a good thing. 
+        # readSettingsFromTextFile() would need to be updated to soft-fail by returning None instead of crashing the program on malformed data. Does updating it that way make sense? A strict=True, flag could be added to toggle this behavior without changing existing calling code, but changing the source to be strict about it is probably for the better.
 
 
 # Even if importing to a Python dictionary from .csv .xlsx .xls .ods .tsv, the rule is that the first entry for spreadsheets is headers, so the first key=value entry must be skipped regardless.

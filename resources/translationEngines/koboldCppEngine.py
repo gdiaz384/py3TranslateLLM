@@ -194,7 +194,7 @@ class KoboldCppEngine:
 #class KoboldCppEngine:
     # Address is the protocol and the ip address or hostname of the target server.
     # sourceLanguage and targetLanguage are lists that have the full language, the two letter language codes, the three letter language codes, and some meta information useful for other translation engines.
-    def __init__(self, sourceLanguage=None, targetLanguage=None, characterDictionary=None, settings={} ):
+    def __init__( self, sourceLanguage=None, targetLanguage=None, characterDictionary=None, settings={} ):
 
         # Set generic API static values for this engine.
         self.supportsBatches=False

@@ -86,7 +86,7 @@ Warning: py3TranslateLLM is currently undergoing active development. The project
     - Open an command prompt.
     - `python --version` #Check to make sure Python 3.7+ is installed.
     - `python -m pip install --upgrade pip` #Optional. Update pip, python's package manager program.
-1. Download py3TranslateLLM using one of the following methods:
+1. Download py3TranslateLLM using *one* of the following methods:
     1. Download the latest project archive:
         - Click on the green `< > Code` button at the top -> Download ZIP.
     1. Git:  #Requires `git` to be installed.

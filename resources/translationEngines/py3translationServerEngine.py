@@ -108,7 +108,7 @@ class Py3translationServerEngine:
 
 
     # This expects a python list where every entry is a string.
-    def batchTranslate(self, untranslatedList):
+    def batchTranslate(self, untranslatedList, summary=None):
         #debug=True
         if debug == True:
             print( 'len(untranslatedList)=' , len(untranslatedList) )
