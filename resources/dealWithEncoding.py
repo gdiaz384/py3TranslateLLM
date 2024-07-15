@@ -11,7 +11,7 @@ Usage: See below. Like at the bottom.
 
 License: See main program.
 """
-__version__='2024.06.22'
+__version__ = '2024.06.22'
 
 
 #set defaults

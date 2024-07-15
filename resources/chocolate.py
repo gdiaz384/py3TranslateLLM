@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 """
-__version__='2024.07.05'
+__version__ = '2024.07.05'
 
 #set defaults
 #printStuff=True
@@ -449,10 +449,11 @@ class Strawberry:
     # That is probably the use case that makes the most sense. Translating a plain .txt file and exporting it as a .txt file. Doing spreadsheet -> .txt file exports makes less sense.
     def exportToTextFile(self, fileNameWithPath, columnToExport=None, fileEncoding=defaultTextFileEncoding):
         #print('Hello World'.encode(consoleEncoding))
-        totalLengthOfSpreadsheet=len( getColumn('A') )
+        # TODO: Double check this. Is this really correct? Should it not check the rows instead of the length of a column?
+        totalLengthOfSpreadsheet = len( getColumn('A') )
         if ( columnToExport == None ) and ( totalLengthOfSpreadsheet <=3 ):
             # The user did not translate anything, so just export the extracted data.
-            columnToExport='A'
+            columnToExport = 'A'
         if isinstance( columnToExport, int ):
             columnToExport=openpyxl.utils.cell.get_column_letter(columnToExport)
         # Is this logic correct? Probably.
@@ -550,101 +551,100 @@ class Strawberry:
 
 
     def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=None):
-        with open(fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling) as myOutputFileHandle:
+        with open( fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myOutputFileHandle:
             # if csvDialect != None.:
                 # implement code related to csvDialects here. Default options are unix, excel and excel-tab
-            myCsvHandle = csv.writer(myOutputFileHandle)
+            myCsvHandle = csv.writer( myOutputFileHandle )
 
             # Get every row for current spreadsheet.
             # For every row, get each item's value in a list.
-            # myCsvHandle.writerow(thatList)
-            for row in self.spreadsheet.iter_rows(min_row=1, values_only=True):
-                tempList=[]
+            # myCsvHandle.writerow( thatList )
+            for row in self.spreadsheet.iter_rows( min_row=1, values_only=True ):
+                tempList = []
                 for cell in row:
-                    tempList.append( str(cell) )
-                myCsvHandle.writerow(tempList)
+                    tempList.append( str( cell ) )
+                myCsvHandle.writerow( tempList )
 
-        print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
+        print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
-    def importFromXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None, readOnlyMode=False):
-        print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
-        self.workbook=openpyxl.load_workbook(filename = fileNameWithPath, read_only=readOnlyMode)
+    def importFromXLSX( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None, readOnlyMode=False ):
+        print( ('Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
+        self.workbook = openpyxl.load_workbook( filename = fileNameWithPath, read_only=readOnlyMode )
         if sheetNameInWorkbook == None:
-            self.spreadsheet=self.workbook.active
+            self.spreadsheet = self.workbook.active
         else:
             if sheetNameInWorkbook in self.workbook.sheetnames:
-                self.spreadsheet=self.workbook[ sheetNameInWorkbook ]
-            else:
-                self.workbook.create_sheet( title = str(sheetNameInWorkbook) , index=0 )
                 self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
-        self.spreadsheetName=self.spreadsheet.title
+            else:
+                self.workbook.create_sheet( title = str( sheetNameInWorkbook ) , index=0 )
+                self.spreadsheet = self.workbook[ sheetNameInWorkbook ]
+        self.spreadsheetName = self.spreadsheet.title
 
 
     # https://openpyxl.readthedocs.io/en/stable/optimized.html
     # read_only requires closing the spreadsheet after use.
-    def close(self):
+    def close( self ):
         self.workbook.close()
 
 
     def exportToXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
-        #print('Hello World'.encode(consoleEncoding))
         #Syntax: 
-        #theWorkbook.save(filename="myAwesomeSpreadsheet.xlsx")
-        self.workbook.save(filename=fileNameWithPath)
-        print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
+        #theWorkbook.save(filename='myAwesomeSpreadsheet.xlsx')
+        self.workbook.save( filename=fileNameWithPath )
+        print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
     def importFromXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None):
-        print('Hello World'.encode(consoleEncoding))
-        #print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
+        print( 'Hello World' )
+        #print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
         #return workbook
 
 
-    def exportToXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
-        print('Hello World'.encode(consoleEncoding))
-        #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
+    def exportToXLS( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding ):
+        print( 'Hello World' )
+        #print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
     def importFromODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None):
-        print('Hello World'.encode(consoleEncoding))
-        #print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
+        print( 'Hello World' )
+        #print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
         #return workbook
 
 
-    def exportToODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
-        print('Hello World'.encode(consoleEncoding))
-        #print( ('Wrote: '+fileNameWithPath).encode(consoleEncoding) )
+    def exportToODS( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding ):
+        print( 'Hello World'.encode( consoleEncoding ) )
+        #print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
     # These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with its associated row number.
-    def initializeCache(self):
+    def initializeCache( self ):
         # Technically, if using readOnly mode, then a perfect hash table would provide better 'performance', but not clear how to implement that, so do not worry about it.
-        #tempDict={}
+        #tempDict = {}
         # Build index.
-        self.index={}
-        for counter,entry in enumerate( self.getColumn('A') ):
-            #tempDict[entry]=None
+        self.index = {}
+        for counter,entry in enumerate( self.getColumn( 'A' ) ):
+            #tempDict[ entry ] = None
             # Skip adding the header.
             if counter == 0:
                 continue
             # Otherwise, populate the index based upon the first column. The payload is the source row.
             if ( entry == None ) or ( entry == '' ):
                 raise Exception( 'Unable to initalize cache due to None or empty string values in cache.\nTip: Use cache.rebuildCache() to remove the empty items before trying to initializeCache().' )
-            self.index[entry]=counter+1
+            self.index[ entry ] = counter + 1
         # last entry = total length of the index since counting starts at 1. Adding 1 would put it out of bounds. # Update: Incorrect. It would be out of bounds if it was pointing to itself, but it is actually pointing to self.spreadsheet which needs the +1 in order for the pointer in the index to point to the correct cell in self.spreadsheet. Otherwise, it ends up pointing to the cell above it resulting in an off by 1 error.
-        if len(self.index) != 0:
-            self.lastEntry = len(self.index) + 1
+        if len( self.index ) != 0:
+            self.lastEntry = len( self.index ) + 1
         else:
             # There is a special failure case when initializing an empty index with only 0 or 1 entries in the main self.spreadsheet. In that case, self.lastEntry will remain 0 instead of getting incremented by 1. Then, the next time something gets cache.addToCache(), self.lastEntry will be incremented by 1 and return 1 when the correct address is actually 2, assuming a header row is present in the main self.spreadsheet which it always should be. So, increment self.lastEntry from 0 to 1 here.
             self.lastEntry = 1
-        # If this fails, then it should check a variable that if set tries to deduplicate the cache.
+        # If this fails, then it should check a variable that if set tries to deduplicate the cache. Hummmm. Maybe not here, but in main program? It should be a user decision to do rebuild or not.
         try:
-            assert( len(self.index)+1 == len(self.getColumn('A')) )
+            assert( len( self.index ) + 1 == len( self.getColumn('A') ) )
         except:
-            print('len(self.index)+1=',len(self.index) )
-            print('len(self.getColumn(A))=',len(self.getColumn('A')))
-            print( 'Error: Spreadsheet has duplicate items. Cannot use as cache.\nTip: Use cache.rebuildCache() to remove the duplicate items before trying to initializeCache(). Adding new entries while duplicates exist will corrupt the cache.')
+            print( 'len( self.index ) + 1=', len( self.index ) )
+            print( 'len( self.getColumn(A) )=', len( self.getColumn('A') ) )
+            print( 'Error: Spreadsheet has duplicate items. Cannot use as cache.\nTip: Use cache.rebuildCache() to remove the duplicate items before trying to cache.initializeCache(). Adding new entries while duplicates exist will corrupt the cache.' )
             raise
 
     # Expects a string and searches through the current cache index. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
@@ -652,10 +652,10 @@ class Strawberry:
         if myString == None:
             print( 'Warning: Cannot use searchCache to search for myString=None.' )
             return None
-        elif not isinstance(myString, str):
-            myString=str(myString)
+        elif not isinstance( myString, str ):
+            myString = str( myString )
 
-        if myString.strip() == '':
+        if myString.strip() == '' :
             print( 'Warning: Cannot use searchCache to search for myString=empty string.' )
             return None
         elif myString in self.index.keys():
@@ -670,8 +670,8 @@ class Strawberry:
         if myString == None:
             print( 'Warning: Cannot use addToCache to add myString=None.' )
             return None
-        elif not isinstance(myString, str):
-            myString=str(myString)
+        elif not isinstance( myString, str):
+            myString = str( myString )
 
         if myString.strip() == '':
             print( 'Warning: Cannot use addToCache to add myString=empty string.' )
@@ -680,13 +680,13 @@ class Strawberry:
         tempSearchResult = self.searchCache(myString)
         if tempSearchResult == None:
             # then add it to the main spreadsheet.
-            self.spreadsheet.append( [myString] )
+            self.spreadsheet.append( [ myString ] )
 
             # Update the self.lastEntry as needed.
             self.lastEntry += 1
 
             # then add it to the index.
-            self.index[myString]=self.lastEntry
+            self.index[ myString ] = self.lastEntry
 
             # And return where it was added.
             return self.lastEntry

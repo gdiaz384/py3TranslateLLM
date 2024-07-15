@@ -197,8 +197,10 @@ Variable | Scope | Description
 {untranslatedText} | prompt.txt | The current line prior to translation.
 {sourceLanguage} | All | The source language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
 {targetLanguage} | All | The target language specified at the command prompt. The literal text is the first entry in `languageCodes.csv` 
-{history} | prompt.txt | The rolling history buffer of previously untranslated/translated entry pairs. This will be formatted according to the LLM instruction type: chat, instruct, autocomplete. If this is not formatted properly, update the engine appropriately or [open an issue] to requesting to add support for a specific model.
+{history} | prompt.txt | The rolling history buffer of previously untranslated/translated entry pairs. This gets formatted according to the LLM instruction type: chat, instruct, autocomplete.
 {scene} | sceneSummary.txt | The current untranslated lines to use when generating a summary.
+
+Note: If the above is not formatted properly, update the engine.py appropriately or [open an issue] to request support for a specific LLM model.
 
 ## Release Notes:
 
