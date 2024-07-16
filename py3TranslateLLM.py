@@ -77,9 +77,9 @@ defaultMinimumSaveIntervalForSceneSummaryCache = 540
 
 # These two lists do not determine if the values are True/ False by default. Use action='store_true' and 'store_false' in the CLI options to toggle defaults and then update these two lists. These lists ensure the values are toggled correctly if a different than default setting is specified in program.ini when merging the CLI options with the options from the .ini .
 booleanValuesTrueByDefault = [ 'cache', 'batches', 'backups']
-booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'resume', 'rebuildCache', 'verbose', 'debug', 'version' ]
+booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
 
-translationEnginesAvailable = 'parseOnly, cacheOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, pykakasi, cutlet'
+translationEnginesAvailable = 'cacheOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, pykakasi, cutlet'
 usageHelp = ' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -te KoboldCpp -f myInputFile.ks \n Translation Engines: ' + translationEnginesAvailable + '.'
 
 
@@ -143,34 +143,34 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-te', '--translationEngine', help='Specify translation engine to use, options=' + translationEnginesAvailable + '.', type=str )
 
     commandLineParser.add_argument( '-f', '--fileToTranslate', help='Either the raw file to translate or the spreadsheet file to resume translating from, including path.', default=None, type=str )
-    commandLineParser.add_argument( '-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-fe', '--fileToTranslateEncoding', help='The encoding of the input file. Default=' + str( defaultTextEncoding ), default=None, type=str )
     commandLineParser.add_argument( '-of', '--outputFile', help='The file to insert translations into, including path. Default is same as input file.', default=None, type=str )
     commandLineParser.add_argument( '-ofe', '--outputFileEncoding', help='The encoding of the output file. Default is same as input file.', default=None, type=str)
 
     commandLineParser.add_argument( '-pf', '--promptFile', help='This file has the prompt for the LLM.', default=None, type=str )
-    commandLineParser.add_argument( '-pfe', '--promptFileEncoding', help='Specify encoding for prompt file, default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-pfe', '--promptFileEncoding', help='Specify encoding for prompt file, default=' + str( defaultTextEncoding ), default=None, type=str )
     commandLineParser.add_argument( '-mf', '--memoryFile', help='This file has the memory for the LLM. Optional.', default=None, type=str )
-    commandLineParser.add_argument( '-mfe', '--memoryFileEncoding', help='Specify encoding for the memory file, default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-mfe', '--memoryFileEncoding', help='Specify encoding for the memory file, default=' + str( defaultTextEncoding ), default=None, type=str )
 
-    commandLineParser.add_argument( '-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\'' + str(defaultLanguageCodesFile)+'\'.', default=None, type=str )
-    commandLineParser.add_argument( '-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv. Default=' + str(defaultTextEncoding), default=None, type=str )
-    commandLineParser.add_argument( '-sl', '--sourceLanguage', help='Specify language of source text. Default=' + str(defaultSourceLanguage), default=None, type=str )
-    commandLineParser.add_argument( '-tl', '--targetLanguage', help='Specify language of source text. Default=' + str(defaultTargetLanguage), default=None, type=str )
+    commandLineParser.add_argument( '-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\'' + str( defaultLanguageCodesFile ) + '\'.', default=None, type=str )
+    commandLineParser.add_argument( '-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
+    commandLineParser.add_argument( '-sl', '--sourceLanguage', help='Specify language of source text. Default=' + str( defaultSourceLanguage ), default=None, type=str )
+    commandLineParser.add_argument( '-tl', '--targetLanguage', help='Specify language of source text. Default=' + str( defaultTargetLanguage ), default=None, type=str )
 
     commandLineParser.add_argument( '-cnd', '--characterNamesDictionary', help='The file name and path of characterNames.csv', default=None, type=str )
-    commandLineParser.add_argument( '-cnde', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv. Default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-cnde', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
     commandLineParser.add_argument( '-revd', '--revertAfterTranslationDictionary', help='The file name and path of revertAfterTranslation.csv', default=None, type=str )
-    commandLineParser.add_argument( '-revde', '--revertAfterTranslationDictionaryEncoding', help='The encoding of file revertAfterTranslation.csv. Default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-revde', '--revertAfterTranslationDictionaryEncoding', help='The encoding of file revertAfterTranslation.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
     commandLineParser.add_argument( '-pred', '--preTranslationDictionary', help='The file name and path of preTranslation.csv', default=None, type=str)
-    commandLineParser.add_argument( '-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default=' + str(defaultTextEncoding), default=None, type=str)
+    commandLineParser.add_argument( '-prede', '--preTranslationDictionaryEncoding', help='The encoding of file preTranslation.csv. Default=' + str( defaultTextEncoding ), default=None, type=str)
     commandLineParser.add_argument( '-postd', '--postTranslationDictionary', help='The file name and path of postTranslation.csv.', default=None, type=str )
-    commandLineParser.add_argument( '-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-postde', '--postTranslationDictionaryEncoding', help='The encoding of file postTranslation.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
     # Update: postWritingToFileDictionary might only make sense for text files.
     commandLineParser.add_argument( '-postwd', '--postWritingToFileDictionary', help='The file name and path of postWritingToFile.csv.', default=None, type=str )
-    commandLineParser.add_argument( '-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default=' + str(defaultTextEncoding), default=None, type=str )
+    commandLineParser.add_argument( '-postwde', '--postWritingToFileDictionaryEncoding', help='The encoding of file postWritingToFile.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
 
     commandLineParser.add_argument( '-c', '--cache', help='Toggles cache. Specifying this will disable using or updating the cache file for translated entries. Default=Use the cache file to fill in previously translated entries and update it with new entries to speed up future translations.', action='store_false' )
-    commandLineParser.add_argument( '-cf', '--cacheFile', help='The location of the cache file. Must be in a spreadsheet format like .xlsx. Default=' + str(defaultCacheFileLocation), default=None, type=str )
+    commandLineParser.add_argument( '-cf', '--cacheFile', help='The location of the cache file. Must be in a spreadsheet format like .xlsx. Default=' + str( defaultCacheFileLocation ), default=None, type=str )
     commandLineParser.add_argument( '-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true' )
     commandLineParser.add_argument( '-owc', '--overrideWithCache', help='Override any already translated lines in the spreadsheet with results from the cache. Default=Do not override already translated lines. This setting is overwritten by reTranslate.', action='store_true' )
     commandLineParser.add_argument( '-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines. This setting takes precedence over overrideWithCache.', action='store_true' )
@@ -178,43 +178,45 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-rbc', '--rebuildCache', help='This rebuilds the cache, removing blank lines and duplicates, based upon an existing spreadsheet if there is any error detected when generating it. Use this if the cache ever becomes corrupt. Rebuilding the cache lowers memory usage. The first column will be used as the untranslated data. Default=Error out if there is any error reading the cache file. The cache cannot be rebuilt if readOnlyCache is enabled.', action='store_true' )
 
     commandLineParser.add_argument( '-ch', '--contextHistory', help='Toggles context history setting. Specifying this will toggle keeping track of or submitting history of previously translated entries to the translation engine. Default=Keep track of previously translated entries and submit them to the translation engines that support history to improve the quality of future translations.', action='store_false' )
-    commandLineParser.add_argument( '-chml', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable contextHistory. Not all translation engines support context. Default=' + str(defaultContextHistoryMaxLength), default=None, type=int )
+    commandLineParser.add_argument( '-chml', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable contextHistory. Not all translation engines support context. Default=' + str( defaultContextHistoryMaxLength ), default=None, type=int )
 
     commandLineParser.add_argument( '-ssp', '--sceneSummaryPrompt', help='Experimental feature. The location of the sceneSummaryPrompt.txt file, a text file used to generate a summary of the untranslated text prior to translation. Only valid with specific translation engines. Specifying this text file will enable generating a scene summary prior to translation to potentially boost translation quality. Due to the highly experimental nature of this feature, translations are disabled by default when this feature is enabled in order to provide time to quality check the generated summary before attempting translation and to potentially one engines/APIs to generate the summary and another for the subsequent translation. After quality checking the generated summaries, use -sset --sceneSummaryEnableTranslation to enable translations when using this feature. Actually using the summary during translation requires the following string to be present in either the memory.txt or prompt.txt file: {sceneSummary} Default=Do not generate a summary prior to translation.', default=None, type=str )
     commandLineParser.add_argument( '-sspe', '--sceneSummaryPromptEncoding', help='Experimental feature. The encoding of the sceneSummaryPrompt.txt file. Default=' + defaultTextEncoding, default=None, type=str )
-    commandLineParser.add_argument( '-ssl', '--sceneSummaryLength', help='Experimental feature. The number of entries that should be summarized at any one time. If batches are enabled, batches and this will be reduced to the same number depending on whichever is lower. Set to 0 to disable limits when generating a summary. Default=' + str(defaultSceneSummaryLength), default=None, type=int )
+    commandLineParser.add_argument( '-ssl', '--sceneSummaryLength', help='Experimental feature. The number of entries that should be summarized at any one time. If batches are enabled, batches and this will be reduced to the same number depending on whichever is lower. Set to 0 to disable limits when generating a summary. Default=' + str( defaultSceneSummaryLength ), default=None, type=int )
     commandLineParser.add_argument( '-sset', '--sceneSummaryEnableTranslation', help='Enable the use of summaries of untranslated text when translating data. This setting always requires a sceneSummaryPrompt.txt file. sceneSummaryCache.xlsx will be used as cache. Default= Do not translate when generating a summary. The summary will be inserted in place of {sceneSummary} of memory.txt and prompt.txt', action='store_true' )
     commandLineParser.add_argument( '-sscf', '--sceneSummaryCacheFile', help='Experimental feature. The location of the sceneSummaryCache.xlsx file which stores a cache of every previously generated summary. Default=' + defaultSceneSummaryCacheLocation, default=None, type=str )
 
     commandLineParser.add_argument( '-b', '--batches', help='Toggles if entries should be submitted for translations engines that support them. Enabling batches disables context history. Default=Batches are automatically enabled for NMTs that support batches and web APIs like DeepL, but disabled for LLMs. Specifying this will disable them globally for all engines.', action='store_false' )
-    commandLineParser.add_argument( '-bllm', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches and DeepL regardless of this setting. Enabling batches for LLMs disables context history. Default=' + str(defaultEnableBatchesForLLMs), action='store_true' )
-    commandLineParser.add_argument( '-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. If the scene summary feature is enabled, this and sceneSummaryLength will be reduced to the same number depending on whichever is lower. Default=' + str(defaultBatchSizeLimit), default=None, type=int )
-
-    commandLineParser.add_argument( '-bk', '--backups', help='This setting toggles writing backup files for mainSpreadsheet. This setting does not affect cache. Default=Write mainSpreadsheet to backups/[date]/* periodically for use with --resume. Specifying this will disable creating backups.', action='store_false' )
-    commandLineParser.add_argument( '-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees. Not currently implemented.', action='store_true' )
+    commandLineParser.add_argument( '-bllm', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches and DeepL regardless of this setting. Enabling batches for LLMs disables context history. Default=' + str( defaultEnableBatchesForLLMs ), action='store_true' )
+    commandLineParser.add_argument( '-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. If the scene summary feature is enabled, this and sceneSummaryLength will be reduced to the same number depending on whichever is lower. Default=' + str( defaultBatchSizeLimit ), default=None, type=int )
 
     commandLineParser.add_argument( '-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str )
     commandLineParser.add_argument( '-port', '--port', help='Specify the port for the NMT/LLM server. Example: 5001', default=None, type=int )
-    commandLineParser.add_argument( '-to', '--timeout', help='Specify the maximum number of seconds each individual request can take before quiting. Default=' + str(defaultTimeout), default=None, type=int )
+    commandLineParser.add_argument( '-to', '--timeout', help='Specify the maximum number of seconds each individual request can take before quiting. Default=' + str( defaultTimeout ), default=None, type=int )
 
-    commandLineParser.add_argument( '-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str(defaultInputTextEncodingErrorHandler) + '\'.', default=None, type=str )
-    commandLineParser.add_argument( '-oeh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str(defaultOutputTextEncodingErrorHandler) + '\'.', default=None, type=str )
+    commandLineParser.add_argument( '-bk', '--backups', help='This setting toggles writing backup files for mainSpreadsheet. This setting does not affect cache. Default=Write mainSpreadsheet to backups/[date]/* periodically for use with --resume. Specifying this will disable creating backups.', action='store_false' )
+    commandLineParser.add_argument( '-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees. Not currently implemented.', action='store_true' )
+    commandLineParser.add_argument( '-tr', '--testRun', help='Specifying this will read all input files and import the translation engine, but there will be no translation or output files written. Default=Translate contents and write output.', action='store_true' )
+    commandLineParser.add_argument( '-sf', '--settingsFile', help='The is the '+ defaultScriptSettingsFileExtension + ' file from which to read program settings. Default= The name of the program ' + defaultScriptSettingsFileExtension + ' Example: py3TranslateLLM.ini This file must be encoded as ' + defaultTextEncoding, default=None, type=str )
 
-    commandLineParser.add_argument( '-ce', '--consoleEncoding', help='Specify encoding for standard output. Default=' + str(defaultConsoleEncoding), default=None,type=str )
+    commandLineParser.add_argument( '-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str( defaultInputTextEncodingErrorHandler ) + '\'.', default=None, type=str )
+    commandLineParser.add_argument( '-oeh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str( defaultOutputTextEncodingErrorHandler ) + '\'.', default=None, type=str )
+
+    commandLineParser.add_argument( '-ce', '--consoleEncoding', help='Specify encoding for standard output. Default=' + str( defaultConsoleEncoding ), default=None,type=str )
 
     commandLineParser.add_argument( '-vb', '--verbose', help='Print more information.', action='store_true' )
     commandLineParser.add_argument( '-d', '--debug', help='Print too much information.', action='store_true' )
     commandLineParser.add_argument( '-v', '--version', help='Print version information and exit.', action='store_true' )
 
     # Import options from command line options.
-    commandLineArguments=commandLineParser.parse_args()
+    commandLineArguments = commandLineParser.parse_args()
     #print( 'debugSettingFromCLI = '+ str( commandLineArguments.debug ) )
 
     if commandLineArguments.version == True:
         print( __version__ )
         sys.exit( 0 )
 
-    userInput={}
+    userInput = {}
     userInput[ 'translationEngine' ] = commandLineArguments.translationEngine
     userInput[ 'fileToTranslate' ] = commandLineArguments.fileToTranslate
     userInput[ 'outputFile '] = commandLineArguments.outputFile
@@ -237,6 +239,7 @@ def createCommandLineOptions():
     userInput[ 'overrideWithCache' ] = commandLineArguments.overrideWithCache
     userInput[ 'reTranslate' ] = commandLineArguments.reTranslate
     userInput[ 'readOnlyCache' ] = commandLineArguments.readOnlyCache
+    userInput[ 'rebuildCache' ] = commandLineArguments.rebuildCache
 
     userInput[ 'contextHistory' ] = commandLineArguments.contextHistory
     userInput[ 'contextHistoryMaxLength' ] = commandLineArguments.contextHistoryMaxLength
@@ -250,12 +253,14 @@ def createCommandLineOptions():
     userInput[ 'batchesEnabledForLLMs' ] = commandLineArguments.batchesEnabledForLLMs
     userInput[ 'batchSizeLimit' ] = commandLineArguments.batchSizeLimit
 
-    userInput[ 'backups' ] = commandLineArguments.backups
-    userInput[ 'resume' ] = commandLineArguments.resume
-
     userInput[ 'address' ] = commandLineArguments.address  #Must be reachable. How to test for that?
     userInput[ 'port' ] = commandLineArguments.port                #Port should be conditionaly guessed. If no port specified and an address was specified, then try to guess port as either 80, 443, or default settings depending upon protocol and translationEngine selected.
     userInput[ 'timeout' ] = commandLineArguments.timeout
+
+    userInput[ 'backups' ] = commandLineArguments.backups
+    userInput[ 'resume' ] = commandLineArguments.resume
+    userInput[ 'testRun' ] = commandLineArguments.testRun
+    userInput[ 'settingsFile' ] = commandLineArguments.settingsFile
 
     userInput[ 'inputErrorHandling' ] = commandLineArguments.inputErrorHandling
     userInput[ 'outputErrorHandling' ] = commandLineArguments.outputErrorHandling
@@ -296,7 +301,7 @@ def createCommandLineOptions():
 
 # Settings specified at the command prompt take precedence, but py3translateLLM.ini still needs to be parsed.
 # This function parses that file and places the settings discovered into a dictionary. That dictionary can then be used along with the command line options to determine the program settings prior to validation of those settings. The settings after validation are the final program settings.
-def mergeUserInputSettings( userInput, currentScriptName=__file__  ):
+def mergeUserInputSettings( userInput, scriptSettingsFile = __file__  ):
     if tempConsoleEncoding in userInput:
         consoleEncoding = userInput[ 'tempConsoleEncoding' ]
         userInput.pop( 'tempConsoleEncoding' )
@@ -305,14 +310,18 @@ def mergeUserInputSettings( userInput, currentScriptName=__file__  ):
 
     # In order to read from settings.ini, the name of the current script must first be determined.
     #currentScriptFullFileNameAndPath=os.path.realpath( __file__ ) # Old code. This returns a string and the full path of the currently running script including the name and extension. 
-    currentScriptPathObject = pathlib.Path( currentScriptName ).absolute()
+    currentScriptPathObject = pathlib.Path( __file__ ).absolute()
     userInput[ 'currentScriptPathOnly' ] = str( currentScriptPathObject.parent ) # Does not include last / and this will return one subfolder up if it is called on a folder.
     userInput[ 'currentScriptNameWithoutPath' ] = currentScriptPathObject.name
     userInput[ 'currentScriptNameWithoutPathOrExt' ] = currentScriptPathObject.stem
     userInput[ 'currentScriptNameWithPathNoExt' ] = userInput[ 'currentScriptPathOnly' ] + '/' + userInput[ 'currentScriptNameWithoutPathOrExt' ]
 
     userInput[ 'backupsFolder' ] = userInput[ 'currentScriptPathOnly' ] + '/' + defaultBackupsFolder
-    scriptSettingsFileFullNameAndPath = userInput[ 'currentScriptNameWithPathNoExt' ] + defaultScriptSettingsFileExtension
+
+    if scriptSettingsFile == __file__ :
+        scriptSettingsFileFullNameAndPath = userInput[ 'currentScriptNameWithPathNoExt' ] + defaultScriptSettingsFileExtension
+    else:
+        scriptSettingsFileFullNameAndPath = str( pathlib.Path( scriptSettingsFile ).absolute() )
     scriptSettingsFileNameOnly = pathlib.Path( scriptSettingsFileFullNameAndPath ).name
 
     if ( userInput[ 'verbose' ] == True) or ( userInput[ 'debug' ] == True):
@@ -342,7 +351,7 @@ def mergeUserInputSettings( userInput, currentScriptName=__file__  ):
     # Send the userInput dictionary to the translationEngine in case it is useful there. This potentially half-makes sense for API keys and engine specific variables so that the main program does not have to worry about them. Does that make sense, or should main program always worry about engine specific variables in order to validate them? Are there any examples of engine variables that main program should not validate besides API keys?
     # Answer: Any values related to pre or post processing text should not be validated. In addition, the API of certain translation engines should be able to be changed without main program needing any direct update. Updating the engine and perhaps adding an engine specific value in the .ini should be enough to update as it is. Since updating main program should not be necessary for translation engine API changes, especially minor changes, therefore no validation should be done at all for engine specific variables. This includes pykakasi/cutlet's romaji format. TODO: Remove such ill-advised validation attempts from the CLI and .ini. Update: Done.
     if not isinstance( scriptSettingsDictionary, dict ):
-        print( ( 'Warning: Unable to read settings from \'' + str(scriptSettingsFileFullNameAndPath) + '\'' ).encode(consoleEncoding) )
+        print( ( 'Warning: Unable to read settings from \'' + str( scriptSettingsFileFullNameAndPath ) + '\'' ).encode( consoleEncoding ) )
         return userInput
 
     for key,value in scriptSettingsDictionary:
@@ -377,8 +386,8 @@ def mergeUserInputSettings( userInput, currentScriptName=__file__  ):
                         pass
                 # else if the key is in not in either booleanValuesTrueByDefault or booleanValuesFalseByDefault, then something is wrong. The value needs to be added to one of those two lists.
                 else:
-                    print( ( 'Error: Unable to merge .ini and CLI settings because the key \''+ key + '\'could not be found in either booleanValuesTrueByDefault or booleanValuesFalseByDefault. Please update the appropriate list and try again.' ).encode(consoleEncoding) )
-                    sys.exit(1)
+                    print( ( 'Error: Unable to merge .ini and CLI settings because the key \''+ key + '\'could not be found in either booleanValuesTrueByDefault or booleanValuesFalseByDefault. Please update the appropriate list and try again.' ).encode( consoleEncoding ) )
+                    sys.exit( 1 )
             # User specified something at the CLI that is not a boolean. Always use that instead. Valid types are str and int.
             elif userInput[ key ] != None:
                 pass
@@ -469,7 +478,7 @@ def validateUserInput( userInput=None ):
 
     # This cannot be set here because fileToTranslateFileExtensionOnly has not been determined yet which means this is a derived value.
     #if userInput[ 'outputFileName' ] == None:
-        # If no outputFileName was specified, then set it the same as the input file with 'translation' and the date appended.
+        # if no outputFileName was specified, then set it the same as the input file with 'translation' and the date appended.
         #userInput[ 'outputFileName' ] = userInput[ 'fileToTranslateFileName' ] + '.translated.' + functions.getDateAndTimeFull() + userInput[ 'fileToTranslateFileExtensionOnly' ]
 
     if userInput[ 'languageCodesFileName' ] == None:
@@ -550,7 +559,7 @@ def validateUserInput( userInput=None ):
     # Determine file paths now. Will be useful later.
     # pathlib.Path() does not mind mixing / and \ so always use /.
     fileToTranslatePathObject = pathlib.Path( userInput[ 'fileToTranslateFileName' ] ).absolute()
-    #fileToTranslateFileNameWithPathNoExt, fileToTranslateFileExtensionOnly = os.path.splitext(fileToTranslateFileName) # Old code.
+    #fileToTranslateFileNameWithPathNoExt, fileToTranslateFileExtensionOnly = os.path.splitext( fileToTranslateFileName ) # Old code.
     userInput[ 'fileToTranslateFileExtensionOnly' ] = fileToTranslatePathObject.suffix   # .txt  .ks  .ts .csv .xlsx .xls .ods
     userInput[ 'fileToTranslatePathOnly' ] = str( fileToTranslatePathObject.parent )  # pathlib.Path().parent returns not-a-string. Does not include final / at the end and will return one subfolder up if it is called on a folder.
     userInput[ 'fileToTranslateFileNameWithoutPath' ] = fileToTranslatePathObject.name # pathlib.Path().name returns a string.
@@ -1218,7 +1227,7 @@ def getSummary( userInput=None, programSettings=None, untranslatedList=[] ):
 
     return None
 
-def batchTranslate( userInput=None, programSettings=None, untranslatedList=[] ):
+def batchTranslate( userInput=None, programSettings=None, untranslatedList=[], sceneSummary=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
     #global cache
     #global cacheForSummary
@@ -1328,11 +1337,12 @@ def batchTranslate( userInput=None, programSettings=None, untranslatedList=[] ):
         # Perform replacements specified by revertAfterTranslationDictionary.
         if userInput[ 'revertAfterTranslationDictionary' ]  != None:
             for index,entry in enumerate( translateMe ):
-                for key,item in userInput[ 'revertAfterTranslationDictionary' ] .items():
+                for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
                     if translateMe[ index ].find( key ) != -1:
                         translateMe[ index ] = translateMe[ index ].replace( key, item )
 
-        settings = {}
+        # Core logic.
+        settings = userInput.copy()
         settings[ 'sceneSummary' ] = sceneSummary
         postTranslatedList = programSettings[ 'translationEngine' ].batchTranslate( translateMe, settings=settings )
 
@@ -1342,7 +1352,7 @@ def batchTranslate( userInput=None, programSettings=None, untranslatedList=[] ):
     # Perform replacements specified by revertAfterTranslationDictionary, in reverse.
     if userInput[ 'revertAfterTranslationDictionary' ] != None:
         for index,entry in enumerate( translateMe ):
-            for key,item in userInput[ 'revertAfterTranslationDictionary' ] .items():
+            for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
                 if translateMe[index].find( item ) != -1:
                     translateMe[ index ] = translateMe[ index ].replace( item, key )
 
@@ -1400,7 +1410,7 @@ def batchTranslate( userInput=None, programSettings=None, untranslatedList=[] ):
             # untranslatedList and finalTranslatedList need to be added to the cache file now.
 
             for counter,untranslatedString in enumerate( untranslatedList ):
-                updateCache( untranslatedString, finalTranslatedList[counter] )
+                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=untranslatedString, translation=finalTranslatedList[ counter ] )
 
     # Check with postDictionary, a Python dictionary for possible updates.
     if userInput[ 'postDictionary' ] != None:
@@ -1413,45 +1423,8 @@ def batchTranslate( userInput=None, programSettings=None, untranslatedList=[] ):
                         print( ( 'found key=' + key + ' at line=' + str(counter) ).encode(consoleEncoding) )
                     finalTranslatedList[ counter ] = finalTranslatedList[ counter ].replace( key, item )
 
-    # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
-    if overrideWithCache == True:
-        finalTranslatedList.insert( 0, translationEngine.model ) # Put header back. This returns None.
-        mainSpreadsheet.replaceColumn( currentMainSpreadsheetColumn , finalTranslatedList ) # Batch replace the entire column.
-    #if overrideWithCache != True:
-    else:
-        # Consider each entry individually.
+    return finalTranslatedList
 
-        #print('pie pie')
-        #print('len(untranslatedList)=',len(untranslatedList) )
-        #print('reTranslate=',reTranslate)
-
-        currentRow=2 # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
-        for listCounter,untranslatedString in enumerate( untranslatedList ):
-            # Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedList and finalTranslatedList with the same counter.
-            #tempSearchResult = cache.searchCache( untranslatedString )
-            assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(currentRow)) )
-
-            currentTranslatedCellAddress=currentMainSpreadsheetColumn + str(currentRow)
-
-            # Check with postDictionary, a Python dictionary for possible updates.
-#            if postDictionary != None:
-#                for key,items in postDictionary.items():
-#                    if finalTranslatedList[listCounter].find( key ) != -1:
-#                        finalTranslatedList[listCounter]=finalTranslatedList[listCounter].replace( key, item )
-
-            #print( currentTranslatedCellAddress, end='' )
-            # Check if the entry is current None. if entry is none
-            if ( mainSpreadsheet.getCellValue(currentTranslatedCellAddress) == None ) or ( reTranslate == True ):
-                # then always update the entry.
-                mainSpreadsheet.setCellValue(currentTranslatedCellAddress, finalTranslatedList[listCounter] )
-                #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + finalTranslatedList[listCounter] ).encode(consoleEncoding) )
-            # if entry is not none
-            #else:
-                # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
-                # reTraslate could still be True, but in that case update 
-            currentRow += 1
-
-    #backupMainSpreadsheet( userInput=userInput, outputName=backupsFilePathWithNameAndDate, force=True )
 
 def translate( userInput=None, programSettings=None, untranslatedList=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
@@ -1487,7 +1460,6 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
         # To check if the queue is full,
         #if contextHistory.full() == True:
 
-    currentRow = 2  # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs. 
 
 
     if tqdmAvailable == False:
@@ -1497,15 +1469,15 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
 
     # for every cell in A, try to translate it.
     for rawUntranslatedEntry in tempIterable:
-        translatedEntry=None
+        translatedEntry = None
 
         # Sanity check.
-        assert( rawUntranslatedEntry == mainSpreadsheet.getCellValue( 'A' + str(currentRow) ) )
+        assert( rawUntranslatedEntry == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( programSettings[ 'currentRow'] ) ) )
 
-        currentTranslatedCellAddress = currentMainSpreadsheetColumn + str(currentRow)
+        currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( programSettings[ 'currentRow' ] )
 
         # Get speaker, if any.
-        tempSpeakerName = mainSpreadsheet.getRow(currentRow)
+        tempSpeakerName = programSettings[ 'mainSpreadsheet' ].getRow( programSettings[ 'currentRow' ] )
         if len( tempSpeakerName ) > 1:
             tempSpeakerName = tempSpeakerName[1]
             if ( tempSpeakerName == '' ) or ( not isinstance( tempSpeakerName, str ) ):
@@ -1520,7 +1492,7 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
                 tempSpeakerName = userInput[ 'characterNamesDictionary' ][ tempSpeakerName ]
 
         # if the current cell contents are already translated, then just continue onto the next entry unless retranslate is specified.
-        currentMainSpreadsheetCellContents = mainSpreadsheet.getCellValue( currentTranslatedCellAddress )
+        currentMainSpreadsheetCellContents = programSettings[ 'mainSpreadsheet' ].getCellValue( currentTranslatedCellAddress )
         if ( currentMainSpreadsheetCellContents != None ) and ( reTranslate != True ):
             # Update the contextHistory queue.
             if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
@@ -1532,12 +1504,12 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
             # It is not clear where the translation already in the spreadsheet came from so do not update cache. # Update: Well, it could be determined by reading the header in the current column and looking up the same column in the cache. Will they always match perfectly or is it possible they will not match perfectly? If they always match perfectly, the model in the mainSpreadsheet and the model in cache.xlsx, then it may be possible to update the cache.
             # if the header (translation engine) of the current column in the mainSpreadsheet matches the header (translation engine) of the cache header
             # They should always match, right?
-            if cacheEnabled == True:
-                if mainSpreadsheet.getCellValue( currentMainSpreadsheetColumn + '1' ) == cache.getCellValue( currentCacheColumn + '1' ):
+            if userInput[ 'cacheEnabled' ] == True:
+                if programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + '1' ) == programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + '1' ):
                     # then update the cache with what was found in the mainSpreadsheet
-                    updateCache( rawUntranslatedEntry, currentMainSpreadsheetCellContents )
+                    updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=rawUntranslatedEntry, translation=currentMainSpreadsheetCellContents )
 
-            currentRow += 1
+            programSettings[ 'currentRow' ] += 1
             continue
         #elif ( currentMainSpreadsheetCellContents == None ) or ( userInput[ 'reTranslate' ] == True ):
         #else:
@@ -1560,7 +1532,7 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
             tempAddress=None
             # if tempRowNumberForCache == None, that means the untranslated string does not appear in the cache.
             if tempRowNumberForCache != None:
-                tempAddress = currentCacheColumn + str(tempRowNumberForCache)
+                tempAddress = currentCacheColumn + str( tempRowNumberForCache )
 
                 # if cache hit confirmed, then set this to translatedEntry=
                 # get cell back and check if that cell is not None. If it is None, then that means the untranslated string does appear in the cache, but not for that exact model. A different entry might be valid with cache any match.
@@ -1628,7 +1600,7 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
             # once it is back check to make sure it is not None or another error value
             if ( translatedEntry == None ) or ( translatedEntry == '' ):
                 print( ( 'Unable to translate: ' + untranslatedEntry).encode(consoleEncoding) )
-                currentRow += 1
+                programSettings[ 'currentRow' ] += 1
                 continue
 
         # History should be updated before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
@@ -1651,7 +1623,7 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
 
         # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
         if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
-            updateCache( rawUntranslatedEntry, translatedEntry )
+            updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=rawUntranslatedEntry, translation=translatedEntry )
 
         # Check with postDictionary, a Python dictionary for possible updates.
         if userInput[ 'postDictionary' ] != None:
@@ -1667,11 +1639,8 @@ def translate( userInput=None, programSettings=None, untranslatedList=None ):
             backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFilePathWithNameAndDate' ] )
 
         # and move on to next cell
-        currentRow += 1
+        programSettings[ 'currentRow' ] += 1
         continue
-
-    # Now that all entries have been translated, process them to put them into the spreadsheet data structure in the specified column.
-    # if overrideWithCache == True: then always output cell contents even if the cell's contents already exist.
 
 
 def main( userInput=None ):
@@ -1680,7 +1649,10 @@ def main( userInput=None ):
         # Define command line options.
         # userInput is a dictionary.
         userInput = createCommandLineOptions()
-        userInput = mergeInput( userInput, __name__ )
+        if userInput[ 'settingsFile' ] != None:
+            userInput = mergeInput( userInput, userInput[ 'settingsFile' ] )
+        else:
+            userInput = mergeInput( userInput, __name__ )
 
     # Verify input.
     userInput = validateUserInput( userInput )
@@ -1697,7 +1669,7 @@ def main( userInput=None ):
     # Initialize programSettings dictionary. Instead of making everything global, the idea is to organize variables, including class instances, into this dictionary and pass the dictionary around. This should split variables into 1) userInput, 2) programSettings, or 3) local function variables. Passing the programSettings dictionary as an argument to a function passes a pointer to it in CPython, so there should be no performance ramifications compared to global variables.
     programSettings = {}
 
-    # Initialize some counters.
+    # Initialize some counters and other variables.
     # How can these values be copied without having them all point to the same object? Does time.perf_counter() have some sort of .copy() utility method? Well, it should not matter because a new object is created whenever they need to be updated. Having them all point to the same object initially should not matter.
     currentTime = time.perf_counter()
     programSettings[ 'timeThatBackupOfMainSpreadsheetWasLastSaved' ] = currentTime
@@ -1706,6 +1678,7 @@ def main( userInput=None ):
 
     programSettings[ 'cacheWasUpdated' ] = False
     programSettings[ 'sceneSummaryCacheWasUpdated' ] = False
+    programSettings[ 'currentRow' ] = 2 # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs.
 
     # Next turn fileToTranslateFileName into a data structure. How? Read the file, then create data structure from that file.
     # chocolate.Strawberry() is a wrapper class for the onenpyxl.workbook class with additional methods.
@@ -1766,7 +1739,7 @@ def main( userInput=None ):
         # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
         # Initialize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
         global cache
-        cache=chocolate.Strawberry( myFileName = userInput[ 'cacheFileName' ], fileEncoding = defaultTextEncoding, spreadsheetNameInWorkbook = userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode'], readOnlyMode = userInput[ 'readOnlyCache' ] )
+        programSettings[ 'cache' ] = chocolate.Strawberry( myFileName = userInput[ 'cacheFileName' ], fileEncoding = defaultTextEncoding, spreadsheetNameInWorkbook = userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode' ], readOnlyMode = userInput[ 'readOnlyCache' ] )
 
         if functions.checkIfThisFileExists( userInput[ 'cacheFileName' ] ) != True:
             # if the Strawberry is brand new, add header row.
@@ -1776,7 +1749,7 @@ def main( userInput=None ):
         # TODO: This should be more flexible. If there is an error initalizing it, then call cache.rebuildCache() and try again.
         # However, that might be a mistake if the user specified the wrong option or file by mistake, so require user confirmation via a CLI flag for this exact action.
         # if cli option not enabled
-        cache.initializeCache() # This enables the use of searchCache() and addToCache() methods.
+        programSettings[ 'cache' ].initializeCache() # This enables the use of searchCache() and addToCache() methods.
         # else, do a try: except: block that includes rebuilding it.
 
         #originalNumberOfEntriesInCache = len( cache.getColumn( 'A' ) )
@@ -1938,61 +1911,110 @@ def main( userInput=None ):
         else:
             batchModeEnabled=False
 
-    untranslatedEntriesColumnFull = mainSpreadsheet.getColumn( 'A' )
+    untranslatedEntriesColumnFull = programSettings[ 'mainSpreadsheet' ].getColumn( 'A' )
 
     if debug == True:
         # Debug code.
-        for counter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
-            assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(counter+1)) )
-            #print('pie')
-        #print('pie0')
-        print( len(untranslatedEntriesColumnFull) )
+        for counter,untranslatedString in enumerate( untranslatedEntriesColumnFull ):
+            assert( untranslatedString == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( counter + 1 )) )
+            #print( 'pie' )
+        #print( 'pie0' )
+        print( len( untranslatedEntriesColumnFull ) )
 
     untranslatedEntriesColumnFull.pop(0) # This removes the header and returns the header.
 
     if debug == True:
-        print( len(untranslatedEntriesColumnFull) )
+        print( len( untranslatedEntriesColumnFull ) )
         # Debug code.
-        for counter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
-            assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(counter+2)) )
+        for counter,untranslatedString in enumerate( untranslatedEntriesColumnFull ):
+            assert( untranslatedString == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( counter + 2 ) ) )
 
         currentRow=2 
-        for listCounter,untranslatedString in enumerate(untranslatedEntriesColumnFull):
+        for listCounter,untranslatedString in enumerate( untranslatedEntriesColumnFull ):
             try:
-                assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str(currentRow)) )
+                assert( untranslatedString == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( currentRow )) )
             except:
                 print( 'Mismatch:')
-                print( ('untranslatedString='+str(untranslatedString) ).encode(consoleEncoding) )
-                print( ('mainSpreadsheet.getCellValue(A'+ str(currentRow) + ')=' + mainSpreadsheet.getCellValue( 'A' + str(currentRow)) ).encode(consoleEncoding) )
+                print( ( 'untranslatedString=' + str( untranslatedString ) ).encode( consoleEncoding ) )
+                print( ( 'mainSpreadsheet.getCellValue( A' + str( currentRow ) + ' )=' + mainSpreadsheet.getCellValue( 'A' + str( currentRow ) ) ).encode(consoleEncoding) )
                 raise
             currentRow += 1
 
     # Debug code.
     #batchModeEnabled=False
 
+
+
     if batchModeEnabled == True:
 
-        if userInput[ 'batchSize' ] > userInput[ 'summarySize' ]:
-            userInput[ 'batchSize' ] = userInput[ 'summarySize' ]
-        elif userInput[ 'summarySize' ] > userInput[ 'batchSize' ]:
-            userInput[ 'summarySize' ] = userInput[ 'batchSize' ]
-        assert( userInput[ 'batchSize' ] == userInput[ 'summarySize' ] )
+        # Moved.
+        #if userInput[ 'batchSize' ] > userInput[ 'summarySize' ]:
+        #    userInput[ 'batchSize' ] = userInput[ 'summarySize' ]
+        #elif userInput[ 'summarySize' ] > userInput[ 'batchSize' ]:
+        #    userInput[ 'summarySize' ] = userInput[ 'batchSize' ]
+        if userInput[ 'sceneSummaryEnabled' ] == True:
+            assert( userInput[ 'batchSize' ] == userInput[ 'summarySize' ] )
 
-
-        # range(start, stop, stepAmount):
-        #for i in range(0, len(untranslatedList), maxBatchSize):
+        # range( start, stop, stepAmount ):
+        #for i in range(0, len(untranslatedList), maxBatchSize ):
         #    translateBatchFunction( untranslatedList[ i : i + maxBatchSize ]  )
         #    print( untranslatedList[ i : i + maxBatchSize ]  )
 
-        for i in range(0, len(untranslatedEntriesColumnFull), maxBatchSize):
-            if userInput[ 'sceneSummaryPrompt' ] != None:
+        for i in range( 0, len( programSettings[ 'untranslatedEntriesColumnFull' ] ), userInput[ 'maxBatchSize'] ):
+            if userInput[ 'sceneSummaryEnabled' ] != None:
                 # This either returns none or a string.
-                sceneSummary=getSceneSummary( userInput=userInput, untranslatedList=untranslatedList[ i : i + maxBatchSize ], translationEngine=translationEngine)
+                sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedList=untranslatedList[ i : i + maxBatchSize ] )
             else:
                 sceneSummary=None
 
-            if enableTranslation == True:
-                batchTranslate( userInput=userInput, untranslatedList=untranslatedList[ i : i + maxBatchSize ], translationEngine=translationEngine, summary=sceneSummary )
+            if ( sceneSummaryEnabled == False ) or ( ( sceneSummaryEnabled == True ) and ( sceneSummaryEnableTranslation == True ):
+                translatedList = batchTranslate( userInput=userInput, programSettings=programSettings, untranslatedList=untranslatedList[ i : i + maxBatchSize ], sceneSummary=sceneSummary )
+
+
+                # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
+                if overrideWithCache == True:
+                    translatedList.insert( 0, translationEngine.model ) # Put header back. This returns None.
+                    programSettings[ 'mainSpreadsheet' ].replaceColumn( programSettings[ 'currentMainSpreadsheetColumn' ] , translatedList ) # Batch replace the entire column.
+                #if overrideWithCache != True:
+                else:
+                    # Consider each entry individually.
+
+                    #print('pie pie')
+                    #print('len(untranslatedList)=',len(untranslatedList) )
+                    #print('reTranslate=',reTranslate)
+
+
+                    for listCounter,untranslatedString in enumerate( untranslatedList ):
+                        # Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedList and translatedList with the same counter.
+                        #tempSearchResult = programSettings[ 'cache' ].searchCache( untranslatedString )
+                        assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str( programSettings[ 'currentRow' ] ) ) )
+
+                        currentTranslatedCellAddress= programSettings[ 'currentMainSpreadsheetColumn' ] + str( programSettings[ 'currentRow' ] )
+
+                        # Check with postDictionary, a Python dictionary for possible updates.
+            #            if postDictionary != None:
+            #                for key,items in postDictionary.items():
+            #                    if translatedList[listCounter].find( key ) != -1:
+            #                        translatedList[listCounter]=translatedList[listCounter].replace( key, item )
+
+                        #print( currentTranslatedCellAddress, end='' )
+                        # Check if the entry is current None. if entry is none
+                        if ( programSettings[ 'mainSpreadsheet' ].getCellValue( currentTranslatedCellAddress ) == None ) or ( userInput[ 'reTranslate' ] == True ):
+                            # then always update the entry.
+                            programSettings[ 'mainSpreadsheet' ].setCellValue( currentTranslatedCellAddress, translatedList[ listCounter ] )
+                            #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + translatedList[ listCounter ] ).encode( consoleEncoding ) )
+                        # if entry is not none
+                        #else:
+                            # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
+                            # reTraslate could still be True, but in that case update 
+                        programSettings[ 'currentRow' ] += 1
+
+                #backupMainSpreadsheet( userInput=userInput, outputName=backupsFilePathWithNameAndDate, force=True )
+
+
+
+
+
 
         # if there is a limit to how large a batch can be, then the server should handle that internally.
         # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations. Implemented as batchSizeLimit , now just need to implement the batch limiting code.
@@ -2000,27 +2022,28 @@ def main( userInput=None ):
 
     #elif batchModeEnabled == False:
     else:
-        translate( userInput=userInput, untranslatedList=untranslatedEntriesColumnFull, translationEngine=translationEngine, summary=None)
+        translate( userInput=userInput, programSettings=programSettings, untranslatedList=untranslatedEntriesColumnFull, summary=None)
 
 
     if debug == True:
-        print('mainSpreadsheet.printAllTheThings():')
-        mainSpreadsheet.printAllTheThings()
+        print( 'mainSpreadsheet.printAllTheThings():' )
+        programSettings[ 'mainSpreadsheet' ].printAllTheThings()
 
-    mainSpreadsheet.export( userInput[ 'outputFileName' ], fileEncoding=userInput[ 'outputFileEncoding' ], columnToExportForTextFiles=currentMainSpreadsheetColumn )
+    if userInput[ 'testRun' ] != True:
+        programSettings[ 'mainSpreadsheet' ].export( userInput[ 'outputFileName' ], fileEncoding=userInput[ 'outputFileEncoding' ], columnToExportForTextFiles=currentMainSpreadsheetColumn )
 
     # https://openpyxl.readthedocs.io/en/stable/optimized.html
     # readOnlyMode requires manually closing the spreadsheet after use.
-    if cacheEnabled == True:
+    if userInput[ 'cacheEnabled' ] == True:
         if userInput[ 'readOnlyCache' ] == True:
-            cache.close()
+            programSettings[ 'cache' ].close()
         # There is a bug where cacheWasUpdated is getting set to True even if it is never updated sometimes.
-        elif userInput[ 'cacheWasUpdated' ] == True:
-            backupCache(force=True)
+        elif programSettings[ 'cacheWasUpdated' ] == True:
+            backupCache( userInput=userInput, programSettings=programSettings, force=True )
 
 
 if __name__ == '__main__':
     main()
-    print('end reached')
+    print( 'end reached' )
     sys.exit(0)
 
