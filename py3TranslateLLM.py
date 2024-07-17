@@ -188,7 +188,7 @@ def createCommandLineOptions():
 
     commandLineParser.add_argument( '-b', '--batches', help='Toggles if entries should be submitted for translations engines that support them. Enabling batches disables context history. Default=Batches are automatically enabled for NMTs that support batches and web APIs like DeepL, but disabled for LLMs. Specifying this will disable them globally for all engines.', action='store_false' )
     commandLineParser.add_argument( '-bllm', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches and DeepL regardless of this setting. Enabling batches for LLMs disables context history. Default=' + str( defaultEnableBatchesForLLMs ), action='store_true' )
-    commandLineParser.add_argument( '-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. If the scene summary feature is enabled, this and sceneSummaryLength will be reduced to the same number depending on whichever is lower. Default=' + str( defaultBatchSizeLimit ), default=None, type=int )
+    commandLineParser.add_argument( '-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. If the scene summary feature is enabled, this and sceneSummaryLength will be reduced to the same number depending on whichever is lower. Some translation engines might also have their own internal limiters not affected by this setting. Default=' + str( defaultBatchSizeLimit ), default=None, type=int )
 
     commandLineParser.add_argument( '-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str )
     commandLineParser.add_argument( '-port', '--port', help='Specify the port for the NMT/LLM server. Example: 5001', default=None, type=int )
@@ -659,9 +659,10 @@ def validateUserInput( userInput=None ):
     implemented = False
     #validate input from command line options
     # This section should probably be updated with more helpful error messages like what to do if the engines did not import correctly. pip install pykakasi ...etc
-    if ( userInput[ 'translationEngine' ].lower() == 'parseonly' ): # Is this mode still valid? # Update: This should be renamed to enable a test run mode.
-        userInput[ 'mode' ] = 'parseOnly'
-        implemented=True
+    # Is this mode still valid? # Update: This should be renamed to enable a test run mode. # Update2: parseOnly was removed completely and cacheOnly is taking its place. --testRun, a flag, was also implemented as a replacement for --translationEngine parseOnly.
+    if ( userInput[ 'translationEngine' ].lower() == 'cacheOnly' ):
+        userInput[ 'mode' ] = 'cacheonly'
+        implemented=False
     elif ( userInput[ 'translationEngine' ].lower() == 'koboldcpp' ):
         userInput[ 'mode' ] = 'koboldcpp'
         import resources.translationEngines.koboldCppEngine as koboldCppEngine
@@ -669,11 +670,11 @@ def validateUserInput( userInput=None ):
         implemented=True
     elif ( userInput[ 'translationEngine' ].lower() == 'deepl_api_free' ) or ( userInput[ 'translationEngine' ].lower() == 'deepl-api-free' ):
         userInput[ 'mode' ] = 'deepl_api_free'
-        import resources.translationEngines.deepLApiFreeEngine as deepLApiFreeEngine
+        import resources.translationEngines.deepLAPIFreeEngine as deepLAPIFreeEngine
         #import deepl
     elif ( userInput[ 'translationEngine' ].lower() == 'deepl_api_pro' ) or ( userInput[ 'translationEngine' ].lower() == 'deepl-api-pro' ):
         userInput[ 'mode' ] = 'deepl_api_pro'
-        import resources.translationEngines.deepLApiProEngine as deepLApiProEngine
+        import resources.translationEngines.deepLAPIProEngine as deepLAPIProEngine
     elif ( userInput[ 'translationEngine' ].lower() == 'deepl_web' ) or ( userInput[ 'translationEngine' ].lower() == 'deepl-web' ):
         userInput[ 'mode' ] = 'deepl_web'
         import resources.translationEngines.deepLWebEngine as deepLWebEngine
@@ -803,12 +804,23 @@ def validateUserInput( userInput=None ):
             print( ( 'sceneSummaryCacheFile: \'' + str( userInput[ 'sceneSummaryCacheFileName' ] ) ).encode(consoleEncoding) )
             sys.exit(1)
 
+    # Moved.
+    #if userInput[ 'batchSize' ] > userInput[ 'summarySize' ]:
+    #    userInput[ 'batchSize' ] = userInput[ 'summarySize' ]
+    #elif userInput[ 'summarySize' ] > userInput[ 'batchSize' ]:
+    #    userInput[ 'summarySize' ] = userInput[ 'batchSize' ]
+
+    # A batch size of 0 means unlimited. TODO: Implement this later.
     if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'batchesEnabled' ] == True ):
         if ( userInput[ 'sceneSummaryLength' ] == 0 ) or ( userInput[ 'sceneSummaryLength' ] > userInput[ 'batchSizeLimit' ] ):
             userInput[ 'sceneSummaryLength' ] = userInput[ 'batchSizeLimit' ]
         elif ( userInput[ 'batchSizeLimit' ] == 0 ) or ( userInput[ 'batchSizeLimit' ] > userInput[ 'sceneSummaryLength' ] ):
             userInput[ 'batchSizeLimit' ] = userInput[ 'sceneSummaryLength' ]
         assert( userInput[ 'batchSizeLimit' ] == userInput[ 'sceneSummaryLength' ] )
+
+    # if batches are disabled, then neither sceneSummaryLength nor batchSizeLimit get reduced in size and so should not necessarily match.
+    #if userInput[ 'sceneSummaryEnabled' ] == True:
+    #    assert( userInput[ 'batchSizeLimit' ] == userInput[ 'sceneSummaryLength' ] )
 
     if userInput[ 'verbose' ] == True:
         print( 'sceneSummaryLength=' + str( userInput[ 'sceneSummaryLength' ] ) )
@@ -842,13 +854,11 @@ def validateUserInput( userInput=None ):
             sys.exit( 1 )
 
 
-    # if using deepl_api_free, pro
-    #if ( userInput[ 'mode' ] == 'deepl_api_free' ) or ( userInput[ 'mode' ] == 'deepl_api_pro' ):
-        # API key must exist.
-        # Maybe check both environmental variable and also a file?
-        # The deepL library also requires it, so how does it need to be specified? Does it check any environmental variable for it?
-        # Let the deepLEngine library worry about it. It should fail to switch to ready state without a valid API key.
-        # Syntax: os.environ[ 'CT2_VERBOSE' ] = '1'
+    # if using deepl_api_free, pro or any engine that requires internet access, then insist the internet is available.
+    if ( userInput[ 'mode' ] == 'deepl_api_free' ) or ( userInput[ 'mode' ] == 'deepl_api_pro' ) or ( userInput[ 'mode' ] == 'deepl_web' ):
+        # Must have internet access. How to check? # Moved to functions.py. This should be moved to verifyInput() because deepL always requires internet access since it is a cloud service. # Update: Done.
+        # Added functions.checkIfInternetIsAvailable() function that uses requests/socket to fetch a web page or resolve an address.
+        assert( functions.checkIfInternetIsAvailable() == True )
 
 
     # if using deepl_web... TODO validate anything it needs
@@ -1097,7 +1107,7 @@ def backupCache( userInput=None, programSettings=None, force=False ):
         programSettings[ 'timeThatCacheWasLastSaved' ] = time.perf_counter()
 
 
-# rawEntries is a list of strings, metadata is filename_startLineNumber+1_endLineNumberRaw+1 as a string, summaryData is the actual summary.
+# rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
 # programSettings should have
 def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
@@ -1110,8 +1120,9 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=No
     # entry, engine # What is entry? A hash? 50 raw text entries? How about the sha1 hash?
     # Since that is too cryptic and since 50 raw texts is too long, then there must also be a metadata column to make the data human readable and debuggable.
     # entry, metadata, engine
-    # entry is the sha1 hash of the rawEntries list, engine is the translation engine from translationEngine.model, and metadata is filename_startLineNumber+1_endLineNumberRaw+1
+    # entry is the sha1 hash of the rawEntries list, engine is the translation engine from translationEngine.model, and metadata is filename_startLineNumber_endLineNumberRaw
     # The +1 is to correct for the header in the spreadsheet which is removed from the data during processing.
+    # Update: The +1 is not needed since it is based on currentRow which is already correct.
 
     # Calculate sha1 hash from rawEntries.
     tempString = ''
@@ -1228,18 +1239,47 @@ def getSummary( userInput=None, programSettings=None, untranslatedList=[] ):
     return None
 
 
-# translate() recieves untranslatedList which is a list of untranslated strings with programSettings[ 'currentRow' ] pointing to mainSpreadsheet entry that corresponds to the first item in that list. This function is responsible for translating untranslatedList and always returning the same number of entries.
+# translate() recieves untranslatedList which is a list of untranslated strings with programSettings[ 'currentRow' ] pointing to mainSpreadsheet entry that corresponds to the first item in that list. This function is responsible for translating untranslatedList and always returning the same number of entries as the input. This function must also handle updating the cache, reinserting the translated entries into mainSpreadsheet, and backing up cache/mainSpreadsheet regularly.
 # for cacheOnly, it should return None for every entry not found in the cache and never try to update the cache.
 # This function should:
-# 1) Fetch the items from cache.
-# 2) Decide if the translation should occur in batch mode or not in batch mode.
-# 3) Translate the items using translateEngine.translate() or translateEngine.batchTranslate()
-# 4) Update the cache.
-# 5) Return the translated list.
-def translate( userInput=None, programSettings=None, untranslatedList=None, sceneSummary=None ):
+# 1) Fetch the rawUntranslatedList from mainSpreadsheet for the current batch.
+# 2) Update fetched items with translated values from cache.
+# 3) if any values were in mainSpreadsheet or only in cache, then update accordingly to what userInput says to do. Default behavior is to add to cache whatever is in mainSpreadsheet. If reTranslate == True, then wipe or ignore both. If overrideWithCache, then say the value is from cache and update mainSpreadsheet, here or later? Probably later since the entire list needs to be processed later anyway. No. this needs to occur right away because this is the only time both overrideUsingCache and overrideUsingSpreadsheet are checked while iterating through the contents of mainSpreadsheet. Otherwise, alreadyTranslated woulld need to be ignored and entries updated again. Technically, they could be done later, but there is no reason to wait that long. Are they going to be updated anyway? Only if re-translate is specified. Otherwise, if overrideUsingSpreadsheet
+# 4) After the list of items that needs to be translated have been extracted, decide if the translation should occur in batch mode or not in batch mode. Not batch mode supports history which needs to be handled in a special way. In additional, values that have translations either from cache or were already filled in mainSpreadsheet should not be submitted to the translation engines unless reTranslate == True.
+# 5) Translate the items using translateEngine.translate() or translateEngine.batchTranslate()
+# 6) Update the cache.
+# 7) Update mainSpreadsheet
+# 8) Return the translated items, including those extracted from mainSpreadsheet or cache, or perhaps just a count of them?
+# Minor bug: There is this minor bug right now where if an entry is already translated, has an entry in main spreadsheet, if cache is disabled and batches are enabled or if cache is enabled but that entry is not in the cache yet, then it will be submitted to the translation engine which is unwanted behavior. This does not occur if cache is both enabled or if translating each entry individually instead of in batches...probably. This was not a big deal when originally designing the algorithim because the entries should get added to the cache and that should block any subsequent duplicate translations. Still this is not ideal behavior.
+# This function needs to be re-written, almost from scratch, because 1) of the above bug 2) the need to extract speaker names during searches to submit to the translation engine as batches and 3) to use programSettings['currentRow'] + untranslatedListSize to derive untranslatedList from mainSpreadsheet.
+# Q: Is there any way to incorprorate history when generating a list of untranslated entries that can be used with both batch translations and non-batch translations? No right? Those features directly contradict way too much.
+def translate( userInput=None, programSettings=None, untranslatedListSize=None, sceneSummary=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    # currentRow is the current and correct pointer to the current contents being processed in mainSpreadsheet. Split it into two values, one global value, programSettings[ 'currentRow' ], that keeps track of the pointer globally and a local value used to iterate through the current batch.
+    # currentRow is the current and correct pointer to the current contents being processed in mainSpreadsheet. This is split it into two values, one global value, programSettings[ 'currentRow' ], that keeps track of the pointer globally and a local value used to iterate through the current batch. currentRow can also be reset periodically during processing.
     currentRow = programSettings[ 'currentRow' ]
+
+    # New algorithim to generate untranslatedList:
+    # Get raw list based upon pointer.
+    # Syntax: range( start, stop, stepAmount ):
+    for i in range( currentRow, currentRow + untranslatedListSize, 1 ):
+        # This is iterating through the correct addresses in mainSpreadsheet that data needs to be extract data from.
+        # The data needed during processing is...
+        # 1) untranslated string
+        # 2) speaker name
+        # 3) current translation in mainSpreadsheet
+        # 4) does this have an entry in cache? If so, is the value from cache, yes/no
+        # 5) if the value is from cache because it was present and not None, then the actual translated string from cache
+        # The current syntax is: tempRequestList.append( [ 'rawEntry', thisValueIsFromCache, 'translatedData' ] )
+        # but it needs to be changed to...
+        # [ 'rawEntry', 'speakerName', alreadyTranslated, 'translatedData' ]
+        # if the spreadsheet has data, but cache does not, then semi-silently update cache to include the spreadsheet data as long as reTranslate is not specified
+        # if reTranslate is specified, then ignore all data currently in the spreadsheet and the cache and set alreadyTranslated to False for all entries.
+        # if overrideWithCache is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from the cache and update mainSpreadsheet. Use that as the 'translatedData'.
+        # if overrideWithSpreadsheet is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from mainSpreadsheet and update the cache.
+        # By default, whatever is in the spreadsheet already is fudged as the 'translatedData' and 'alreadyTranslated' is set to True to avoid that value getting translated again. If there is a contradiction between the value in the cache and the current spreadsheet, then by default, neither is updated. alreadyTranslated is set to True regardless, which is not technically correct.
+        # reTranslate will force both to get updated.
+        # overrideWithCache will override the spreadsheet.
+        # There is no option to override the cache without retranslating. Should there be? overrideWithSpreadsheet Might as well.
 
     #global cache
     #global currentCacheColumn
@@ -1247,8 +1287,9 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
     #global mainSpreadsheet
     #global translationEngine
 
-    # Can the batch mode logic be moved further down?
-    if batchModeEnabled == True:
+    # Can the batch mode logic be moved further down? It is not clear how to move it further down because handling history is both very complicated and very delicate. History also implies transfering spreaker names which batch translations do not necessarily do.
+    # TODO: Update batch translation logic to also transfer accurate speaker list as part of settings{}.
+    if programSettings[ 'batchModeEnabled' ] == True:
         translateMe = []
         tempRequestList = []
         tempList = []
@@ -1257,6 +1298,8 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
             # cacheHitCounter is only used for sanity checking.
             cacheHitCounter = 0
 
+        # Minor Bug: This logic is incorrect. This needs to check each cell in the spreadsheet and not attempt to translate cells which already have translations. If there is a cell with data in the spreadsheet already, then update the cache with that data dynamically.
+        # If cache is disabled, then what exactly should happen? The same process needs to occur of not submitting entries for translation
         if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'reTranslate' ] != True ) and ( len( tempList ) > 1 ):
             # Implement cache here. Create a list that will store the raw entry, whether there was a cache hit, and the value from the cache.
             # if there was not a cache hit, then add to a different list that will store the entries to translate as a batch.
@@ -1264,14 +1307,19 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
             # Syntax: tempRequestList.append( [ 'rawEntry', thisValueIsFromCache, 'translatedData' ] )
             # Take every list entry from untranslatedList
             for untranslatedEntry in untranslatedList:
-
                 # if entryInList/translatedData exists as a key in translationCacheDictionary,
                 # if entryInList/untranslatedData exists in the cache's first column
                 tempRowForCacheMatch = programSettings[ 'cache' ].searchCache( untranslatedEntry )
-                if tempRowForCacheMatch != None:
+
+                # if untranslatedEntry is not in the cache
+                if tempRowForCacheMatch == None:
+                    tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
+                    translateMe.append( untranslatedEntry )
+                #if tempRowForCacheMatch != None:
+                else:
                     # then check if the appropriate column in the cache is a match.
                     # This will return either None or the cell's contents.
-                    tempCellContents = programSettings[ 'cache' ].getCellValue( currentCacheColumn + str( tempRowForCacheMatch ) )
+                    tempCellContents = programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + str( tempRowForCacheMatch ) )
                     if tempCellContents != None:
                         # if there is a match, then a perfect hit exists, so append the translatedEntry to tempRequestList
                         tempRequestList.append( [ untranslatedEntry, True, tempCellContents ] )
@@ -1318,24 +1366,18 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
                             tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
                             translateMe.append( untranslatedEntry )
 
-                #else untranslatedEntry is not in the cache
-                #elif tempRowForCacheMatch == None:
-                else:
-                    # The rawEntry does not exist in the cache.
-                    tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
-                    translateMe.append( untranslatedEntry )
 
-            assert( ( len(translateMe) + cacheHitCounter ) == len( untranslatedList ) )
+            assert( ( len( translateMe ) + cacheHitCounter ) == len( untranslatedList ) )
 
-        # if the cache is not enabled, if the user specified to reTranslate all lines, if the cache is too small, then skip
+        # if the cache is not enabled, if the user specified to reTranslate all lines, or if the cache is too small, then translate every entry in the spreadsheet.
         #elif ( cacheEnabled != True ) or ( reTranslate == True ) or ( len( cache.getColumn( 'A' ) ) <=1 ):
         else:
-            # Without copy(), this just creates a pointer to the original list, which means modifying the second list will also modify the original list which is not intended behavior here.
+            # Without copy(), this just creates a pointer to the original list, which means modifying the second list will also modify the original list which is not intended behavior here. Duplicating dictionaries also just creates a pointer. Duplicating strings and integers creates new instances. Duplicating classes or functions probably just creates a pointer, but this is untested. Tuples and sets are also untested.
             translateMe = untranslatedList.copy()
 
         postTranslatedList = []
         if debug == True:
-            print( ( 'translateMe=' + str( translateMe ) ).encode(consoleEncoding) )
+            print( ( 'translateMe=' + str( translateMe ) ).encode( consoleEncoding ) )
         # Only attempt to translate entries if there was at least one entry not found in the cache.
         if len( translateMe ) > 0:
 
@@ -1356,10 +1398,11 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
             # Core logic.
             settings = userInput.copy()
             settings[ 'sceneSummary' ] = sceneSummary
+            settings[ 'timeout' ] = userInput[ 'timeout' ]
             postTranslatedList = programSettings[ 'translationEngine' ].batchTranslate( translateMe, settings=settings )
 
-        if debug==True:
-            print( ( 'postTranslatedListRaw=' + str(postTranslatedList) ).encode(consoleEncoding) )
+        if userInput[ 'debug' ] == True:
+            print( ( 'postTranslatedListRaw=' + str(postTranslatedList) ).encode( consoleEncoding ) )
 
         # Perform replacements specified by revertAfterTranslationDictionary, in reverse.
         if userInput[ 'revertAfterTranslationDictionary' ] != None:
@@ -1368,10 +1411,10 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
                     if translateMe[index].find( item ) != -1:
                         translateMe[ index ] = translateMe[ index ].replace( item, key )
 
-            if debug==True:
+            if userInput[ 'debug' ] == True:
                 print( ( 'postTranslatedListAfterRevertAfterTranslationDictionaryChanges=' + str( postTranslatedList ) ).encode( consoleEncoding ) )
 
-        finalTranslatedList=[]
+        finalTranslatedList = []
         if userInput[ 'cacheEnabled' ] == True:
 
             # First, populate finalTranslatedList which requires merging the newly translated entries with the entries obtained from the cache.
@@ -1436,6 +1479,42 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
                         finalTranslatedList[ counter ] = finalTranslatedList[ counter ].replace( key, item )
 
 
+            # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
+            #if userInput[ 'overrideWithCache' ] == True:
+                #translatedList.insert( 0, userInput[ 'translationEngine' ].model ) # Put header back. This returns None.
+                #programSettings[ 'mainSpreadsheet' ].replaceColumn( programSettings[ 'currentMainSpreadsheetColumn' ], translatedList ) # Batch replace the entire column.
+            #if overrideWithCache != True:
+            else:
+                # Consider each entry individually.
+
+            #print( 'pie pie' )
+            #print( 'len( untranslatedList )=', len( untranslatedList ) )
+            #print( 'reTranslate=', reTranslate )
+
+            for listCounter,untranslatedString in enumerate( untranslatedList ):
+                # Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedList and translatedList with the same counter.
+                #tempSearchResult = programSettings[ 'cache' ].searchCache( untranslatedString )
+                assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str( currentRow ) )
+
+                currentTranslatedCellAddress= programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow )
+
+                # Check with postDictionary, a Python dictionary for possible updates.
+    #            if postDictionary != None:
+    #                for key,items in postDictionary.items():
+    #                    if translatedList[listCounter].find( key ) != -1:
+    #                        translatedList[listCounter]=translatedList[listCounter].replace( key, item )
+
+                #print( currentTranslatedCellAddress, end='' )
+                # Check if the entry is current None. if entry is none
+                if ( programSettings[ 'mainSpreadsheet' ].getCellValue( currentTranslatedCellAddress ) == None ) or ( userInput[ 'reTranslate' ] == True ):
+                    # then always update the entry.
+                    programSettings[ 'mainSpreadsheet' ].setCellValue( currentTranslatedCellAddress, translatedList[ listCounter ] )
+                    #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + translatedList[ listCounter ] ).encode( consoleEncoding ) )
+                # if entry is not none
+                #else:
+                    # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
+                    # reTraslate could still be True, but in that case update 
+                currentRow += 1
 
 
     #elif batchModeEnabled == False:
@@ -1642,7 +1721,7 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
 
             if userInput[ 'backupsEnabled' ] == True:
                 # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
-                backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFilePathWithNameAndDate' ] )
+                backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
 
             # and move on to next cell
             currentRow += 1
@@ -1650,6 +1729,11 @@ def translate( userInput=None, programSettings=None, untranslatedList=None, scen
 
     return finalTranslatedList
 
+
+# Implement KoboldAPI first, then DeepL.
+# Update: Implement py3translationserver, then Sugoi, then KoboldCPP's API, then DeepL API, then DeepL Web, then OpenAI's API (generic).
+# Update (again): Implement py3translationserver, then KoboldCpp, then DeepL API Free, then Google-T, then Groq + mixtral8x7b API, then sugoi.
+# Update (again): Implement py3translationserver, then KoboldCpp, then DeepL API Free, then sugoi, then DeepL API Pro, then Google-T, then Groq + mixtral8x7b API.
 def main( userInput=None ):
 
     if not isinstance( userInput, dict ):
@@ -1673,6 +1757,7 @@ def main( userInput=None ):
     # This should also read in all of the input prompt files into dictionaries using the settings in userInput.
     userInput = readInputFiles( userInput )
 
+
     # Initialize programSettings dictionary. Instead of making everything global, the idea is to organize variables, including class instances, into this dictionary and pass the dictionary around. This should split variables into 1) userInput, 2) programSettings, or 3) local function variables. Passing the programSettings dictionary as an argument to a function passes a pointer to it in CPython, so there should be no performance ramifications compared to global variables.
     programSettings = {}
 
@@ -1685,113 +1770,10 @@ def main( userInput=None ):
 
     programSettings[ 'cacheWasUpdated' ] = False
     programSettings[ 'sceneSummaryCacheWasUpdated' ] = False
-    # currentRow is the current and correct pointer to the current contents being processed in mainSpreadsheet.
-    # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs.
-    #  Split it into two values, one global value, programSettings[ 'currentRow' ], that keeps track of the pointer globally and a local value used to iterate through the current batch.
-    programSettings[ 'currentRow' ] = 2
 
-
-    # Next turn fileToTranslateFileName into a data structure. How? Read the file, then create data structure from that file.
-    # chocolate.Strawberry() is a wrapper class for the onenpyxl.workbook class with additional methods.
-    # The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class. Syntax:
-    # mainSpreadsheet = chocolate.Strawberry()
-
-    # if main file is a spreadsheet, then it will be read in as a native data structure. Otherwise, if the main file is a .txt file, then it will be parsed as line-by-line by the class.
-    # Basically, the user is responsible for proper parsing if line-by-line parsing does not work right. Proper parsing is outside the scope of py3TranslateLLM.
-    # Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
-    #global mainSpreadsheet
-    programSettings[ 'mainSpreadsheet' ] = chocolate.Strawberry( userInput[ 'fileToTranslateFileName' ], fileEncoding=userInput[ 'fileToTranslateEncoding' ], removeWhitespaceForCSV=False, addHeaderToTextFile=False )
-
-    #Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use     backupMainSpreadsheet( userInput=userInput, outputName=outputName, force=False):
-
-    #backupsFolder does not have / at the end
-    backupsFolderWithDate = backupsFolder + '/' + functions.getYearMonthAndDay()
-    pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
-    #mainDatabaseWorkbook.save( 'backups/' + functions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
-    # This variable is derivative of the fileToTranslateFileNameWithoutPath, hence not incorrect to consider it part of userInput as a derivative variable.
-    userInput[ 'backupsFilePathWithNameAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath' ] + '.raw.' + functions.getDateAndTimeFull() + defaultExportExtension
-    #mainSpreadsheet.exportToXLSX( userInput[ 'backupsFilePathWithNameAndDate' ] )
-    # TODO: There should be a CLI setting to not create backups. # Update: Done.
-    if userInput[ 'backupsEnabled' ] == True:
-        backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFilePathWithNameAndDate' ], force=True )
-
-    # Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx? Alternatively, could set the option as a default boolean toggle in the script, but that might be annoying during actual usage. TODO: Implement this as a CLI option later in order to respect the user's decision.
-    userInput[ 'backupsFilePathWithNameAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath '] + '.backup.' + functions.getDateAndTimeFull() + defaultExportExtension
-    #print( ( 'Wrote backup to: ' + backupsFilePathWithNameAndDate ).encode(consoleEncoding) )
-
-    if userInput[ 'debug' ] == True:
-        print( ( 'fileToTranslateFileNameWithoutPathOrExt=' + userInput[ 'fileToTranslateFileNameWithoutPathOrExt' ] ).encode(consoleEncoding) )
-        print( ( 'Today=' + functions.getYearMonthAndDay() ).encode(consoleEncoding) )
-        print( ( 'Yesterday=' + functions.getYesterdaysDate() ).encode(consoleEncoding) )
-        print( ( 'CurrentTime=' + functions.getCurrentTime() ).encode(consoleEncoding) )
-        print( ( 'DateAndTime=' + functions.getDateAndTimeFull() ).encode(consoleEncoding) )
-
-    #Now that the main data structure has been created, the spreadsheet is ready to be translated.
-    if userInput[ 'mode' ] == 'parseOnly':
-        programSettings[ 'mainSpreadsheet' ].export( userInput[ 'outputFileName' ], fileEncoding=userInput[ 'outputFileEncoding' ], columnToExportForTextFiles='A' )
-
-        #work complete. Exit.
-        print( 'Work complete.' )
-        sys.exit( 0 )
-
-    #Now need to translate stuff.
-
-    # Cache should always be added. This potentially creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision to keep cache enabled despite the slight collisions.
-    # Currently, cache does not consider multiple languages. It may be a good idea to specify a specific 'sheet' to load or work from based upon the source and destination 3-letter language names when initalizing it. Something like... source_target, jpn_eng, chi_eng, eng_spn Update: Cache now consideres multiple languages. Each sheet in the workbook is a different sourceLanguage_targetLanguage pair marked by 3 letter words.
-
-    print( 'cacheEnabled=', userInput[ 'cacheEnabled' ] )
-
-    if userInput[ 'cacheEnabled' ] == True:
-        #First, initialize cache.xlsx file under backups/
-        # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header row of course. Multiple columns with each one as a different translation engine.
-        #if the path for cache does not exist, then create it.
-        pathlib.Path( userInput[ 'cacheFilePathOnly' ] ).mkdir( parents = True, exist_ok = True )
-
-        # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
-        # Initialize Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
-        global cache
-        programSettings[ 'cache' ] = chocolate.Strawberry( myFileName=userInput[ 'cacheFileName' ], fileEncoding=defaultTextEncoding, spreadsheetNameInWorkbook=userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode' ], readOnlyMode=userInput[ 'readOnlyCache' ] )
-
-        # readOnlyCache conflicts with this, but this is only added if cacheFileName does not exist. This should fail with those input combinations. That is a user error, so let them deal with it.
-        if functions.checkIfThisFileExists( userInput[ 'cacheFileName' ] ) != True:
-            # if the Strawberry is brand new, add header row.
-            programSettings[ 'cache' ].appendRow( [ 'rawText' ] )
-
-        # Build the index from all entries in the first column. cache.initializeCache() enables the use of cache.searchCache() and cache.addToCache() methods.
-        # TODO: This should be more flexible. If there is an error initalizing it, then call cache.rebuildCache() and try again.
-        # However, that might be a mistake if the user specified the wrong option or file by mistake, so require user confirmation via a CLI flag for this exact action. Update: Dont.
-        # if cli option not enabled
-        if userInput[ 'rebuildCache' ] == False:
-            programSettings[ 'cache' ].initializeCache()
-        # elif rebuildCache == True:
-        else:
-            # Do a try: except: block that includes rebuilding it.
-            try:
-                programSettings[ 'cache' ].initializeCache()
-            except:
-                programSettings[ 'cache' ].rebuildCache()
-                programSettings[ 'cache' ].initializeCache()
-
-        #originalNumberOfEntriesInCache = len( userInput[ 'cache' ].getColumn( 'A' ) )
-
-        # Debug code.
-        if userInput[ 'debug' ] == True:
-            userInput[ 'cache' ].printAllTheThings()
-    #    if readOnlyCache != True:
-    #        userInput[ 'cache' ].export( userInput[ 'cacheFileName' ] )
-
-        if userInput[ 'verbose' ] == True:
-            print( ( 'Cache is available at: ' + str( userInput[ 'cacheFileName' ] ) ).encode( consoleEncoding ) )
-
-    # Implement KoboldAPI first, then DeepL, .
-    # Update: Implement py3translationserver, then Sugoi, then KoboldCPP's API, then DeepL API, then DeepL Web, then OpenAI's API (generic).
-    # Update (again): Implement py3translationserver, then KoboldCpp, then DeepL API Free, then Google-T, then Groq + mixtral8x7b API, then sugoi.
-    # Check current engine.
-        # Echo request? Some firewalls block echo requests.
-        # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
 
     # Build settings dictionary for this translation engine.
-    settingsDictionary={}
+    settingsDictionary = {}
     settingsDictionary[ 'address' ] = userInput[ 'address' ] # address has both the protocol and the port.
     settingsDictionary[ 'port' ] = userInput[ 'port' ]
 
@@ -1807,11 +1789,11 @@ def main( userInput=None ):
         # Add unique settings for this translation engine.
         #settingsDictionary[ 'prompt' ] = userInput[ 'promptFileContents' ]
 
-        programSettings[ 'translationEngine' ]= sugoiNMTEngine.sugoiNMTEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], settings=settingsDictionary)
+        programSettings[ 'translationEngine' ]= sugoiNMTEngine.sugoiNMTEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], settings=settingsDictionary )
 
     # KoboldCpp's API must be reachable. Check by getting currently loaded model. This is required for the cache and mainSpreadsheet.
-    elif userInput[ 'mode' ] ==' koboldcpp':
-
+    elif userInput[ 'mode' ] == 'koboldcpp':
+        # This check should be redundant.
         #assert( promptFileContents != None )
         assert( isinstance( userInput[ 'promptFileContents' ], str ) )
 
@@ -1826,20 +1808,33 @@ def main( userInput=None ):
         # Add unique settings for this translation engine.
         #settingsDictionary[ 'prompt' ] = userInput[ 'promptFileContents' ]
 
-        programSettings[ 'translationEngine' ] = pykakasiEngine.PyKakasiEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary)
+        programSettings[ 'translationEngine' ] = pykakasiEngine.PyKakasiEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary )
 
     elif userInput[ 'mode' ] == 'cutlet':
         # Add unique settings for this translation engine.
         #settingsDictionary[ 'prompt' ] = userInput[ 'promptFileContents' ]
 
-        programSettings[ 'translationEngine' ] =cutletEngine.CutletEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary)
+        programSettings[ 'translationEngine' ] = cutletEngine.CutletEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary )
 
-    # DeepL has already been imported, and it must have an API key. (already checked for) # Updated: This check has been moved to the translationEngine itself.
-        #Must have internet access then. How to check? # Also moved.
-        # Added functions.checkIfInternetIsAvailable() function that uses requests/socket to fetch a web page or resolve an address.
-        # assert( functions.checkIfInternetIsAvailable() == True )
+    #elif userInput[ 'mode' ] == 'deepl_api_free':
+        # The deepL engine has already been imported. It must be used with an API key. Was this already checked for in verifyInput()?
+        # Update: This check has been moved to the translationEngine itself. API key must exist, but let the engine deal with it.
+        # The deepL library also requires it, so how does it need to be specified? Does it check any environmental variable for it? Maybe check both environmental variable and also a file?
+        # Let the deepLEngine library worry about it. It should fail as engine.reachable == False without a valid API key even if both the internet is available and if the library imported successfully.
+        # Syntax: os.environ[ 'CT2_VERBOSE' ] = '1'
 
-        #Check if the server is reachable. If not, then exit. How? The py3translationServer should have both the version and model available at http://localhost:14366/api/v1/model and version, and should have been set during initalization, so verify they are not None.
+        #programSettings[ 'translationEngine' ] = deepLAPIFreeEngine.DeepLAPIFreeEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary )
+
+    #elif userInput[ 'mode' ] == 'deepl_api_pro':
+        #programSettings[ 'translationEngine' ] = deepLAPIFreeEngine.DeepLAPIProEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary )
+    #elif userInput[ 'mode' ] == 'deepl_api_web':
+        #programSettings[ 'translationEngine' ] = deepLWebEngine.DeepLWebEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary )
+
+
+        # Check if the server is reachable. If not, then exit. How? The py3translationServer should have both the version and model available at http://localhost:14366/api/v1/model and version, and should have been set during initalization, so verify they are not None.
+        # Check current engine.
+        # Echo request? Some firewalls block echo requests.
+        # Maybe just assume it exists and poke it with various requests until it is obvious to the user that it is not responding?
         # Update: Moved this code inside the translation engine itself and made it accessible as translationEngine.reachable which is a boolean, which is checked below.
     #    if translationEngine.model == None:
     #        print( 'translationEngine.model is None' )
@@ -1853,8 +1848,45 @@ def main( userInput=None ):
         sys.exit(1)
 
 
+    # Next turn fileToTranslateFileName into a data structure. How? Read the file, then create data structure from that file.
+    # chocolate.Strawberry() is a wrapper class for the onenpyxl.workbook class with additional methods.
+    # The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class. Syntax:
+    # mainSpreadsheet = chocolate.Strawberry()
+    # if main file is a spreadsheet, then it will be read in as a native data structure. Otherwise, if the main file is a .txt file, then it will be parsed as line-by-line by the class. Basically, the user is responsible for proper parsing if line-by-line parsing does not work right. Proper parsing is outside the scope of py3TranslateLLM.
+    # Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
+    programSettings[ 'mainSpreadsheet' ] = chocolate.Strawberry( userInput[ 'fileToTranslateFileName' ], fileEncoding=userInput[ 'fileToTranslateEncoding' ], removeWhitespaceForCSV=False, addHeaderToTextFile=True )
+
+    # Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use  backupMainSpreadsheet( userInput=userInput, outputName=outputName, force=False):
+    #backupsFolder does not have / at the end
+    backupsFolderWithDate = backupsFolder + '/' + functions.getYearMonthAndDay()
+    pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
+    #mainDatabaseWorkbook.save( 'backups/' + functions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
+    # This variable is derivative of the fileToTranslateFileNameWithoutPath, hence not incorrect to consider it part of userInput as a derivative variable.
+    userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath' ] + '.raw.' + functions.getDateAndTimeFull() + defaultExportExtension
+    #mainSpreadsheet.exportToXLSX( userInput[ 'backupsFileNameWithPathAndDate' ] )
+    # TODO: There should be a CLI setting to not create backups. # Update: Done.
+    if userInput[ 'backupsEnabled' ] == True:
+        backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=True )
+
+    # Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx? Alternatively, could set the option as a default boolean toggle in the script, but that might be annoying during actual usage. TODO: Implement this as a CLI option later in order to respect the user's decision.
+    userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath '] + '.backup.' + functions.getDateAndTimeFull() + defaultExportExtension
+    #print( ( 'Wrote backup to: ' + backupsFileNameWithPathAndDate ).encode( consoleEncoding ) )
+
+    if userInput[ 'debug' ] == True:
+        print( ( 'fileToTranslateFileNameWithoutPathOrExt=' + userInput[ 'fileToTranslateFileNameWithoutPathOrExt' ] ).encode( consoleEncoding ) )
+        print( ( 'Today=' + functions.getYearMonthAndDay() ).encode( consoleEncoding ) )
+        print( ( 'Yesterday=' + functions.getYesterdaysDate() ).encode( consoleEncoding ) )
+        print( ( 'CurrentTime=' + functions.getCurrentTime() ).encode( consoleEncoding ) )
+        print( ( 'DateAndTime=' + functions.getDateAndTimeFull() ).encode( consoleEncoding ) )
+
+    # This functionality is supersceded by --testRun so comment out old 'parseOnly' related settings.
+    #if userInput[ 'mode' ] == 'parseOnly':
+        #programSettings[ 'mainSpreadsheet' ].export( userInput[ 'outputFileName' ], fileEncoding=userInput[ 'outputFileEncoding' ], columnToExportForTextFiles='A' )
+        #work complete. Exit.
+        #print( 'Work complete.' )
+        #sys.exit( 0 )
+
     # This will return the column letter of the model if the model is already in the spreadsheet. Otherwise, if it is not found, then it will return None.
-    #global currentMainSpreadsheetColumn
     programSettings[ 'currentMainSpreadsheetColumn' ] = programSettings[ 'mainSpreadsheet' ].searchHeaders( programSettings[ 'translationEngine' ].model )
     if programSettings[ 'currentMainSpreadsheetColumn' ] == None:
         # Then the model is not currently in the spreadsheet, so need to add it. Update currentMainSpreadsheetColumn after it has been updated.
@@ -1863,8 +1895,64 @@ def main( userInput=None ):
         programSettings[ 'mainSpreadsheet' ].replaceRow( 1, headers )
         programSettings[ 'currentMainSpreadsheetColumn' ] = programSettings[ 'mainSpreadsheet' ].searchHeaders( programSettings[ 'translationEngine' ].model )
         if programSettings[ 'currentMainSpreadsheetColumn' ] == None:
-            print( 'unspecified error.' )
+            print( 'u nspecified error.' )
             sys.exit(1)
+
+    # Now that the main data structure has been created, the spreadsheet is ready to be translated. However, there are still a few more things to initialize, like cache.
+    # Cache should always be added. This potentially creates a situation where cache is not valid when going from one title to another or where it is used for translating entries for one character that another character spoke, but that is fine since that is a user decision to keep cache enabled despite the slight collisions.
+    # Currently, cache consideres multiple language pairs using different sheets. Each sheet in the workbook is a different sourceLanguage_targetLanguage pair marked by 3 letter words. Syntax: source_target Examples: jpn_eng, chi_eng, eng_spn
+
+    print( 'cacheEnabled=', userInput[ 'cacheEnabled' ] )
+
+    if userInput[ 'cacheEnabled' ] == True:
+        #First, initialize cache.xlsx file under backups/
+        # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header row of course. Multiple columns with each one as a different translation engine.
+
+        #if the path for cache does not exist, then create it.
+        pathlib.Path( userInput[ 'cacheFilePathOnly' ] ).mkdir( parents = True, exist_ok = True )
+
+        # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
+        # Initialize chocolate.Strawberry(). Very tempting to hardcode utf-8 here, but... will avoid.
+        global cache
+        programSettings[ 'cache' ] = chocolate.Strawberry( myFileName=userInput[ 'cacheFileName' ], fileEncoding=defaultTextEncoding, spreadsheetNameInWorkbook=userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode' ], readOnlyMode=userInput[ 'readOnlyCache' ] )
+
+        # readOnlyCache conflicts with this, but this is only added if cacheFileName does not exist. This should fail with those input combinations. That is a user error, so let them deal with it.
+        if functions.checkIfThisFileExists( userInput[ 'cacheFileName' ] ) != True:
+            # if the chocolate.Strawberry() is brand new, add header row.
+            programSettings[ 'cache' ].appendRow( [ 'rawText' ] )
+
+        # Build the index from all entries in the first column. cache.initializeCache() enables the use of cache.searchCache() and cache.addToCache() methods.
+        # if cli option not enabled
+        if userInput[ 'rebuildCache' ] == False:
+            # Then error out if there is an error initalizing the index.
+            programSettings[ 'cache' ].initializeCache()
+        # elif rebuildCache == True:
+        else:
+            # Do a try: except: block that includes rebuilding it.
+            try:
+                programSettings[ 'cache' ].initializeCache()
+            except:
+                programSettings[ 'cache' ].rebuildCache()
+                programSettings[ 'cache' ].initializeCache()
+
+        # Debug code.
+        if userInput[ 'debug' ] == True:
+            userInput[ 'cache' ].printAllTheThings()
+        #if readOnlyCache != True:
+        #    userInput[ 'cache' ].export( userInput[ 'cacheFileName' ] )
+
+        if userInput[ 'verbose' ] == True:
+            print( ( 'Cache is available at: ' + str( userInput[ 'cacheFileName' ] ) ).encode( consoleEncoding ) )
+
+        if userInput[ 'sceneSummaryCacheEnabled' ] == True:
+            programSettings[ 'sceneSummaryCache' ] = chocolate.Strawberry( myFileName=userInput[ 'sceneSummaryCacheFileName' ], fileEncoding=defaultTextEncoding, spreadsheetNameInWorkbook=userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode' ], readOnlyMode=userInput[ 'readOnlyCache' ] )
+
+            if functions.checkIfThisFileExists( userInput[ 'sceneSummaryCacheFileName' ] ) != True:
+                # if the chocolate.Strawberry() is brand new, add header row.
+                programSettings[ 'sceneSummaryCache' ].appendRow( [ 'hashedText', 'metadata' ] )
+
+            if userInput[ 'verbose' ] == True:
+                print( ( 'sceneSummaryCache is available at: ' + str( userInput[ 'sceneSummaryCacheFileName' ] ) ).encode( consoleEncoding ) )
 
 
     if userInput [ 'cacheEnabled' ] == True:
@@ -1873,11 +1961,11 @@ def main( userInput=None ):
         if programSettings[ 'currentCacheColumn' ] == None:
             # Then the model is not currently in the cache, so need to add it. Update currentCacheColumn after it has been updated.
             headers = programSettings[ 'cache' ].getRow( 1 )
-            headers.append( translationEngine.model )
-            cache.replaceRow( 1, headers )
-            currentCacheColumn = cache.searchHeaders( translationEngine.model )
+            headers.append( programSettings[ 'translationEngine' ].model )
+            programSettings[ 'cache' ].replaceRow( 1, headers )
+            currentCacheColumn = programSettings[ 'cache' ].searchHeaders( programSettings[ 'translationEngine' ].model )
             if currentCacheColumn == None:
-                print( 'unspecified error .' )
+                print( 'un specified error .' )
                 sys.exit( 1 )
 
         # Prepare some static data for cacheAnyMatch so that it does not have to be prepared while in the loop on every loop.
@@ -1908,24 +1996,27 @@ def main( userInput=None ):
     # requiresPrompt = False and supportsBatches = False, then is an NMT, then batchModeEnabled=False
 
     # Implementation:
-    if programSettings[ 'translationEngine' ].supportsBatches == False:
-        batchModeEnabled=False
+    if ( programSettings[ 'translationEngine' ].supportsBatches == False ) or ( userInput[ 'batchesEnabled' ] == False ):
+        programSettings[ 'batchModeEnabled' ] = False
     # can be an NMT or LLM.
     # elif translationEngine.supportsBatches == True:
     elif programSettings[ 'translationEngine' ].requiresPrompt == False:
         # is an NMT, always enable batches.
-        batchModeEnabled=True
+        programSettings[ 'batchModeEnabled' ] = True
     # elif translationEngine.supportsBatches == True:
     # elif translationEngine.requiresPrompt == True:
     else:
         # is an LLM that supports batches, only enable batches if batchesEnabledForLLMs == True
         if userInput[ 'batchesEnabledForLLMs' ] == True:
-            batchModeEnabled=True
+            programSettings[ 'batchModeEnabled' ] = True
         else:
-            batchModeEnabled=False
+            programSettings[ 'batchModeEnabled' ] = False
+
+    # Debug code.
+    #programSettings[ 'batchModeEnabled' ] = False
+
 
     untranslatedEntriesColumnFull = programSettings[ 'mainSpreadsheet' ].getColumn( 'A' )
-
     if userInput[ 'debug' ] == True:
         # Debug code.
         for counter,untranslatedString in enumerate( untranslatedEntriesColumnFull ):
@@ -1933,9 +2024,7 @@ def main( userInput=None ):
             #print( 'pie' )
         #print( 'pie0' )
         print( len( untranslatedEntriesColumnFull ) )
-
     untranslatedEntriesColumnFull.pop( 0 ) # This removes the header and returns the header.
-
     # Debug code.
     if userInput[ 'debug' ] == True:
         print( len( untranslatedEntriesColumnFull ) )
@@ -1953,17 +2042,11 @@ def main( userInput=None ):
                 raise
             currentRowTemp += 1
 
-    # Debug code.
-    #batchModeEnabled = False
 
-    # Moved.
-    #if userInput[ 'batchSize' ] > userInput[ 'summarySize' ]:
-    #    userInput[ 'batchSize' ] = userInput[ 'summarySize' ]
-    #elif userInput[ 'summarySize' ] > userInput[ 'batchSize' ]:
-    #    userInput[ 'summarySize' ] = userInput[ 'batchSize' ]
-
-    if userInput[ 'sceneSummaryEnabled' ] == True:
-        assert( userInput[ 'batchSize' ] == userInput[ 'summarySize' ] )
+    # currentRow is the current and correct pointer to the current contents being processed in mainSpreadsheet.
+    # Start with row 2. Rows start with 1 instead of 0 and row 1 is always headers. Therefore, row 2 is the first row number with untranslated/translated pairs.
+    #  Split it into two values, one global value, programSettings[ 'currentRow' ], that keeps track of the pointer globally and a local value used to iterate through the current batch.
+    programSettings[ 'currentRow' ] = 2
 
     # if there is a limit to how large a batch can be, then the server should handle that internally.
     # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations. Implemented as batchSizeLimit , now just need to implement the batch limiting code. Update: Done.
@@ -1973,54 +2056,50 @@ def main( userInput=None ):
     #    translateBatchFunction( untranslatedList[ i : i + maxBatchSize ]  )
     #    print( untranslatedList[ i : i + maxBatchSize ]  )
 
-    for i in range( 0, len( programSettings[ 'untranslatedEntriesColumnFull' ] ), userInput[ 'maxBatchSize'] ):
-        if userInput[ 'sceneSummaryEnabled' ] != None:
-            # This returns either None or a string.
-            sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedList=untranslatedList[ i : i + maxBatchSize ] )
-        else:
-            sceneSummary=None
-
-        if ( userInput[ 'sceneSummaryEnabled' ] == False ) or ( ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == True ):
-            translatedList = batchTranslate( userInput=userInput, programSettings=programSettings, untranslatedList=untranslatedList[ i : i + maxBatchSize ], sceneSummary=sceneSummary )
-
-            # Always replacing the target column is only valid for batchMode == True and also if overrideWithCache == True. Otherwise, any entries that have already been translated, should not be overriden and batch replacements are impossible since each individual entry needs to be processed for non-batch modes.
-            if userInput[ 'overrideWithCache' ] == True:
-                translatedList.insert( 0, userInput[ 'translationEngine' ].model ) # Put header back. This returns None.
-                programSettings[ 'mainSpreadsheet' ].replaceColumn( programSettings[ 'currentMainSpreadsheetColumn' ], translatedList ) # Batch replace the entire column.
-            #if overrideWithCache != True:
+    if userInput[ 'testRun' ] != True:
+        # Now need to translate stuff.
+        for i in range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'maxBatchSize'] ):
+            currentBatchSize = len( untranslatedEntriesColumnFull[ i : i + maxBatchSize ] ) # This will be different than maxBatchSize during the last iteration.
+            if userInput[ 'sceneSummaryEnabled' ] == False:
+                sceneSummary = None
+            #if userInput[ 'sceneSummaryEnabled' ] != None:
             else:
-                # Consider each entry individually.
+                # This returns either None or a string.
+                sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
 
-                #print( 'pie pie' )
-                #print( 'len( untranslatedList )=', len( untranslatedList ) )
-                #print( 'reTranslate=', reTranslate )
+                # TODO: Update sceneSummaryCache here.
+                # 1) data is, current lines, the lines themselves,
+                # 2) metadata the fileName_currentRow_currentRow+currentBatchSize as a string
+                # 3) sceneSummary if it is not None and is an instance of a string
+                # rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
+                #def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
 
-                for listCounter,untranslatedString in enumerate( untranslatedList ):
-                    # Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedList and translatedList with the same counter.
-                    #tempSearchResult = programSettings[ 'cache' ].searchCache( untranslatedString )
-                    assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str( programSettings[ 'currentRow' ] ) ) )
+                metadata = userInput[ 'fileToTranslateFileNameWithoutPath' ] + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] ) + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] + currentBatchSize )
+                if isinstance( sceneSummary, str) == True:
+                    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + maxBatchSize ], metadata=metadata, summaryData=sceneSummary )
+                #elif sceneSummary is not a string:
+                #else:
+                    # Error generating sceneSummary.
 
-                    currentTranslatedCellAddress= programSettings[ 'currentMainSpreadsheetColumn' ] + str( programSettings[ 'currentRow' ] )
+            # There is a few special failure case here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated.
+            if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False )
+                programSettings[ 'currentRow' ] += currentBatchSize
+                continue
 
-                    # Check with postDictionary, a Python dictionary for possible updates.
-        #            if postDictionary != None:
-        #                for key,items in postDictionary.items():
-        #                    if translatedList[listCounter].find( key ) != -1:
-        #                        translatedList[listCounter]=translatedList[listCounter].replace( key, item )
+            # translate() should only consider the size of untranslatedList as valid since it has programSettings[ 'currentRow' ] as the correct pointer to the first entry already and mainSpreadsheet needs to be parsed again to determine which entries already have translations, which entries can be found in the cache, the speaker names, and the order of each entry for {history}. Since it needs to be re-parsed anyway, passing untranslatedListSize makes more sense than passing the untranslatedList[ slice ].
+            # translate() returns a list where each entry is a string that represents the translated contents.
+            translatedList = translate( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize, sceneSummary=sceneSummary )
 
-                    #print( currentTranslatedCellAddress, end='' )
-                    # Check if the entry is current None. if entry is none
-                    if ( programSettings[ 'mainSpreadsheet' ].getCellValue( currentTranslatedCellAddress ) == None ) or ( userInput[ 'reTranslate' ] == True ):
-                        # then always update the entry.
-                        programSettings[ 'mainSpreadsheet' ].setCellValue( currentTranslatedCellAddress, translatedList[ listCounter ] )
-                        #print( ( 'updated ' + currentTranslatedCellAddress + ' with: ' + translatedList[ listCounter ] ).encode( consoleEncoding ) )
-                    # if entry is not none
-                    #else:
-                        # then do not override entry. Do nothing here. If it was appropriate to override the entry, then overrideWithCache== True and this code would never execute since it would have all been done already.
-                        # reTraslate could still be True, but in that case update 
-                    programSettings[ 'currentRow' ] += 1
+            # Does this still make sense?
+            assert( len( translatedList ) == currentBatchSize )
 
-            #backupMainSpreadsheet( userInput=userInput, outputName=backupsFilePathWithNameAndDate, force=True )
+            # This will attempt to backup mainSpreadsheet after each translation loop. Does this make sense?
+            # No, because processing a batch could take longer, several hours, than the minimum time to save backupMainSpreadsheet(), a few minutes. To avoid losing data due to insufficent mainSpreadsheet backups, there should be an attempt to back it up after every single translation for local LLMs, especially since it is on a minimum timer anyway. However, if updating main spreadsheet here instead of inside the translate() function, then backing up main spreadsheet here is unavoidable because it does not make sense to backupMainSpreadsheet() inside the translate() function since that would back it up prior to updating it. What makes more sense, waiting for the batches to return to update it or updating it within translate() after every entry?
+            # Normally, it would always make sense to update inside of translate() after every entry, but cache gets updated regardless so there is no lost data. Hummm. Well, that does not consider operations were cache is disabled and backing up mainSpreadsheet() regularly is the only way to save data if an error occurs in that situation. Is cache a required feature? No. Therefore this backupMainSpreadsheet() behavior must be moved inside of translate so it occurs after every translation to minimize loss of data as intended. Thus, that also means the code to update mainSpreadsheet must also take place inside of translate().
+            #backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=False )
+            # Increment pointer by batch size so next loop begins at the start of the next entry.
+            programSettings[ 'currentRow' ] += currentBatchSize
+
 
     if userInput[ 'debug' ] == True:
         print( 'mainSpreadsheet.printAllTheThings():' )
@@ -2034,13 +2113,13 @@ def main( userInput=None ):
     if userInput[ 'cacheEnabled' ] == True:
         if userInput[ 'readOnlyCache' ] == True:
             programSettings[ 'cache' ].close()
-        # There is a bug where cacheWasUpdated is getting set to True even if it is never updated sometimes.
+        # There is a bug where cacheWasUpdated is getting set to True even if it is never updated sometimes. # Update: This might have been a scope issue. TODO: Double check if this bug persists after the refactor is complete.
         elif programSettings[ 'cacheWasUpdated' ] == True:
             backupCache( userInput=userInput, programSettings=programSettings, force=True )
 
 
 if __name__ == '__main__':
     main()
-    print( 'end reached' )
-    sys.exit(0)
+    print( 'End reached.' )
+    sys.exit( 0 )
 

@@ -24,7 +24,7 @@ try:
     import deepl
 except:
     print( 'DeepL\'s python library is not available. Please install using: pip install deepl' )
-    sys.exit(1)
+    sys.exit( 1 )
 
 # Environmental variable syntax:
 # os.environ[ 'CT2_VERBOSE' ] = '1'

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
-Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods.
+Description: A helper/wrapper library to aid in using openpyxl as a data structure. Supports i/o for .csv, .xlsx, .xlsx, .ods, .tsv.
 If using this library for cache.xlsx, where entries are unique, there are specialized functions available as well.
 
 Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 """
-__version__ = '2024.07.05'
+__version__ = '2024.07.17'
 
 #set defaults
 #printStuff = True
@@ -113,6 +113,8 @@ class Strawberry:
                     self.importFromXLS( myFileName, fileEncoding, sheetNameInWorkbook=spreadsheetNameInWorkbook )
                 elif myFileExtensionOnly == '.ods':
                     self.importFromODS( myFileName, fileEncoding, sheetNameInWorkbook=spreadsheetNameInWorkbook )
+                elif myFileExtensionOnly == '.tsv':
+                    self.importFromTSV( myFileName, myFileNameEncoding=fileEncoding, removeWhitespaceForCSV=removeWhitespaceForCSV, csvDialect=csvDialect )
                 else:
                     #Else the file must be a text file to instantiate a class with. Only line-by-line parsing is supported.
                     if ( myFileExtensionOnly != '.txt' ) and ( myFileExtensionOnly != '.text' ):
@@ -272,11 +274,11 @@ class Strawberry:
         if debug == True:
             print( str( len( newRowList ) ).encode( consoleEncoding ) )
             print( str( range( len( newRowList ) ) ).encode( consoleEncoding ) )
-            print( ('newRowList=' + str(newRowList) ).encode( consoleEncoding ) )
+            print( ( 'newRowList=' + str( newRowList ) ).encode( consoleEncoding ) )
 
-        for i in range(len(newRowList)):
-            #Syntax for assignment is: mySpreadsheet['A4'] = 'pie'
-            #mySpreadsheet['A4'] without an assignment returns: <Cell 'Sheet'.A4> 
+        for i in range( len( newRowList ) ):
+            #Syntax for assignment is: mySpreadsheet[ 'A4' ] = 'pie'
+            #mySpreadsheet[ 'A4' ] without an assignment returns: <Cell 'Sheet'.A4> 
             #columns begin with 1 instead of 0, so add 1 when referencing the target column, but not the source because source is a python list which are referenced as list[0], list[1], list[2], list[3], etc
 
             #Was workaround for Syntax error cannot assign value to function call: mySpreadsheet.cell( row=5, column=3 ) = 'pies'  
@@ -286,7 +288,7 @@ class Strawberry:
             self.spreadsheet.cell( row=int( rowLocation ), column=i + 1 ).value = newRowList[ i ]
         #return myWorkbook
 
-    #Example: replaceRow(7,newRow)
+    #Example: replaceRow( 7, newRow )
 
 
     def replaceColumn( self, columnLetter, newColumnInAList ):
@@ -426,6 +428,8 @@ class Strawberry:
             self.exportToXLS( outputFileNameWithPath )
         elif outputFileExtensionOnly == '.ods':
             self.exportToODS( outputFileNameWithPath )
+        if outputFileExtensionOnly == '.tsv':
+            self.exportToTSV( outputFileNameWithPath, fileEncoding=self.fileEncoding, csvDialect=self.csvDialect)
         elif ( outputFileExtensionOnly == '.txt' ) or ( outputFileExtensionOnly == '.text' ):
             self.exportToTextFile( outputFileNameWithPath, columnToExport=columnToExportForTextFiles, fileEncoding=self.fileEncoding )
         else:
@@ -501,11 +505,12 @@ class Strawberry:
     #Edit: Return value/reference for reading from files should be done by returning a class instance (object) of Strawberry()
     #Strawberry should have its own methods for writing to files of various formats.
     #All files follow the same rule of the first row being reserved for header values and invalid for inputting/outputting actual data.
-    def importFromCSV(self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True, csvDialect=None):
-        print( ('Reading from: '+fileNameWithPath).encode(consoleEncoding) )
+    def importFromCSV( self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True, csvDialect=None ):
+        print( ('Reading from: ' + fileNameWithPath).encode( consoleEncoding ) )
         #import languageCodes.csv, but first check to see if it exists
         if os.path.isfile(fileNameWithPath) != True:
-            sys.exit(('\n Error. Unable to find .csv file:"' + fileNameWithPath + '"').encode(consoleEncoding))
+            print( ('\n Error. Unable to find .csv file:\'' + fileNameWithPath + '\'' ).encode( consoleEncoding ) )
+            sys.exit( 1 )
 
         #tempWorkbook = openpyxl.Workbook()
         #tempSpreadsheet = tempWorkbook.active
@@ -522,38 +527,38 @@ class Strawberry:
         # Reading from dictionaries can be called with the "False" option for maximum flexibility.
         # New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
         #print(inputErrorHandling)
-        with open(fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
+        with open( fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling ) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
             # if csvDialect != None.:
                 # implement code related to csvDialects here. Default options are unix, excel and excel-tab
-            myCsvHandle = csv.reader(myFile)
+            myCsvHandle = csv.reader( myFile )
 
             for listOfStrings in myCsvHandle:
                 if debug == True:
-                    print( str(listOfStrings).encode(consoleEncoding) )
-                # Clean up whitespace for entities.
-                for i in range( len(listOfStrings) ):
+                    print( str( listOfStrings ).encode( consoleEncoding ) )
+                for i in range( len( listOfStrings ) ):
+                    # Clean up whitespace for entities.
                     if removeWhitespaceForCSV == True:
-                        listOfStrings[i]=listOfStrings[i].strip()
+                        listOfStrings[ i ] = listOfStrings[ i ].strip()
+
                     # Fix types.
-                    if listOfStrings[i].lower() == 'true':
-                        listOfStrings[i]=True
-                    elif listOfStrings[i].lower() == 'false':
-                        listOfStrings[i]=False
-                    elif ( listOfStrings[i].lower() == 'none' ) or ( listOfStrings[i].lower() == '' ):
-                        listOfStrings[i]=None
+                    if listOfStrings[ i ].lower() == 'true':
+                        listOfStrings[ i ] = True
+                    elif listOfStrings[ i ].lower() == 'false':
+                        listOfStrings[ i ] = False
+                    elif ( listOfStrings[i].lower() == 'none' ) or ( listOfStrings[ i ].lower() == '' ):
+                        listOfStrings[ i ]=None
                     # Leave numbers as strings. They should not be processed anyway, so there is no need to mess with them.
 
                     #tempSpreadsheet.append(listOfStrings)
                     #tempSpreadsheet.appendRow(listOfStrings)
 
-
-                self.spreadsheet.append(listOfStrings)
+                self.spreadsheet.append( listOfStrings )
         #return tempWorkbook
         if debug == True:
             self.printAllTheThings()
 
 
-    def exportToCSV(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=None):
+    def exportToCSV( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=None ):
         with open( fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myOutputFileHandle:
             # if csvDialect != None.:
                 # implement code related to csvDialects here. Default options are unix, excel and excel-tab
@@ -572,7 +577,7 @@ class Strawberry:
 
 
     def importFromXLSX( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None, readOnlyMode=False ):
-        print( ('Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
+        print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
         self.workbook = openpyxl.load_workbook( filename = fileNameWithPath, read_only=readOnlyMode )
         if sheetNameInWorkbook == None:
             self.spreadsheet = self.workbook.active
@@ -591,33 +596,106 @@ class Strawberry:
         self.workbook.close()
 
 
-    def exportToXLSX(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
+    def exportToXLSX( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding):
         #Syntax: 
         #theWorkbook.save(filename='myAwesomeSpreadsheet.xlsx')
         self.workbook.save( filename=fileNameWithPath )
         print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
-    def importFromXLS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None):
-        print( 'Hello World' )
+    def importFromXLS( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None ):
+        print( 'Hello world.' )
         #print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
         #return workbook
 
 
     def exportToXLS( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding ):
-        print( 'Hello World' )
+        print( 'Hello world.' )
         #print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
-    def importFromODS(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None):
-        print( 'Hello World' )
+    def importFromODS( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, sheetNameInWorkbook=None ):
+        print( 'Hello world.' )
         #print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
         #return workbook
 
 
     def exportToODS( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding ):
-        print( 'Hello World'.encode( consoleEncoding ) )
+        print( 'Hello world.' )
         #print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
+
+
+    def importFromTSV( self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True, csvDialect=None ):
+        print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
+        print( 'Hello world.' )
+        #import languageCodes.csv, but first check to see if it exists
+        if os.path.isfile(fileNameWithPath) != True:
+            print( ( '\n Error. Unable to find .csv file:\'' + fileNameWithPath + '\'' ).encode( consoleEncoding ) )
+            sys.exit( 1 )
+
+        #tempWorkbook = openpyxl.Workbook()
+        #tempSpreadsheet = tempWorkbook.active
+        #tempSpreadsheet = Strawberry()
+
+        # It looks like quoting fields in csv's that use commas , and new
+        # lines works but only as double quotes " and not single quotes '
+        # Spaces are also preserved as-is if they are within the commas (,) by default, so remove them
+        # If spaces are intended to be within the entry, then the user can encapslate them in double quotes
+        # Need to test. Even double quotes might not preserve them. Tested: They do not.
+        # Could also just say not supported since it is almost certainly an error for hand-written CSV's.
+        # Could also have a flag that switches back and forth.
+        # Partial solution, added "removeWhitespaceForCSV" function parameter which defaults to True.
+        # Reading from dictionaries can be called with the "False" option for maximum flexibility.
+        # New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
+        #print(inputErrorHandling)
+        with open( fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling ) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
+            # if csvDialect != None.:
+                # implement code related to csvDialects here. Default options are unix, excel and excel-tab
+            myCsvHandle = csv.reader( myFile )
+
+            for listOfStrings in myCsvHandle:
+                if debug == True:
+                    print( str( listOfStrings ).encode( consoleEncoding ) )
+                # Clean up whitespace for entities.
+                for i in range( len( listOfStrings ) ):
+                    if removeWhitespaceForCSV == True:
+                        listOfStrings[ i ] = listOfStrings[ i ].strip()
+                    # Fix types.
+                    if listOfStrings[ i ].lower() == 'true':
+                        listOfStrings[ i ] = True
+                    elif listOfStrings[ i ].lower() == 'false':
+                        listOfStrings[ i ] = False
+                    elif ( listOfStrings[ i ].lower() == 'none' ) or ( listOfStrings[i].lower() == '' ):
+                        listOfStrings[ i ] = None
+                    # Leave numbers as strings. They should not be processed anyway, so there is no need to mess with them.
+
+                    #tempSpreadsheet.append(listOfStrings)
+                    #tempSpreadsheet.appendRow(listOfStrings)
+
+                self.spreadsheet.append( listOfStrings )
+
+        #return tempWorkbook
+        if debug == True:
+            self.printAllTheThings()
+
+
+    def exportToTSV( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, csvDialect=None ):
+        print( 'Hello world.' )
+        with open( fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myOutputFileHandle:
+            # if csvDialect != None.:
+                # implement code related to csvDialects here. Default options are unix, excel and excel-tab
+            myCsvHandle = csv.writer( myOutputFileHandle )
+
+            # Get every row for current spreadsheet.
+            # For every row, get each item's value in a list.
+            # myCsvHandle.writerow( thatList )
+            for row in self.spreadsheet.iter_rows( min_row=1, values_only=True ):
+                tempList = []
+                for cell in row:
+                    tempList.append( str( cell ) )
+                myCsvHandle.writerow( tempList )
+
+        print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
     # These are methods that try to optimize using chocolate.Strawberry() as cache.xlsx by indexing the first column into a Python dictionary with its associated row number.
@@ -764,7 +842,7 @@ class Strawberry:
                 #strawberryToMergeDatabase = self._getDatabaseFromSpreadsheet( extraStrawberryToMerge.spreadsheet, coreHeader )
 
                 # Doing a generic dict1.update(dict2) will override all conflicting keys with the values in dict2. Basically, it will resolve conflicts, but also delete half the cache for those entries. Not ideal behavior.
-                #tempDatabase.update(strawberryToMergeDatabase)
+                #tempDatabase.update( strawberryToMergeDatabase )
 
                 # To merge two dictionaries where each dictionary has a key={dictionary}, 1) iterate through the keys of the second one. 2) If the key appears in the first one, 3) then pull both value dictionaries, 4) merge them, and 5) if necessary, update the dictionary in the key={dictionary} in the first dictionary.
                 # Fancy merge code goes here.
@@ -880,21 +958,21 @@ class Strawberry:
             if rowCounter == 0:
                 continue
 
-            rowKey = mySpreadsheet[ 'A'+ str( rowCounter + 1 ) ].value
+            rowKey = mySpreadsheet[ 'A' + str( rowCounter + 1 ) ].value
             if rowKey == None:
-                print( ( 'None key found at row '+ str( rowCounter + 1 ) + '.' ).encode( consoleEncoding ) )
+                print( ( 'None key found at row ' + str( rowCounter + 1 ) + '.' ).encode( consoleEncoding ) )
                 continue
             elif rowKey.strip() == '':
-                print( ( 'Empty string key found at row '+ str( rowCounter + 1 ) + '.').encode( consoleEncoding ) )
+                print( ( 'Empty string key found at row ' + str( rowCounter + 1 ) + '.').encode( consoleEncoding ) )
                 continue
 
             if rowKey in tempDatabase.keys():
-                print( ( 'Duplicate key found at row '+ str( rowCounter + 1 ) + ': '+ rowKey ).encode( consoleEncoding ) )
+                print( ( 'Duplicate key found at row ' + str( rowCounter + 1 ) + ': '+ rowKey ).encode( consoleEncoding ) )
 
             tempRowDict={}
             for columnCounter,cell in enumerate( row ):
                 if ( cell != None ) and ( cell != '' ):
-                    tempRowDict[ headers[ columnCounter ] ]=cell 
+                    tempRowDict[ headers[ columnCounter ] ] = cell 
 
             tempDatabase[ rowKey ] = tempRowDict
 

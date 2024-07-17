@@ -245,6 +245,7 @@ class KoboldCppEngine:
         #debug=True
         if debug == True:
             print( str( settings ).encode( consoleEncoding ) )
+            print( self.sourceLanguageList )
             print( self.sourceLanguage )
             print( self.targetLanguageList )
             print( self.targetLanguage )
@@ -281,7 +282,7 @@ class KoboldCppEngine:
             self.timeout = defaultTimeout
 
         # Update the generic API variables for this engine with the goal of defining self.reachable, a boolean, correctly.
-        print( 'Connecting to KoboldCpp API at ' + self.addressFull + ' ... ', end='')
+        print( 'Connecting to KoboldCpp API at ' + self.addressFull + ' ... ', end='' )
         if ( self.address != None ) and ( self.port != None ):
             try:
                 self.model = requests.get( self.addressFull + '/api/v1/model', timeout=10 ).json()[ 'result' ]
