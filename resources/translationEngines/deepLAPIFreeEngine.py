@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__='2024.07.14'
+__version__ = '2024.07.14'
 
 #set defaults
 #printStuff = True

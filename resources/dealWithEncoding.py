@@ -21,8 +21,8 @@ debug=False
 #debug=True
 consoleEncoding='utf-8'
 defaultTextFileEncoding='utf-8'
-# Technically, it should be possible to detect the file name encoding of .zip files even if they are binary files, so do not add them here. .epub files are a type of zip file.
-knownBinaryFormats=[
+# Technically, it should be possible to detect the encoding of the file names in .zip files from the header even if they are stored as binary files later in the data structure, so do not add them here. .epub files are a type of zip file.
+knownBinaryFormats = [
 '.7z',
 '.dll',
 '.exe',

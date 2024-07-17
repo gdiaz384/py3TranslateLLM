@@ -680,7 +680,7 @@ class Strawberry:
             print( 'Warning: Cannot use addToCache to add myString=empty string.' )
             return None
 
-        tempSearchResult = self.searchCache(myString)
+        tempSearchResult = self.searchCache( myString )
         if tempSearchResult == None:
             # then add it to the main spreadsheet.
             self.spreadsheet.append( [ myString ] )
@@ -697,7 +697,7 @@ class Strawberry:
             return tempSearchResult
 
 
-    def rebuildCache(self, coreHeader=None, extraStrawberryToMerge=None):
+    def rebuildCache( self, coreHeader=None, extraStrawberryToMerge=None ):
         # Algorithim for merging (deduplicating) multiple files:
         # Must match: sheet's name (sheet.title, self.spreadsheetNameInWorkbook), and coreHeader
         # coreHeader does not really need to match in terms of being in A1. Could just use A1 from first spreadsheet as coreHeader and then search for it in other spreadsheets. However, it must be present.
@@ -712,12 +712,15 @@ class Strawberry:
         # move on to next spreadsheet name
 
         # Obtain header values. Use header in first cell A1 as core index.
-        # coreHeader=self.spreadsheet['A1']
-        self.index={}
-        database={}
+        # coreHeader=self.spreadsheet[ 'A1' ]
+        self.index = {}
+        database = {}
 
         if coreHeader == None:
-            coreHeader=self.spreadsheet['A1'].value
+            coreHeader = self.spreadsheet[ 'A1' ].value
+
+        print( 'Rebuilding index using coreHeader=' + str( coreHeader ) ).encode( consoleEncoding ) )
+        print( 'self.spreadsheetName=' + self.spreadsheetName )
 
         # tempDatabase has keys derived from coreHeader. data itself is the rest of the headers and the data
         #tempDatabase={ key:value, key:value} where the keys are untranslated strings, one string per row, and the values are another dictionary.
@@ -725,18 +728,18 @@ class Strawberry:
         # The actual return value is a tuple (headers, database) which is returned that way to reliably get back the original headers instead of having to sort through the data to derive them.
         tempDatabase = self._getDatabaseFromSpreadsheet( self.spreadsheet, coreHeader )
         if tempDatabase == None:
-            print('Unspecified error turning spreadsheet into database while rebuilding cache. No work done. Exiting.')
+            print( 'Unspecified error turning spreadsheet into database while rebuilding cache. No work done. Exiting.' )
             return
-        assert isinstance(tempDatabase, tuple)
+        assert isinstance( tempDatabase, tuple )
 
-        headersList=tempDatabase[0]
-        headers={}
+        headersList = tempDatabase[ 0 ]
+        headers = {}
         # This de-duplicates the headers. Not a good idea actually. Duplicate headers are invalid because it is not clear how to process them, so do it anyway and error out earlier than this if there are duplicate headers.
         for i in headersList:
-            headers[i]=None
+            headers[ i ] = None
         # The duplicates should have already been removed.
-        assert( len(headersList) == len(headers) )
-        tempDatabase=tempDatabase[1]
+        assert( len( headersList ) == len( headers ) )
+        tempDatabase = tempDatabase[ 1 ]
 
         # This cycles through the data to get the row headers as a dictionary {}, but the row headers will not be added for a particular item if the translation for a particular item, if that exact cell for that untranslatedString, is None. 
         # That means the header for that item will not exist in that particular rowDictionary, but it might exist in other ones. That makes it difficult to derive the total number of headers in the data, the names of those headers, and their default order.
@@ -773,12 +776,12 @@ class Strawberry:
                 #     break
 
         # Delete the existing active spreadsheet in the main workbook. Do not delete the existing workbook.
-        self.workbook.remove(self.spreadsheet)
+        self.workbook.remove( self.spreadsheet )
 
         # Create a new worksheet with the same name.
         # This does not seem to be creating the new spreadsheet with the same name as the old spreadsheet. #Update: Fixed.
         # self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
-        #print(self.workbook.sheetnames)
+        #print( self.workbook.sheetnames )
         self.spreadsheet = self.workbook[ self.spreadsheetName ]
 
         # Add the values into the worksheet.
@@ -796,46 +799,46 @@ class Strawberry:
         #for every untranslated entry
         for untranslatedEntry,rowDictionary in tempDatabase.items():
             # Sanity check.
-            assert( untranslatedEntry == rowDictionary[coreHeader] )
+            assert( untranslatedEntry == rowDictionary[ coreHeader ] )
             # Build the correct row in a list with the order of the data specified by the headers.
             tempList = [ untranslatedEntry ]
             for globalHeader in headers.keys():
                 # if the data from the coreHeader is added, then the resulting list will have a duplicate, so prevent that.
                 if globalHeader != coreHeader:
-                    if (globalHeader in rowDictionary):
-                        tempList.append( rowDictionary[globalHeader] )
+                    if ( globalHeader in rowDictionary ):
+                        tempList.append( rowDictionary[ globalHeader ] )
                     else:
                         tempList.append( None )
-            self.appendRow(tempList)
+            self.appendRow( tempList )
 
         # Delete database.
         del tempDatabase
 
 
     # This function takes a spreadsheet and returns a specially formatted Python dictionary. If the key does not appear, it returns None.
-    def _getDatabaseFromSpreadsheet(self, mySpreadsheet, key):
+    def _getDatabaseFromSpreadsheet( self, mySpreadsheet, key ):
         if ( mySpreadsheet == None ) or ( key == None ):
             return None
 
-        headers=[]
-        for entry in mySpreadsheet[1]:
-            headers.append(entry.value)
-        print( ( 'initial headers=' + str(headers) ).encode(consoleEncoding) )
-        print( 'len(headers)=', len(headers) )
-        if len(headers) == 0:
+        headers = []
+        for entry in mySpreadsheet[ 1 ]:
+            headers.append( entry.value )
+        print( ( 'initial headers=' + str( headers ) ).encode( consoleEncoding ) )
+        print( 'len(headers)=', len( headers ) )
+        if len( headers ) == 0:
             return None
 
-        headersDictionary={}
+        headersDictionary = {}
         for i in headers:
-            headersDictionary[i]=None
-        if len(headersDictionary) != len(headers):
+            headersDictionary[ i ]=None
+        if len( headersDictionary ) != len( headers ):
             print( 'Duplicate headers found. Unable to make sense of data. Exiting.' )
             return None
 
-        keyColumnAsNumber=None
-        for counter,entry in enumerate(headers):
+        keyColumnAsNumber = None
+        for counter,entry in enumerate( headers ):
             if entry == key:
-                keyColumnAsNumber=counter+1 #Columns are letters, not numbers, but number 1 will map to column A, 2 to B, and so forth so add 1 to convert the header's index as a list to a column index as a number.
+                keyColumnAsNumber = counter + 1 #Columns are letters, not numbers, but number 1 will map to column A, 2 to B, and so forth so add 1 to convert the header's index as a list to a column index as a number.
                 break
         if keyColumnAsNumber == None:
             print( 'Error: The column header chosen as an index could not be found in the spreadsheet headers: '+str(key) )
@@ -845,58 +848,58 @@ class Strawberry:
             # Then it is column B or similar. Move contents to Column A.
             #Add a new column.
             #print('pie')
-            mySpreadsheet.insert_cols(1)
+            mySpreadsheet.insert_cols( 1 )
             #Copy values from old column.
-            for column in sheet.iter_cols(min_row=keyColumnAsNumber+1, max_row=keyColumnAsNumber+1, values_only=True):
-                for counter,cell in enumerate(column):
-                    #self.spreadsheet[cellAddress]=value
-                    mySpreadsheet[ 'A' + str( counter+1)]=cell
+            for column in sheet.iter_cols( min_row=keyColumnAsNumber+1, max_row=keyColumnAsNumber+1, values_only=True):
+                for counter,cell in enumerate( column ):
+                    #self.spreadsheet[cellAddress] = value
+                    mySpreadsheet[ 'A' + str( counter + 1 ) ] = cell
             #Delete old column.
-            mySpreadsheet.delete_cols( keyColumnAsNumber+1 )
+            mySpreadsheet.delete_cols( keyColumnAsNumber + 1 )
             # Fix headers.
-            headers=[]
-            for entry in mySpreadsheet[1]:
-                headers.append(entry.value)
+            headers = []
+            for entry in mySpreadsheet[ 1 ]:
+                headers.append( entry.value )
             # Sanity checks.
-            for counter,entry in enumerate(headers):
+            for counter,entry in enumerate( headers ):
                 if entry == key:
-                    keyColumnAsNumber=counter+1
+                    keyColumnAsNumber = counter + 1
                     break
             assert( keyColumnAsNumber == 1)
-            assert( headers[0] == key == mySpreadsheet['A1'].value )
+            assert( headers[ 0 ] == key == mySpreadsheet[ 'A1' ].value )
 
-        tempDatabase={}
+        tempDatabase = {}
         # tempDatabase['headers']=headers #Workaround. Nevermind. Do this properly.
         # Now the coreHeader is always in A1 and columnA values can be used as keys in tempDatabase. Time to create a dictionary of header:value pairs for each row in order to eventually assign
-        # tempDatabase[ ColumnARowDataAsKey ]=rowDictionaryContainingHeaderAndValuePairs
+        # tempDatabase[ ColumnARowDataAsKey ] = rowDictionaryContainingHeaderAndValuePairs
 
         #for i in range( len(headers) ):
         #    tempDictionary={}
-        for rowCounter,row in enumerate( mySpreadsheet.iter_rows(values_only=True) ):
+        for rowCounter,row in enumerate( mySpreadsheet.iter_rows( values_only=True ) ):
             #skip header
-            if rowCounter==0:
+            if rowCounter == 0:
                 continue
 
-            rowKey=mySpreadsheet[ 'A'+ str(rowCounter+1) ].value
+            rowKey = mySpreadsheet[ 'A'+ str( rowCounter + 1 ) ].value
             if rowKey == None:
-                print( ('Null key found at row '+ str(rowCounter+1) + '.' ).encode(consoleEncoding) )
+                print( ( 'None key found at row '+ str( rowCounter + 1 ) + '.' ).encode( consoleEncoding ) )
                 continue
             elif rowKey.strip() == '':
-                print( ('Empty string key found at row '+ str(rowCounter+1) + '.').encode(consoleEncoding) )
+                print( ( 'Empty string key found at row '+ str( rowCounter + 1 ) + '.').encode( consoleEncoding ) )
                 continue
 
             if rowKey in tempDatabase.keys():
-                print( ('Duplicate key found at row '+ str(rowCounter+1) + ': '+ rowKey).encode(consoleEncoding) )
+                print( ( 'Duplicate key found at row '+ str( rowCounter + 1 ) + ': '+ rowKey ).encode( consoleEncoding ) )
 
             tempRowDict={}
             for columnCounter,cell in enumerate( row ):
                 if ( cell != None ) and ( cell != '' ):
-                    tempRowDict[ headers[columnCounter] ]=cell 
+                    tempRowDict[ headers[ columnCounter ] ]=cell 
 
-            tempDatabase[ rowKey ]=tempRowDict
+            tempDatabase[ rowKey ] = tempRowDict
 
-        print( 'len(mySpreadsheet[A]) before rebuilding=', len(mySpreadsheet['A']) )
-        print( 'len(tempDatabase) after rebuilding=', len(tempDatabase) )
+        print( 'len( mySpreadsheet[A] ) before rebuilding=', len( mySpreadsheet[ 'A' ] ) )
+        print( 'len( tempDatabase ) after rebuilding=', len( tempDatabase ) )
 
         # This cycles through the data to get the row headers, but the row headers will not be added for a particular item if that item is None. 
         # That means the header for that item will not exist in that particular rowDictionary, but it might exist in other ones. That makes it difficult to derive the total number of headers in the data, the names of those headers, and their default order.
@@ -909,7 +912,7 @@ class Strawberry:
 #            print('')
 #            break
         # return a tuple of the headers in the dataset, and the raw dataset itself.
-        return (headers, tempDatabase)
+        return ( headers, tempDatabase )
 
 
 """
