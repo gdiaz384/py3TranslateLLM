@@ -728,7 +728,7 @@ class Strawberry:
             print( 'Error: Spreadsheet has duplicate items. Cannot use as cache.\nTip: Use cache.rebuildCache() to remove the duplicate items before trying to cache.initializeCache(). Adding new entries while duplicates exist will corrupt the cache.' )
             raise
 
-    # Expects a string and searches through the current cache index. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
+    # Expects a string and searches through the current cache index. Returns the currentRow number where myString was found. Python dictionaries have an O(1) search time, they are hash tables, compared to O(n) search time on Python lists especially when the last list item is being searched for immediately after an append() opperation. Compared to O(n), O(1) is crazy levels of fast, although even O(log n) would have been an improvement.
     def searchCache( self, myString ):
         if myString == None:
             print( 'Warning: Cannot use searchCache to search for myString=None.' )

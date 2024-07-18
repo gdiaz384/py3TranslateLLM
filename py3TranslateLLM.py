@@ -77,9 +77,9 @@ defaultMinimumSaveIntervalForSceneSummaryCache = 540
 
 # These two lists do not determine if the values are True/ False by default. Use action='store_true' and 'store_false' in the CLI options to toggle defaults and then update these two lists. These lists ensure the values are toggled correctly if a different than default setting is specified in program.ini when merging the CLI options with the options from the .ini .
 booleanValuesTrueByDefault = [ 'cache', 'batches', 'backups']
-booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
+booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'overrideWithSpreadsheet', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
 
-translationEnginesAvailable = 'cacheOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi, pykakasi, cutlet'
+translationEnginesAvailable = 'cacheOnly, koboldcpp, py3translationserver, sugoi, deepl_api_free, deepl_api_pro, deepl_web, pykakasi, cutlet'
 usageHelp = ' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -te KoboldCpp -f myInputFile.ks \n Translation Engines: ' + translationEnginesAvailable + '.'
 
 
@@ -172,8 +172,9 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-c', '--cache', help='Toggles cache. Specifying this will disable using or updating the cache file for translated entries. Default=Use the cache file to fill in previously translated entries and update it with new entries to speed up future translations.', action='store_false' )
     commandLineParser.add_argument( '-cf', '--cacheFile', help='The location of the cache file. Must be in a spreadsheet format like .xlsx. Default=' + str( defaultCacheFileLocation ), default=None, type=str )
     commandLineParser.add_argument( '-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true' )
-    commandLineParser.add_argument( '-owc', '--overrideWithCache', help='Override any already translated lines in the spreadsheet with results from the cache. Default=Do not override already translated lines. This setting is overwritten by reTranslate.', action='store_true' )
-    commandLineParser.add_argument( '-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines. This setting takes precedence over overrideWithCache.', action='store_true' )
+    commandLineParser.add_argument( '-owc', '--overrideWithCache', help='Override any already translated lines in mainSpreadsheet with results from the cache. Default=Do not override already translated lines. This setting is overridden by reTranslate. This setting takes precedence over overrideWithSpreadsheet.', action='store_true' )
+    commandLineParser.add_argument( '-ows', '--overrideWithSpreadsheet', help='Override any already translated lines in the cache using mainSpreadsheet. Default=Do not override already translated lines. This setting is overridden by reTranslate. overrideWithCache takes precedence over this setting.', action='store_true' )
+    commandLineParser.add_argument( '-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines. This setting takes precedence over overrideWithCache and overrideWithSpreadsheet.', action='store_true' )
     commandLineParser.add_argument( '-roc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it or rebuilding it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file. This setting takes precedence over rebuildCache.', action='store_true' )
     commandLineParser.add_argument( '-rbc', '--rebuildCache', help='If there is any error detected when generating it, this rebuilds the cache, removing blank lines and duplicates, based upon an existing spreadsheet. Use this if the cache ever becomes corrupt. Rebuilding the cache lowers memory usage. The first column will be used as the untranslated data. Default=Error out if there is any error reading the cache file. The cache cannot be rebuilt if readOnlyCache is enabled.', action='store_true' )
 
@@ -237,6 +238,7 @@ def createCommandLineOptions():
     userInput[ 'cacheFile' ] = commandLineArguments.cacheFile
     userInput[ 'cacheAnyMatch' ] = commandLineArguments.cacheAnyMatch
     userInput[ 'overrideWithCache' ] = commandLineArguments.overrideWithCache
+    userInput[ 'overrideWithSpreadsheet' ] = commandLineArguments.overrideWithSpreadsheet
     userInput[ 'reTranslate' ] = commandLineArguments.reTranslate
     userInput[ 'readOnlyCache' ] = commandLineArguments.readOnlyCache
     userInput[ 'rebuildCache' ] = commandLineArguments.rebuildCache
@@ -660,7 +662,7 @@ def validateUserInput( userInput=None ):
     #validate input from command line options
     # This section should probably be updated with more helpful error messages like what to do if the engines did not import correctly. pip install pykakasi ...etc
     # Is this mode still valid? # Update: This should be renamed to enable a test run mode. # Update2: parseOnly was removed completely and cacheOnly is taking its place. --testRun, a flag, was also implemented as a replacement for --translationEngine parseOnly.
-    if ( userInput[ 'translationEngine' ].lower() == 'cacheOnly' ):
+    if ( userInput[ 'translationEngine' ].lower() == 'cacheonly' ):
         userInput[ 'mode' ] = 'cacheonly'
         implemented=False
     elif ( userInput[ 'translationEngine' ].lower() == 'koboldcpp' ):
@@ -671,13 +673,16 @@ def validateUserInput( userInput=None ):
     elif ( userInput[ 'translationEngine' ].lower() == 'deepl_api_free' ) or ( userInput[ 'translationEngine' ].lower() == 'deepl-api-free' ):
         userInput[ 'mode' ] = 'deepl_api_free'
         import resources.translationEngines.deepLAPIFreeEngine as deepLAPIFreeEngine
+        implemented=False
         #import deepl
     elif ( userInput[ 'translationEngine' ].lower() == 'deepl_api_pro' ) or ( userInput[ 'translationEngine' ].lower() == 'deepl-api-pro' ):
         userInput[ 'mode' ] = 'deepl_api_pro'
         import resources.translationEngines.deepLAPIProEngine as deepLAPIProEngine
+        implemented=False
     elif ( userInput[ 'translationEngine' ].lower() == 'deepl_web' ) or ( userInput[ 'translationEngine' ].lower() == 'deepl-web' ):
         userInput[ 'mode' ] = 'deepl_web'
         import resources.translationEngines.deepLWebEngine as deepLWebEngine
+        implemented=False
     elif ( userInput[ 'translationEngine' ].lower() == 'py3translationserver' ):
         userInput[ 'mode' ] = 'py3translationserver'
         import resources.translationEngines.py3translationServerEngine as py3translationServerEngine
@@ -686,7 +691,7 @@ def validateUserInput( userInput=None ):
         userInput[ 'mode'] = 'sugoi'
         # Sugoi has a default port association and only supports Jpn->Eng translations, so having a dedicated entry for it is still useful for input validation, especially since it only supports a subset of the py3translationserver API.
         import resources.translationEngines.sugoiEngine as sugoiEngine
-        implemented = True
+        implemented = False
     elif ( userInput[ 'translationEngine' ].lower() == 'pykakasi' ):
         userInput[ 'mode' ] = 'pykakasi'
         import resources.translationEngines.pykakasiEngine as pykakasiEngine
@@ -697,15 +702,16 @@ def validateUserInput( userInput=None ):
     elif ( userInput[ 'translationEngine' ].lower() == 'cutlet' ):
         userInput[ 'mode' ] = 'cutlet'
         import resources.translationEngines.cutletEngine as cutletEngine
-        implemented=False
-        #cacheEnabled=False # Is enabling cache worth it for cutlet?
+        implemented = False
+        userInput [ 'cacheEnabled' ] = False # Is enabling cache worth it for cutlet?
     else:
-        print( ( 'Error. Invalid translation engine specified: \'' + userInput[ 'translationEngine' ] + '\'' + usageHelp ).encode(consoleEncoding))
+        print( ( 'Error. Invalid translation engine specified: \'' + userInput[ 'translationEngine' ] + '\'' + usageHelp ).encode( consoleEncoding ))
         sys.exit( 1 )
+    userInput.pop( 'translationEngine' )
 
-    print( ( 'Mode is set to: \'' + str( userInput[ 'mode'] ) + '\'' ).encode(consoleEncoding) )
+    print( ( 'Mode is set to: \'' + str( userInput[ 'mode'] ) + '\'' ).encode( consoleEncoding ) )
     if implemented == False:
-        print( '\n\'' + mode + '\' not yet implemented. Please pick another translation engine. \n Translation engines: ' + str(translationEnginesAvailable) )
+        print( '\n\'' + mode + '\' not yet implemented. Please pick another translation engine. \n Translation engines: ' + str( translationEnginesAvailable ) )
         sys.exit( 1 )
 
     functions.verifyThisFileExists( userInput[ 'fileToTranslateFileName' ] ) #, 'fileToTranslate'
@@ -713,7 +719,7 @@ def validateUserInput( userInput=None ):
     if userInput[ 'fileToTranslateIsASpreadsheet' ] == False:
         # if the extension is not .txt or .text, then warn the user about it.
         if not ( ( userInput[ 'fileToTranslateFileExtensionOnly' ] == '.txt' ) or ( userInput[ 'fileToTranslateFileExtensionOnly' ] == '.text' ) ):
-            print( ( 'Warning: Unrecognized extension for spreadsheet: ' + str( userInput[ 'fileToTranslateFileExtensionOnly' ] + ' File will be parsed line-by-line as a text file. Consider using a dedicated parser if this is incorrect.' ) ).encode(consoleEncoding) )
+            print( ( 'Warning: Unrecognized extension for spreadsheet: ' + str( userInput[ 'fileToTranslateFileExtensionOnly' ] + ' File will be parsed line-by-line as a text file. Consider using a dedicated parser if this is incorrect.' ) ).encode( consoleEncoding ) )
 
     # outputFileName does not need to exist.
 
@@ -781,9 +787,10 @@ def validateUserInput( userInput=None ):
             print( ( 'cacheFile: \'' + str( userInput[ 'cacheFileName' ] ) ).encode(consoleEncoding) )
             sys.exit(1)
 
-        # overrideWithCache means to ignore the current translation and fill it in with entries from the cache. reTranslate means to ignore the current translation and fill it in with fresh entries from the translation engine. These settings directly conflict. When then conflict, reTranslate should take precedence.
+        # overrideWithCache means to ignore the current translation and fill it in with entries from the cache. overrideWithSpreadsheet means to ignore what is in the cache and replace it with a translation from mainSpreadsheet. reTranslate means to ignore the current translation and fill it in with fresh entries from the translation engine. These settings directly conflict. When then conflict, reTranslate should take precedence.
         if ( userInput[ 'overrideWithCache' ] == True ) and ( userInput[ 'reTranslate' ] == True ):
             userInput[ 'overrideWithCache' ] = False
+            userInput[ 'overrideWithSpreadsheet' ] = False
 
         # readOnlyCache means to not write/alter the current cache.xlsx. rebuildCache means to alter the current cache.xlsx. When these settings conflict, disable rebuildCache.
         if ( userInput[ 'readOnlyCache' ] == True ) and ( userInput[ 'rebuildCache' ] == True ):
@@ -791,7 +798,7 @@ def validateUserInput( userInput=None ):
 
     #if contextHistoryMaxLength was specified as == 0, then disable it.
     if userInput[ 'contextHistoryMaxLength' ] == 0:
-        userInput[ 'contextHistoryEnabled'] = False
+        userInput[ 'contextHistoryEnabled' ] = False
 
     if userInput[ 'sceneSummaryPromptFileName' ] != None:
         functions.verifyThisFileExists( userInput[ 'sceneSummaryPromptFileName' ] )
@@ -877,7 +884,7 @@ def validateUserInput( userInput=None ):
 
     # Set encodings last using dealWithEncoding.py helper library.
     # API: def ofThisFile( myFileName, userInputForEncoding=None, fallbackEncoding=defaultTextFileEncoding ):
-    # Usage: newEncoding = dealWithEncoding.ofThisFile(myFileName, rawCommandLineOption, fallbackEncoding)
+    # Usage: newEncoding = dealWithEncoding.ofThisFile( myFileName, rawCommandLineOption, fallbackEncoding )
     #.csv's work normally since those are both plaintext and spreadsheets but reading encoding from .xlsx, .xls, and .ods is not possible without either hardcoding a specific encoding or using the designated libraries. dealWithEncoding should deal with it. If asked what the encoding of a binary spreadsheet format, then it should just return what the user specified at the command prompt or the default/fallbackEncoding.
 
     # For the output file encoding, if the user specified an input file encoding, use the input file's encoding for the output file.
@@ -888,10 +895,10 @@ def validateUserInput( userInput=None ):
     # For the outputfile, use the input file encoding as a fallback.
     userInput[ 'outputFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'outputFileName' ], userInput[ 'outputFileEncoding' ], userInput[ 'fileToTranslateEncoding' ] )
 
-    userInput[ 'promptFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'promptFileName' ], userInput[ 'promptFileEncoding' ], defaultTextEncoding)
-    userInput[ 'memoryFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'memoryFileName' ], userInput[ 'memoryFileEncoding' ], defaultTextEncoding)
+    userInput[ 'promptFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'promptFileName' ], userInput[ 'promptFileEncoding' ], defaultTextEncoding )
+    userInput[ 'memoryFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'memoryFileName' ], userInput[ 'memoryFileEncoding' ], defaultTextEncoding )
 
-    userInput[ 'languageCodesFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'languageCodesFileName' ], userInput[ 'languageCodesFileEncoding' ], defaultTextEncoding)
+    userInput[ 'languageCodesFileEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'languageCodesFileName' ], userInput[ 'languageCodesFileEncoding' ], defaultTextEncoding )
 
     userInput[ 'characterNamesDictionaryEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'characterNamesDictionaryFileName' ], userInput[ 'characterNamesDictionaryEncoding' ], defaultTextEncoding )
     userInput[ 'revertAfterTranslationDictionaryEncoding' ] = dealWithEncoding.ofThisFile( userInput[ 'revertAfterTranslationDictionaryFileName' ], userInput[ 'revertAfterTranslationDictionaryEncoding' ], defaultTextEncoding )
@@ -905,14 +912,13 @@ def validateUserInput( userInput=None ):
 
 
 def readInputFiles( userInput=None ):
-    # consoleEncoding should be a global variable by this point in the code.
-    global consoleEncoding
+    consoleEncoding = userInput[ 'consoleEncoding' ]
 
     if ( userInput[ 'verbose' ] == True ) or ( userInput[ 'debug' ] == True ):
-        print( ( 'verbose=' + str( userInput[ 'verbose' ] ) ).encode(consoleEncoding) )
-        print( ( 'debug=' + str( userInput[ 'debug'] ) ).encode(consoleEncoding) )
-        print( ( 'sourceLanguageRaw=' + str( userInput[ 'sourceLanguageRaw' ] ) ).encode(consoleEncoding) )
-        print( ( 'targetLanguageRaw=' + str( userInput[ 'targetLanguageRaw' ] ) ).encode(consoleEncoding) )
+        print( ( 'verbose=' + str( userInput[ 'verbose' ] ) ).encode( consoleEncoding ) )
+        print( ( 'debug=' + str( userInput[ 'debug'] ) ).encode( consoleEncoding ) )
+        print( ( 'sourceLanguageRaw=' + str( userInput[ 'sourceLanguageRaw' ] ) ).encode( consoleEncoding ) )
+        print( ( 'targetLanguageRaw=' + str( userInput[ 'targetLanguageRaw' ] ) ).encode( consoleEncoding ) )
 
     # Instantiate basket of Strawberries. Start with languageCodes.csv  # languageCodes.csv, cache.xlsx, sceneSummaryCache.xlsx, and mainSpreadsheet are chocolate.Strawberry() instances. For the various dictionary.csv files, use Python dictionaries instead. The prompt files are regular files (strings).
     # languageCodes.csv could also be a dictionary with key=[ list ] or multidimensional array [[][][]], but then searching through that would be annoying, so leave as a chocolate.Strawberry().
@@ -947,37 +953,37 @@ def readInputFiles( userInput=None ):
     #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive( 'lav')
     #sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive( 'japanese' )
     sourceLanguageCellRow, sourceLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive( userInput[ 'sourceLanguageRaw' ] )
-    if (sourceLanguageCellRow == None) or (sourceLanguageCellColumn == None):
-        print( ( 'Error: Unable to find source language \'' + str(sourceLanguageRaw) + '\' in file: ' + str(languageCodesFileName) ).encode(consoleEncoding) )
+    if ( sourceLanguageCellRow == None ) or ( sourceLanguageCellColumn == None ):
+        print( ( 'Error: Unable to find source language \'' + str( sourceLanguageRaw ) + '\' in file: ' + str( languageCodesFileName ) ).encode( consoleEncoding ) )
         sys.exit(1)
-    print( ( 'Using sourceLanguage \'' + str(sourceLanguageRaw) + '\' found at \'' + str(sourceLanguageCellColumn) + str(sourceLanguageCellRow) + '\' of: ' + languageCodesFileName ).encode(consoleEncoding) )
+    print( ( 'Using sourceLanguage \'' + str( sourceLanguageRaw ) + '\' found at \'' + str( sourceLanguageCellColumn ) + str( sourceLanguageCellRow ) + '\' of: ' + languageCodesFileName ).encode( consoleEncoding ) )
 
     userInput[ 'sourceLanguageFullRow' ] = languageCodesSpreadsheet.getRow( sourceLanguageCellRow )
     userInput[ 'internalSourceLanguageName' ] = userInput[ 'sourceLanguageFullRow' ][0]
     userInput[ 'internalSourceLanguageTwoCode' ] = userInput[ 'sourceLanguageFullRow' ][1]
     userInput[ 'internalSourceLanguageThreeCode' ] = userInput[ 'sourceLanguageFullRow' ][2]
     if userInput[ 'debug' ] == True:
-        print( str( userInput[ 'sourceLanguageFullRow' ] ).encode(consoleEncoding) )
-        print( ('internalSourceLanguageName=' + userInput[ 'internalSourceLanguageName' ] ).encode(consoleEncoding) )
-        print( ('internalSourceLanguageTwoCode=' + userInput[ 'internalSourceLanguageTwoCode' ] ).encode(consoleEncoding) )
-        print( ('internalSourceLanguageThreeCode=' + userInput[ 'internalSourceLanguageThreeCode' ] ).encode(consoleEncoding) )
+        print( str( userInput[ 'sourceLanguageFullRow' ] ).encode( consoleEncoding ) )
+        print( ('internalSourceLanguageName=' + userInput[ 'internalSourceLanguageName' ] ).encode( consoleEncoding ) )
+        print( ('internalSourceLanguageTwoCode=' + userInput[ 'internalSourceLanguageTwoCode' ] ).encode( consoleEncoding ) )
+        print( ('internalSourceLanguageThreeCode=' + userInput[ 'internalSourceLanguageThreeCode' ] ).encode( consoleEncoding ) )
 
     targetLanguageCellRow, targetLanguageCellColumn = languageCodesSpreadsheet.searchColumnsCaseInsensitive( userInput[ 'targetLanguageRaw' ] )
     if ( targetLanguageCellRow == None ) or ( targetLanguageCellColumn == None ):
-        print( ( 'Error: Unable to find target language \'' + userInput[ 'targetLanguageRaw' ] + '\' in file: '+ userInput[ 'languageCodesFileName' ] ).encode(consoleEncoding) )
+        print( ( 'Error: Unable to find target language \'' + userInput[ 'targetLanguageRaw' ] + '\' in file: '+ userInput[ 'languageCodesFileName' ] ).encode( consoleEncoding ) )
         sys.exit(1)
 
-    print( ( 'Using targetLanguage \'' + userInput[ 'targetLanguageRaw' ] + '\' found at \'' + str( targetLanguageCellColumn ) + str( targetLanguageCellRow ) + '\' of: ' + userInput[ 'languageCodesFileName'] ).encode(consoleEncoding) )
+    print( ( 'Using targetLanguage \'' + userInput[ 'targetLanguageRaw' ] + '\' found at \'' + str( targetLanguageCellColumn ) + str( targetLanguageCellRow ) + '\' of: ' + userInput[ 'languageCodesFileName'] ).encode( consoleEncoding ) )
 
     userInput[ 'targetLanguageFullRow' ] = languageCodesSpreadsheet.getRow( targetLanguageCellRow )
     userInput[ 'internalDestinationLanguageName' ] = userInput[ 'targetLanguageFullRow' ][0]
     userInput[ 'internalDestinationLanguageTwoCode' ] = userInput[ 'targetLanguageFullRow' ][1]
     userInput[ 'internalDestinationLanguageThreeCode' ] = userInput[ 'targetLanguageFullRow' ][2]
     if userInput[ 'debug' ] == True:
-        print( str( userInput[ 'targetLanguageFullRow'] ).encode(consoleEncoding) )
-        print( ( 'internalDestinationLanguageName=' + userInput[ 'internalDestinationLanguageName' ] ).encode(consoleEncoding) )
-        print( ( 'internalDestinationLanguageTwoCode=' + userInput[ 'internalDestinationLanguageTwoCode' ] ).encode(consoleEncoding) )
-        print( ( 'internalDestinationLanguageThreeCode=' + userInput[ 'internalDestinationLanguageThreeCode' ] ).encode(consoleEncoding) )
+        print( str( userInput[ 'targetLanguageFullRow'] ).encode( consoleEncoding ) )
+        print( ( 'internalDestinationLanguageName=' + userInput[ 'internalDestinationLanguageName' ] ).encode( consoleEncoding ) )
+        print( ( 'internalDestinationLanguageTwoCode=' + userInput[ 'internalDestinationLanguageTwoCode' ] ).encode( consoleEncoding ) )
+        print( ( 'internalDestinationLanguageThreeCode=' + userInput[ 'internalDestinationLanguageThreeCode' ] ).encode( consoleEncoding ) )
 
 
     # Read in all other files and then the dictionaries.
@@ -1034,15 +1040,15 @@ def readInputFiles( userInput=None ):
         userInput[ 'postWritingToFileDictionary' ] = None
 
     if userInput[ 'debug' ] == True:
-        print( ( 'promptFileContents=' + str( userInput[ 'promptFileContents' ] ) ).encode(consoleEncoding) )
-        print( ( 'memoryFileContents=' + str( userInput[ 'memoryFileContents' ] ) ).encode(consoleEncoding) )
-        print( ( 'sceneSummaryFileContents=' + str( userInput[ 'sceneSummaryFileContents' ] ) ).encode(consoleEncoding) )
+        print( ( 'promptFileContents=' + str( userInput[ 'promptFileContents' ] ) ).encode( consoleEncoding) )
+        print( ( 'memoryFileContents=' + str( userInput[ 'memoryFileContents' ] ) ).encode( consoleEncoding) )
+        print( ( 'sceneSummaryFileContents=' + str( userInput[ 'sceneSummaryFileContents' ] ) ).encode( consoleEncoding ) )
 
-        print( ( 'characterNamesDictionary=' + str( userInput[ 'characterNamesDictionary' ] ) ).encode(consoleEncoding) )
-        print( ( 'revertAfterTranslationDictionary=' + str( userInput[ 'revertAfterTranslationDictionary' ] ) ).encode(consoleEncoding) )
-        print( ( 'preDictionary=' + str( userInput[ 'preDictionary'] ) ).encode(consoleEncoding) )
-        print( ( 'postDictionary=' + str( userInput[ 'postDictionary'] ) ).encode(consoleEncoding) )
-        print( ( 'postWritingToFileDictionary=' + str( userInput[ 'postWritingToFileDictionary' ] ) ).encode(consoleEncoding) )
+        print( ( 'characterNamesDictionary=' + str( userInput[ 'characterNamesDictionary' ] ) ).encode( consoleEncoding ) )
+        print( ( 'revertAfterTranslationDictionary=' + str( userInput[ 'revertAfterTranslationDictionary' ] ) ).encode( consoleEncoding ) )
+        print( ( 'preDictionary=' + str( userInput[ 'preDictionary'] ) ).encode( consoleEncoding ) )
+        print( ( 'postDictionary=' + str( userInput[ 'postDictionary'] ) ).encode( consoleEncoding ) )
+        print( ( 'postWritingToFileDictionary=' + str( userInput[ 'postWritingToFileDictionary' ] ) ).encode( consoleEncoding ) )
 
     return userInput
 
@@ -1061,9 +1067,11 @@ def backupMainSpreadsheet( userInput=None, programSettings=None, outputName=None
 
 def backupSceneSummaryCache( userInput=None, programSettings=None, force=False ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
+    if programSettings[ 'cacheEnabled' ] == False:
+        return None
 
     if ( userInput[ 'readOnlyCache' ] == True ) or ( programSettings[ 'sceneSummaryCacheWasUpdated' ] == False ):
-        return
+        return None
 
     if ( int( time.perf_counter() - programSettings[ 'timeThatSceneSummaryCacheWasLastSaved' ] ) > defaultMinimumSaveIntervalForCache ) or ( force == True ):
 
@@ -1083,13 +1091,11 @@ def backupSceneSummaryCache( userInput=None, programSettings=None, force=False )
 
 def backupCache( userInput=None, programSettings=None, force=False ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    #global cache
-    #global timeThatCacheWasLastSaved
-    #global cacheWasUpdated
-    #global cacheFilePathOnly
+    if programSettings[ 'cacheEnabled' ] == False:
+        return None
 
     if ( userInput[ 'readOnlyCache' ] == True ) or ( programSettings[ 'cacheWasUpdated' ] == False ):
-        return
+        return None
 
     if ( int( time.perf_counter() - programSettings[ 'timeThatCacheWasLastSaved' ] ) > defaultMinimumSaveIntervalForCache ) or ( force == True ):
 
@@ -1111,10 +1117,11 @@ def backupCache( userInput=None, programSettings=None, force=False ):
 # programSettings should have
 def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    #global sceneSummaryCache
+    if programSettings[ 'cacheEnabled' ] == False:
+        return None
 
     if userInput[ 'readOnlyCache' ] == True:
-        return
+        return None
 
     # What format should sceneSummaryCache take?
     # entry, engine # What is entry? A hash? 50 raw text entries? How about the sha1 hash?
@@ -1180,11 +1187,11 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=No
 # Expects two strings.
 def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, translation=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    #global cache
-    #global currentCacheColumn
+    if programSettings[ 'cacheEnabled' ] == False:
+        return None
 
     if userInput[ 'readOnlyCache' ] == True:
-        return
+        return None
 
     # tempSearchResult can be a row number (as a string) or None if the string was not found.
     tempSearchResult = programSettings[ 'cache' ].searchCache( untranslatedEntry )
@@ -1213,8 +1220,9 @@ def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, t
                 programSettings[ 'cacheWasUpdated' ] = True
         # elif the cell's value is not empty
         else:
+            # Does this still make sense?
             # Then only update the cache if reTranslate == True
-            if userInput[ 'reTranslate' ] == True:
+            if ( userInput[ 'reTranslate' ] == True ) or ( userInput[ 'overrideWithSpreadsheet' ] == True ):
                 #print( 'Updated cache')
                 cache.setCellValue( currentCellAddress, translation )
                 if programSettings[ 'cacheWasUpdated' ] == False:
@@ -1228,10 +1236,7 @@ def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, t
 
 
 def getSummary( userInput=None, programSettings=None, untranslatedList=[] ):
-    global consoleEncoding
-    global cache
-    global cacheForSummary
-    global mainSpreadsheet
+    consoleEncoding = userInput[ 'consoleEncoding' ]
 
     # Summary needs its own prompt and has its own translationEngine function call. Unlke the other functions, it also returns a summary as a string.
     # programSettings[ 'translationEngine' ].getSummary( untranslatedList, settings=userInput.copy() )
@@ -1239,15 +1244,95 @@ def getSummary( userInput=None, programSettings=None, untranslatedList=[] ):
     return None
 
 
+def getCellValueFromCache( userInput=None, programSettings=None, searchString=None ):
+    consoleEncoding = userInput[ 'consoleEncoding' ]
+    if programSettings[ 'cacheEnabled' ] == False:
+        return None
+
+    # This will return None of the rowNumber where the entry was found in the cache.
+    rowNumber = programSettings[ 'cache' ].searchCache( searchString )
+    if rowNumber == None:
+        return None
+
+    cellData = programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + str( rowNumber) )
+    #TODO: Add logic here to consider cacheAnyMatch.
+
+    return cellData
+"""
+    # if entryInList/translatedData exists as a key in translationCacheDictionary,
+    # if entryInList/untranslatedData exists in the cache's first column
+    tempRowForCacheMatch = programSettings[ 'cache' ].searchCache( untranslatedEntry )
+
+    # if untranslatedEntry is not in the cache
+    if tempRowForCacheMatch == None:
+        tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
+        translateMe.append( untranslatedEntry )
+    #if tempRowForCacheMatch != None:
+    else:
+        # then check if the appropriate column in the cache is a match.
+        # This will return either None or the cell's contents.
+        tempCellContents = programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + str( tempRowForCacheMatch ) )
+        if tempCellContents != None:
+            # if there is a match, then a perfect hit exists, so append the translatedEntry to tempRequestList
+            tempRequestList.append( [ untranslatedEntry, True, tempCellContents ] )
+            cacheHitCounter += 1
+
+        # elif the cache for that cell is currently empty, then the untranslatedEntry exists in the cache, but there was no cache hit for that model.
+        elif tempCellContents == None:
+        #else:
+
+            # Check if other models should be considered cache hits regardless of not being perfect matches.
+            # determine which columns should be considered to have possible matches
+            # Maybe check all entries past the first 3 blindly? Not valid for spreadsheets without speaker or metadata
+            # How about checking header for known bad headers and putting all other column letters into a list?
+            #cache.convertColumnNumberToColumnLetter()
+            # Known bad headers are...  rawText speaker metadata and currentModel
+            # Update: Moved header code up and out of function.
+            if ( userInput [ 'cacheAnyMatch' ] == True ) and ( len(validColumnLettersForCacheAnyMatch) > 0 ):
+            # if len(list) != 0, If it is 0, then do not bother. The length of that list could be 0 because even though the current model should always be added to cache and it could be returned, the current model should be blacklisted since the relevant cell was already checked.
+
+                # create a tempList=None
+                tempList = []
+                # for every column letter in the list
+                for columnLetter in validColumnLettersForCacheAnyMatch:
+                    # prepend row, tempRowForCacheMatch, and return the individual cell contents.
+                    # if the cell contents are not None,
+                        # then tempList = [ rawEntry, thisValueIsFromCache=True, translatedData ]
+                    # Keep updating the tempList to favor the right-most translation engine.
+
+                    tempCellContents = programSettings[ 'cache' ].getCellValue( columnLetter + str( tempRowForCacheMatch ) )
+                    if tempCellContents != None:
+                        tempList.append( [ untranslatedEntry, True, tempCellContents ] )
+
+                # if tempList != None:
+                if len(tempList) > 0:
+                    # then take the contents of the right-most/last list in tempList and append them to tempRequestList
+                    # tempRequestList.append( [tempList[ 0 ], tempList[ 1 ], tempList[ 2 ] ] )
+                    # len( tempList ) returns the number of items in a list. To get the last item, take the total items and subtract 1 because indexes start with 0.
+                    tempRequestList.append( tempList[ len( tempList ) - 1 ] )
+                    cacheHitCounter += 1
+
+
+
+    # Non-batch code.
+    if ( translatedEntry == None ) and ( cacheAnyMatch == True ) and ( len(userInput[ 'validColumnLettersForCacheAnyMatch' ] ) > 0 ):
+        for columnLetter in userInput[ 'validColumnLettersForCacheAnyMatch' ]:
+            tempCellContents = cache.getCellValue( columnLetter + str( tempRowNumberForCache ) )
+            if tempCellContents != None:
+                # Keep updating translatedEntry to favor the right-most translation engine.
+                translatedEntry = tempCellContents
+"""
+
+
 # translate() recieves untranslatedList which is a list of untranslated strings with programSettings[ 'currentRow' ] pointing to mainSpreadsheet entry that corresponds to the first item in that list. This function is responsible for translating untranslatedList and always returning the same number of entries as the input. This function must also handle updating the cache, reinserting the translated entries into mainSpreadsheet, and backing up cache/mainSpreadsheet regularly.
 # for cacheOnly, it should return None for every entry not found in the cache and never try to update the cache.
 # This function should:
 # 1) Fetch the rawUntranslatedList from mainSpreadsheet for the current batch.
 # 2) Update fetched items with translated values from cache.
-# 3) if any values were in mainSpreadsheet or only in cache, then update accordingly to what userInput says to do. Default behavior is to add to cache whatever is in mainSpreadsheet. If reTranslate == True, then wipe or ignore both. If overrideWithCache, then say the value is from cache and update mainSpreadsheet, here or later? Probably later since the entire list needs to be processed later anyway. No. this needs to occur right away because this is the only time both overrideUsingCache and overrideUsingSpreadsheet are checked while iterating through the contents of mainSpreadsheet. Otherwise, alreadyTranslated woulld need to be ignored and entries updated again. Technically, they could be done later, but there is no reason to wait that long. Are they going to be updated anyway? Only if re-translate is specified. Otherwise, if overrideUsingSpreadsheet
-# 4) After the list of items that needs to be translated have been extracted, decide if the translation should occur in batch mode or not in batch mode. Not batch mode supports history which needs to be handled in a special way. In additional, values that have translations either from cache or were already filled in mainSpreadsheet should not be submitted to the translation engines unless reTranslate == True.
-# 5) Translate the items using translateEngine.translate() or translateEngine.batchTranslate()
-# 6) Update the cache.
+# 3) if any values were in mainSpreadsheet or only in cache, then update accordingly to what userInput says to do. Default behavior is to add to cache whatever is in mainSpreadsheet. If reTranslate == True, then wipe or ignore both. If overrideWithCache, then say the value is from cache and update mainSpreadsheet, here or later? Probably later since the entire list needs to be processed later anyway. No. this needs to occur right away because this is the only time both overrideUsingCache and overrideUsingSpreadsheet are checked while iterating through the contents of mainSpreadsheet. Otherwise, alreadyTranslated would need to be ignored and entries updated again. Technically, they could be done later, but there is no reason to wait that long. Are they going to be updated anyway? Only if re-translate is specified. Otherwise, if overrideUsingSpreadsheet
+# 4) After the list of items that needs to be translated have been extracted, decide if the translation should occur in batch mode or not in batch mode. Not batch mode supports history which needs to be handled in a special way. In addition, values that have translations either from cache or were already filled in mainSpreadsheet should not be submitted to the translation engines unless reTranslate == True.
+# 5) Translate the items using translateEngine.translate() or translateEngine.batchTranslate() For non-batch translations, implement history.
+# 6) Update the cache as needed.
 # 7) Update mainSpreadsheet
 # 8) Return the translated items, including those extracted from mainSpreadsheet or cache, or perhaps just a count of them?
 # Minor bug: There is this minor bug right now where if an entry is already translated, has an entry in main spreadsheet, if cache is disabled and batches are enabled or if cache is enabled but that entry is not in the cache yet, then it will be submitted to the translation engine which is unwanted behavior. This does not occur if cache is both enabled or if translating each entry individually instead of in batches...probably. This was not a big deal when originally designing the algorithim because the entries should get added to the cache and that should block any subsequent duplicate translations. Still this is not ideal behavior.
@@ -1255,9 +1340,12 @@ def getSummary( userInput=None, programSettings=None, untranslatedList=[] ):
 # Q: Is there any way to incorprorate history when generating a list of untranslated entries that can be used with both batch translations and non-batch translations? No right? Those features directly contradict way too much.
 def translate( userInput=None, programSettings=None, untranslatedListSize=None, sceneSummary=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    # currentRow is the current and correct pointer to the current contents being processed in mainSpreadsheet. This is split it into two values, one global value, programSettings[ 'currentRow' ], that keeps track of the pointer globally and a local value used to iterate through the current batch. currentRow can also be reset periodically during processing.
+    # currentRow is the current and correct pointer to the current contents being processed in mainSpreadsheet. This is split it into two values, one global value, programSettings[ 'currentRow' ], that keeps track of the pointer globally and a local value used to iterate through the current batch. currentRow can also be incremented and reset periodically during processing but programSettings[ 'currentRow' ] should not be touched while in a function below main().
     currentRow = programSettings[ 'currentRow' ]
 
+    # cacheHitCounter is only used for sanity checking.
+    cacheHitCounter = 0
+    listForThisBatchRaw = []
     # New algorithim to generate untranslatedList:
     # Get raw list based upon pointer.
     # Syntax: range( start, stop, stepAmount ):
@@ -1276,11 +1364,294 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
         # if reTranslate is specified, then ignore all data currently in the spreadsheet and the cache and set alreadyTranslated to False for all entries.
         # if overrideWithCache is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from the cache and update mainSpreadsheet. Use that as the 'translatedData'.
         # if overrideWithSpreadsheet is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from mainSpreadsheet and update the cache.
-        # By default, whatever is in the spreadsheet already is fudged as the 'translatedData' and 'alreadyTranslated' is set to True to avoid that value getting translated again. If there is a contradiction between the value in the cache and the current spreadsheet, then by default, neither is updated. alreadyTranslated is set to True regardless, which is not technically correct.
-        # reTranslate will force both to get updated.
-        # overrideWithCache will override the spreadsheet.
-        # There is no option to override the cache without retranslating. Should there be? overrideWithSpreadsheet Might as well.
+        # By default, whatever is in the spreadsheet already is fudged as the 'translatedData' and 'alreadyTranslated' is set to True to avoid that value getting translated again.
+        # if there is a contradiction between the value in the cache and the current spreadsheet because they are both present, then by default, neither is updated. alreadyTranslated is set to True regardless.
+            # reTranslate will force both to get updated.
+            # overrideWithCache will override the spreadsheet.
+            # There is no option to override the cache without retranslating. Should there be? overrideWithSpreadsheet Might as well. # Update added.
 
+        # Goal is to create this:
+        #listForThisBatchRaw.append( ( untranslatedData, speaker, alreadyTranslated, translatedData ) )
+
+        untranslatedData = mainSpreadsheet.getCellValue( 'A' + str( i ) )
+        # This makes sure untranslatedData is a string and also not empty.
+        assert( untranslatedData.strip() != '' )
+        speaker = mainSpreadsheet.getCellValue( 'B' + str( i ) )
+
+        # if reTranslate == True, then the data in cache and spreadsheet are not considered.
+        if userInput [ 'reTranslate' ] == True:
+            listForThisBatchRaw.append( ( untranslatedData, speaker, False, None ) ) # This appends a tuple to the current list.
+            continue
+
+        #alreadyTranslated depends on a lot of factors, so no way to determine that yet.
+        dataFromSpreadsheet = programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( i ) )
+        # This is actually a non-trivial operation since there is cacheAnyMatch to consider, so put the logic into a function to retain clarity here.
+        dataFromCache = getCellValueFromCache( userInput=userInput, programSettings=programSettings, searchString=untranslatedData )
+        # Possible situations to consider:
+        # Both None.
+        if ( dataFromSpreadsheet == None ) and ( dataFromCache == None ):
+            listForThisBatchRaw.append( ( untranslatedData, speaker, False, None ) )
+            continue
+        # Spreadsheet is None, but cache has data.
+        if ( dataFromSpreadsheet == None ) and ( dataFromCache != None ):
+            listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromCache ) )
+            # Aside: Update the data in mainSpreadsheet/cache now so that all values that are alreadyTranslated == True can be skipped during processing after translation logic completes.
+            mainSpreadsheet.setCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( i ), dataFromCache )
+            cacheHitCounter += 1
+            continue
+        # Spreadsheet has data, but cache is None.
+        if ( dataFromSpreadsheet != None ) and ( dataFromCache == None ):
+            listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromSpreadsheet ) )
+            #def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, translation=None ): 
+            updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=untranslatedData, translation=dataFromSpreadsheet )
+            cacheHitCounter += 1
+            continue
+        # Both spreadsheet and cache have data.
+        # if both spreadsheet and cache have data, what should happen?
+        # By default if both overrideWithCache and overrideWithSpreadsheet are false, then leave the data alone. That means taking the data from the spreadsheet and treating it as translated data.
+        # if they are the same data, then do nothing as well. Just treat the data in the spreadsheet as translated and move on.
+        if ( ( ( userInput[ 'overrideWithCache' ] == False ) and ( userInput[ 'overrideWithSpreadsheet' ] == False ) ) or ( dataFromSpreadsheet == dataFromCache ):
+            listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromSpreadsheet ) )
+            cacheHitCounter += 1
+            continue
+        if userInput[ 'overrideWithCache' ] == True:
+            # then take the data from the cache, write it to the spreadsheet and add the data taken from the cache as the translated data. Set alreadyTranslated = True
+            listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromCache ) )
+            mainSpreadsheet.setCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( i ), dataFromCache )
+            cacheHitCounter += 1
+            continue
+        if userInput[ 'overrideWithSpreadsheet' ] == True:
+            listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromSpreadsheet ) )
+            updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=untranslatedData, translation=dataFromSpreadsheet )
+            cacheHitCounter += 1
+            continue
+
+        print( 'Error: unspecified.' )
+        sys.exit( 1 )
+
+    translateMe = []
+    translateMeSpeakerList = []
+    for entry in listForThisBatchRaw:
+        if entry[ 2 ] == False:
+            translateMe.append( entry[ 0 ] )
+            translateMeSpeakerList.append( entry[ 1 ] )
+
+    # Sanity check.
+    assert( ( len( translateMe ) + cacheHitCounter ) == untranslatedListSize )
+
+    # if all entries were found in mainSpreadsheet or in cache, just return here.
+    # Since mainSpreadsheet and cache have already been updated, there is no reason to continue.
+    if len( translateMe ) == 0:
+        return listForThisBatchRaw
+
+    # Use characterNamesDictionary to translate character names prior to submission to translationEngine.
+    # The character names should have already been translated prior to this during parsing, but if not, then apply a band-aid fix here to translate them prior to submission to the translationEngine so the translationEngine code does not have to worry about it as much. This code should be harmless if the names are already translated.
+    if userInput[ 'characterNamesDictionary' ] != None:
+        for speakerCounter,speaker in enumerate( translateMeSpeakerList ):
+            if speaker in userInput[ 'characterNamesDictionary' ]:
+                translateMeSpeakerList[ speakerCounter ] = userInput[ 'characterNamesDictionary' ][ speaker ]
+
+    postTranslatedList = []
+    settings = userInput.copy()
+    settings[ 'sceneSummary' ] = sceneSummary
+
+    if programSettings[ 'batchModeEnabled' ] == True:
+        # This preDictionary replacement operation cannot be done outside of the batch code because non-batches need this done to both lines that will be submitted and lines that do not need to be submitted as part of the history feature. Doing it just above here, outside of the batch code, means this preDictionary would be run over the data twice which is incorrect. The translate non-batch code could check for that, but that just complicates the code unnecessarily. Just move the preDictionary code here to gurantee it is only processed once.
+        # Perform replacements specified by preDictionary.
+        if userInput[ 'preDictionary' ] != None:
+            for index,entry in enumerate( translateMe ):
+                for key,item in userInput[ 'preDictionary' ].items():
+                    if translateMe[ index ].find( key ) != -1:
+                        translateMe[ index ] = translateMe[ index ].replace( key, item )
+
+        # Perform replacements specified by revertAfterTranslationDictionary.
+        if userInput[ 'revertAfterTranslationDictionary' ]  != None:
+            for index,entry in enumerate( translateMe ):
+                for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
+                    if translateMe[ index ].find( key ) != -1:
+                        translateMe[ index ] = translateMe[ index ].replace( key, item )
+
+        if userInput[ 'debug' ] == True:
+            print( ( 'translateMe Raw=' + str( translateMe ) ).encode( consoleEncoding ) )
+
+        # Core logic.
+        settings[ 'speakerList' ] = translateMeSpeakerList
+        postTranslatedList = programSettings[ 'translationEngine' ].batchTranslate( translateMe, settings=settings )
+
+        if userInput[ 'debug' ] == True:
+            print( ( 'postTranslatedList Raw=' + str( postTranslatedList ) ).encode( consoleEncoding ) )
+
+        # Perform replacements specified by revertAfterTranslationDictionary, in reverse.
+        if userInput[ 'revertAfterTranslationDictionary' ] != None:
+            for index,entry in enumerate( postTranslatedList ):
+                for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
+                    if postTranslatedList[ index ].find( item ) != -1:
+                        postTranslatedList[ index ] = postTranslatedList[ index ].replace( item, key )
+
+
+    #elif programSettings[ 'batchModeEnabled' ] != True:
+    else:
+       # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength == 0 then it was already disabled,so check for that. contextHistoryMaxLength is always an integer.
+        contextHistory = None
+        if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
+            contextHistory = queue.Queue( maxsize = userInput[ 'contextHistoryMaxLength' ] )
+
+            # Syntax: https://docs.python.org/3.7/library/queue.html#module-queue
+            # To add an entry, contextHistory.put( item )
+            # To remove the oldest, contextHistory.get()
+            # To get every item without modifying the queue
+            #for i in range( contextHistory.qsize() ):
+                #print( contextHistory.queue[i] )
+            # To check if the queue is full,
+            #if contextHistory.full() == True:
+
+        if tqdmAvailable == False:
+            tempIterable = listForThisBatchRaw
+        if tqdmAvailable == True:
+            tempIterable = tqdm.tqdm( listForThisBatchRaw )
+
+        translateMeCounter = 0
+        # for every cell in A, try to translate it.
+        # Every tempList looks like this: ( untranslatedData, speaker, alreadyTranslated, translatedData )
+        for counter,tempList in enumerate( tempIterable ):
+            translatedEntry = None
+
+            # A temporary variable is needed here because otherwise the original entry is lost after all the replacement dictionaries and the cache ends up getting corrupted by revertAfterTranslationDictionary as a result. Humm. Is this still true?
+            untranslatedEntry = tempList[ 0 ]
+            #untranslatedEntry = rawUntranslatedEntry
+            # Sanity check.
+            assert( untranslatedEntry == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( currentRow + counter ) ) )
+            # translateMe is a subset of listForThisBatchRaw. Entries from translateMe can only be validated if they happen to overlap with  listForThisBatchRaw[i][2] == False
+
+            # Get speaker, if any.
+            tempSpeakerName = tempList[ 1 ]
+            if ( not isinstance( tempSpeakerName, str ) ) or ( tempSpeakerName == '' ):
+                tempSpeakerName = None
+            else:
+                tempSpeakerName = tempSpeakerName.strip()
+
+            # Perform replacements specified by preDictionary.
+            if userInput[ 'preDictionary' ] != None:
+                for key,items in userInput[ 'preDictionary' ].items():
+                    if untranslatedEntry.find( key ) != -1:
+                        untranslatedEntry = untranslatedEntry.replace( key, item )
+
+            # if the current 
+            # if the current cell contents are already translated, then just add to history and continue to the next line.
+            if tempList[ 2 ] == True:
+                translatedEntry = tempList[ 3 ]
+                # Update the contextHistory queue.
+                if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True ):
+                    if contextHistory.full() == True():
+                        # This is probably not ideal.
+                        contextHistory = queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
+                        contextHistory.
+                    contextHistory.put( [ untranslatedEntry, translatedEntry, tempSpeakerName  ] )
+
+
+            #contextHistory is formatted as:
+            #contextHistory = [ [ untranslatedString1, translatedString2, speaker ], [ uString1, tString2, None ], [ uString1, tString2, speaker ] ]
+            tempHistory = []
+            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True ) :
+                for i in range( contextHistory.qsize() ):
+                    tempHistory.append( contextHistory.queue[ i ] )
+
+            # Perform replacements specified by revertAfterTranslationDictionary.
+            if userInput[ 'revertAfterTranslationDictionary' ] != None:
+                for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
+                    if untranslatedEntry.find( key ) != -1:
+                        untranslatedEntry = untranslatedEntry.replace( key, item )
+
+                # translate entry
+                # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
+
+
+                if len( tempHistory ) == 0:
+                    tempHistory = None
+
+                settings = {}
+                settings[ 'speakerName' ] = tempSpeakerName
+                settings[ 'contextHistory' ] = tempHistory
+                settings[ 'sceneSummary' ] = sceneSummary
+
+                try:
+                    translatedEntry = translationEngine.translate( untranslatedEntry, settings=settings )
+                except Exception as exception:
+                    print( 'Error: Internal engine error in for translationEngine=' + userInput[ 'mode' ] )
+                    print( exception.__class__.__name__ )
+                    translatedEntry = None
+                    if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
+                        raise exception
+      
+                # once it is back check to make sure it is not None or another error value
+                if ( translatedEntry == None ) or ( translatedEntry == '' ):
+                    print( ( 'Unable to translate: ' + untranslatedEntry).encode( consoleEncoding) )
+                    currentRow += 1
+                    continue
+
+            # History should be updated before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
+            # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
+            # Add it to the dequeue, murdering the oldest entry in the dequeue.
+            # Update the contextHistory queue.
+            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
+                if contextHistory.full() == True:
+                    #contextHistory.get()
+                    # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
+                    # This is probably not ideal. The entire queue should be emptied manually using .get() maybe in a while loop?
+                    contextHistory=queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
+                contextHistory.put( [ rawUntranslatedEntry, translatedEntry, tempSpeakerName ] )
+
+            # perform replacements specified by revertAfterTranslationDictionary, in reverse
+            if userInput[ 'revertAfterTranslationDictionary' ] != None:
+                for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
+                    if translatedEntry.find( item ) != -1:
+                        translatedEntry = translatedEntry.replace( item, key )
+
+
+
+
+    assert( len( translateMe ) == len( postTranslatedList ) )
+
+    # Update cache here.
+            # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
+            if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
+                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=rawUntranslatedEntry, translation=translatedEntry )
+
+
+
+
+    # Check with postDictionary, a Python dictionary for possible updates.
+    if userInput[ 'postDictionary' ] != None:
+        for counter,entry in enumerate(finalTranslatedList):
+            for key,item in postDictionary.items():
+                #print( 'key=', key, 'item=', item )
+                if finalTranslatedList[counter].find( key ) != -1:
+                    if debug == True:
+                        print( ( 'found key=' + key + ' at line=' + str( counter ) ).encode( consoleEncoding ) )
+                    finalTranslatedList[ counter ] = finalTranslatedList[ counter ].replace( key, item )
+
+
+
+            # Check with postDictionary, a Python dictionary for possible updates.
+            if userInput[ 'postDictionary' ] != None:
+                for key,items in userInput[ 'postDictionary' ].items():
+                    if translatedEntry.find( key ) != -1:
+                        translatedEntry = translatedEntry.replace( key, item )
+
+            # then write translations to mainSpreadsheet cell.
+            mainSpreadsheet.setCellValue( currentTranslatedCellAddress , translatedEntry )
+
+            if userInput[ 'backupsEnabled' ] == True:
+                # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
+                backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
+
+            # and move on to next cell
+            currentRow += 1
+            continue
+
+
+
+def old():
     #global cache
     #global currentCacheColumn
     #global cacheForSummary
@@ -1384,7 +1755,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # Perform replacements specified by preDictionary.
             if userInput[ 'preDictionary' ] != None:
                 for index,entry in enumerate( translateMe ):
-                    for key,items in userInput[ 'preDictionary' ].items():
+                    for key,item in userInput[ 'preDictionary' ].items():
                         if translateMe[ index ].find( key ) != -1:
                             translateMe[ index ] = translateMe[ index ].replace( key, item )
 
@@ -1402,7 +1773,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             postTranslatedList = programSettings[ 'translationEngine' ].batchTranslate( translateMe, settings=settings )
 
         if userInput[ 'debug' ] == True:
-            print( ( 'postTranslatedListRaw=' + str(postTranslatedList) ).encode( consoleEncoding ) )
+            print( ( 'postTranslatedListRaw=' + str( postTranslatedList ) ).encode( consoleEncoding ) )
 
         # Perform replacements specified by revertAfterTranslationDictionary, in reverse.
         if userInput[ 'revertAfterTranslationDictionary' ] != None:
@@ -1645,15 +2016,15 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                 # A temporary variable is needed here because otherwise the original entry is lost after all the replacement dictionaries and the cache ends up getting corrupted by revertAfterTranslationDictionary as a result.
                 untranslatedEntry = rawUntranslatedEntry
 
-                # Perform replacements specified by revertAfterTranslationDictionary.
-                if userInput[ 'revertAfterTranslationDictionary' ] != None:
-                    for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
-                        if untranslatedEntry.find( key ) != -1:
-                            untranslatedEntry = untranslatedEntry.replace( key, item )
-
                 # Perform replacements specified by preDictionary.
                 if userInput[ 'preDictionary' ] != None:
                     for key,items in userInput[ 'preDictionary' ].items():
+                        if untranslatedEntry.find( key ) != -1:
+                            untranslatedEntry = untranslatedEntry.replace( key, item )
+
+                # Perform replacements specified by revertAfterTranslationDictionary.
+                if userInput[ 'revertAfterTranslationDictionary' ] != None:
+                    for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
                         if untranslatedEntry.find( key ) != -1:
                             untranslatedEntry = untranslatedEntry.replace( key, item )
 
@@ -1684,7 +2055,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
       
                 # once it is back check to make sure it is not None or another error value
                 if ( translatedEntry == None ) or ( translatedEntry == '' ):
-                    print( ( 'Unable to translate: ' + untranslatedEntry).encode(consoleEncoding) )
+                    print( ( 'Unable to translate: ' + untranslatedEntry).encode( consoleEncoding) )
                     currentRow += 1
                     continue
 
@@ -2015,6 +2386,11 @@ def main( userInput=None ):
     # Debug code.
     #programSettings[ 'batchModeEnabled' ] = False
 
+    if userInput[ 'sceneSummaryEnabled' ] == True:
+        if translationEngine.supportsCreatingSummary == False:
+            print( 'Warning: sceneSummaryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support creating sceneSummary. Disabling feature.' )
+            userInput[ 'sceneSummaryEnabled' ] = False
+
 
     untranslatedEntriesColumnFull = programSettings[ 'mainSpreadsheet' ].getColumn( 'A' )
     if userInput[ 'debug' ] == True:
@@ -2067,16 +2443,17 @@ def main( userInput=None ):
                 # This returns either None or a string.
                 sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
 
-                # TODO: Update sceneSummaryCache here.
+                # TODO: Update sceneSummaryCache here. TODO: Implement updateSceneSummaryCache() properly.
                 # 1) data is, current lines, the lines themselves,
                 # 2) metadata the fileName_currentRow_currentRow+currentBatchSize as a string
                 # 3) sceneSummary if it is not None and is an instance of a string
                 # rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
                 #def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
-
                 metadata = userInput[ 'fileToTranslateFileNameWithoutPath' ] + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] ) + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] + currentBatchSize )
                 if isinstance( sceneSummary, str) == True:
                     updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + maxBatchSize ], metadata=metadata, summaryData=sceneSummary )
+                else:
+                    sceneSummary = None
                 #elif sceneSummary is not a string:
                 #else:
                     # Error generating sceneSummary.

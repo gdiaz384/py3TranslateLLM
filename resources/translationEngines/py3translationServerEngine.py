@@ -35,6 +35,8 @@ class Py3translationServerEngine:
         if untranslatedText.find( '  ' ) != -1:
             untranslatedText = untranslatedText.replace( '  ',' ' ).replace( '  ', ' ' )  # In the middle, replace any two blank spaces with a single blank space.
 
+        # Dataset specific fixes go here.
+
         return untranslatedText
 
 
@@ -146,6 +148,7 @@ class Py3translationServerEngine:
     # This expects a string to translate.
     def translate( self, untranslatedString, settings=None ):
         #assert type is a string
+        assert( isinstance( untranslatedString, str ) ) 
 
         return str( self.batchTranslate( [ untranslatedString ] )[ 0 ] ) # Lazy.
 

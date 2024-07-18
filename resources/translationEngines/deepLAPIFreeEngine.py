@@ -73,7 +73,7 @@ class DeepLApiFreeEngine:
         self.supportsHistory = False
         self.requiresPrompt = False
         self.promptOptional = True
-        self.supportsCreatingSummary = True
+        self.supportsCreatingSummary = False
 
         # Set generic API variables for this engine.
         self.model = None
