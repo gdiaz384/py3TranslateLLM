@@ -99,7 +99,7 @@ import time                                   # Used to write out cache no more 
 # Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes. # Update: Maybe.
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
 #import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
-import queue
+#import queue                               # collections.deque is probably better but it lacks a lot of the methods, like full/empty booleans, that make queue convenient. Just give up and use lists instead.
 import hashlib                              # Allow calculating the sha1 hash for batches of entries when using the experimental sceneSummary feature.
 
 import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests' # Update: Moved to functions.py # Update: Also imported here because it can be useful to parse exceptions (errors) when submitting entries for translation.
@@ -1235,11 +1235,46 @@ def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, t
     backupCache()
 
 
-def getSummary( userInput=None, programSettings=None, untranslatedList=[] ):
+# This function needs to check sceneSummaryCache to see if a sceneSummary has been generated before. If not, then it needs to generate one and update the cache.
+#sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
+def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
 
+    # Generating a summary does not make sense for overly small batches.
+    if untranslatedListSize <= 1:
+        return None
+
+    # Check if in cache. In order to do that, generate a hash using the untranslatedList + speaker list combined. That means they both need to be extracted first.
+
+    # Everything in the pre-translation dictionary needs to be replaced and summaries work best when there is a speaker, so extract the speaker from mainSpreadsheet.
+    # Extract untranslated contents.
+    # Extract speaker.
+    # Translate speaker name as it gets extracted using characterDictionary.
+    # Update untranslated contents with preDictionary.
+    # Should revertAfterTranslationDictionary replacements also be performed? Doing them might lead to lack of flexibility but more consistency. Well, user can also just not specify the revertAfterTranslationDictionary if they do not want the associated replacements performed.
+
+
+    # if preDictionary != None:
+        #for every
+
+    settings=userInput.copy()
+    settings[ 'speakerList' ] = speakerList
+
     # Summary needs its own prompt and has its own translationEngine function call. Unlke the other functions, it also returns a summary as a string.
-    # programSettings[ 'translationEngine' ].getSummary( untranslatedList, settings=userInput.copy() )
+    # programSettings[ 'translationEngine' ].getSceneSummary( untranslatedList, settings=settings )
+
+
+
+    # TODO: Update sceneSummaryCache here. TODO: Implement updateSceneSummaryCache() properly.
+    # 1) data is, current lines, the lines themselves,
+    # 2) metadata the fileName_currentRow_currentRow+untranslatedListSize as a string
+    # 3) sceneSummary if it is not None and is an instance of a string
+    # rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
+    #def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
+    metadata = userInput[ 'fileToTranslateFileNameWithoutPath' ] + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] ) + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] + untranslatedListSize )
+    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + maxBatchSize ], metadata=metadata, summaryData=sceneSummary )
+
+
 
     return None
 
@@ -1349,6 +1384,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
     # New algorithim to generate untranslatedList:
     # Get raw list based upon pointer.
     # Syntax: range( start, stop, stepAmount ):
+    # Possible bug: There might be an off by 1 error here with currentRow + untranslatedListSize depending upon how range behaves.
     for i in range( currentRow, currentRow + untranslatedListSize, 1 ):
         # This is iterating through the correct addresses in mainSpreadsheet that data needs to be extract data from.
         # The data needed during processing is...
@@ -1376,7 +1412,21 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
         untranslatedData = mainSpreadsheet.getCellValue( 'A' + str( i ) )
         # This makes sure untranslatedData is a string and also not empty.
         assert( untranslatedData.strip() != '' )
+
         speaker = mainSpreadsheet.getCellValue( 'B' + str( i ) )
+        if isinstance( speaker, str ) == True:
+            speaker = speaker.strip()
+            if speaker == '':
+                speaker = None
+            else:
+                # Use characterNamesDictionary to translate character names prior to submission to translationEngine.
+                # The character names should have already been translated prior to this during parsing, but if not, then apply a band-aid fix here to translate them prior to submission to the translationEngine so the translationEngine code does not have to worry about it as much. This code should be harmless if the names are already translated.
+                if userInput[ 'characterNamesDictionary' ] != None:
+                    if speaker in userInput[ 'characterNamesDictionary' ]:
+                        speaker = userInput[ 'characterNamesDictionary' ][ speaker ]
+        else:
+            if speaker != None:
+                speaker = None
 
         # if reTranslate == True, then the data in cache and spreadsheet are not considered.
         if userInput [ 'reTranslate' ] == True:
@@ -1426,9 +1476,10 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             cacheHitCounter += 1
             continue
 
-        print( 'Error: unspecified.' )
+        print( 'Error: Unspecified.' )
         sys.exit( 1 )
 
+    # Extract all entries that do not have translations yet.
     translateMe = []
     translateMeSpeakerList = []
     for entry in listForThisBatchRaw:
@@ -1444,19 +1495,12 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
     if len( translateMe ) == 0:
         return listForThisBatchRaw
 
-    # Use characterNamesDictionary to translate character names prior to submission to translationEngine.
-    # The character names should have already been translated prior to this during parsing, but if not, then apply a band-aid fix here to translate them prior to submission to the translationEngine so the translationEngine code does not have to worry about it as much. This code should be harmless if the names are already translated.
-    if userInput[ 'characterNamesDictionary' ] != None:
-        for speakerCounter,speaker in enumerate( translateMeSpeakerList ):
-            if speaker in userInput[ 'characterNamesDictionary' ]:
-                translateMeSpeakerList[ speakerCounter ] = userInput[ 'characterNamesDictionary' ][ speaker ]
-
     postTranslatedList = []
     settings = userInput.copy()
     settings[ 'sceneSummary' ] = sceneSummary
 
     if programSettings[ 'batchModeEnabled' ] == True:
-        # This preDictionary replacement operation cannot be done outside of the batch code because non-batches need this done to both lines that will be submitted and lines that do not need to be submitted as part of the history feature. Doing it just above here, outside of the batch code, means this preDictionary would be run over the data twice which is incorrect. The translate non-batch code could check for that, but that just complicates the code unnecessarily. Just move the preDictionary code here to gurantee it is only processed once.
+        # This preDictionary replacement operation cannot be done outside of the batch code because non-batches need this done to both lines that will be submitted and lines that do not need to be submitted as part of the history feature. Doing it just above here, outside of the batch code, means this preDictionary would be run over the data twice which is incorrect behavior. The translate non-batch code could check for that, but that just complicates the code unnecessarily. Just move the preDictionary code here to gurantee it is only processed once.
         # Perform replacements specified by preDictionary.
         if userInput[ 'preDictionary' ] != None:
             for index,entry in enumerate( translateMe ):
@@ -1492,43 +1536,41 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
     #elif programSettings[ 'batchModeEnabled' ] != True:
     else:
        # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength == 0 then it was already disabled,so check for that. contextHistoryMaxLength is always an integer.
+        #contextHistory is formatted as:
+        #contextHistory = [ ( untranslatedString1, translatedString2, speaker ), ( uString1, tString2, None ), ( uString1, tString2, speaker ) ]
         contextHistory = None
-        if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
-            contextHistory = queue.Queue( maxsize = userInput[ 'contextHistoryMaxLength' ] )
-
-            # Syntax: https://docs.python.org/3.7/library/queue.html#module-queue
-            # To add an entry, contextHistory.put( item )
-            # To remove the oldest, contextHistory.get()
-            # To get every item without modifying the queue
-            #for i in range( contextHistory.qsize() ):
-                #print( contextHistory.queue[i] )
-            # To check if the queue is full,
-            #if contextHistory.full() == True:
+        if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsHistory == True ):
+            contextHistory = []
 
         if tqdmAvailable == False:
             tempIterable = listForThisBatchRaw
-        if tqdmAvailable == True:
+        #elif tqdmAvailable == True:
+        else:
             tempIterable = tqdm.tqdm( listForThisBatchRaw )
 
+        # This counter points to the current entry in translateMe.
         translateMeCounter = 0
-        # for every cell in A, try to translate it.
+        # for every cell in the current batch, try to translate it.
         # Every tempList looks like this: ( untranslatedData, speaker, alreadyTranslated, translatedData )
         for counter,tempList in enumerate( tempIterable ):
             translatedEntry = None
 
-            # A temporary variable is needed here because otherwise the original entry is lost after all the replacement dictionaries and the cache ends up getting corrupted by revertAfterTranslationDictionary as a result. Humm. Is this still true?
+            # A temporary variable is needed here. Otherwise the original entry is lost after all the replacement dictionaries mess with it. In addition, the cache ends up getting corrupted by revertAfterTranslationDictionary as a result since there is no way to get back the original value. Humm. Is this still true? Yes.
+            # tempList[ 0 ], a string inside of a tuple, cannot be modified, but there is a need to alter it prior to submitting it to the translation engine by using preDictionary and revertAfterTranslationDictionary, so making a copy is unavoidable. tempList [ 0 ] is also guranteed to hold the original unmodified value.
+            # In addition to that, to add untranslatedEntry to contextHistory correctly, the value of untranslatedEntry after preDictionary but before revertAfterTranslationDictionary must also be known since the revert changes are not valid context. Or are they? Whatever is being submitted to the translation engine is the context which means after revertAfterTranslationDictionary is the correct context.
+            # Then again, the user might be using revertAfterTranslationDictionary exactly because they do not want something to be part of the context or otherwise remembered in any way, cache, mainSpreadsheet, sceneSummaryCache. revertAfterTranslationDictionary does make the cache less useful. It is a toss up whether to include it or not.
             untranslatedEntry = tempList[ 0 ]
+            #untranslatedEntry_backup =
             #untranslatedEntry = rawUntranslatedEntry
-            # Sanity check.
-            assert( untranslatedEntry == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( currentRow + counter ) ) )
-            # translateMe is a subset of listForThisBatchRaw. Entries from translateMe can only be validated if they happen to overlap with  listForThisBatchRaw[i][2] == False
+            # Sanity checks.
+            assert( tempList[ 0 ] == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( currentRow + counter ) ) )
+            # translateMe is a subset of listForThisBatchRaw. Entries from translateMe can only be validated if they happen to overlap with listForThisBatchRaw[i][2] == False
+            if tempList[ 2 ] == False:
+                # if the current tempList is not already translated, then the current tempList must have an untranslatedEntry that should match the original data at the correct spot. That has already been verified, but the entry from translateMe[ translateMeCounter ] has not been verified.
+                assert( tempList[ 0 ] == translateMe[ translateMeCounter ] )
 
-            # Get speaker, if any.
+            # Get speaker, if any. Either None or a string.
             tempSpeakerName = tempList[ 1 ]
-            if ( not isinstance( tempSpeakerName, str ) ) or ( tempSpeakerName == '' ):
-                tempSpeakerName = None
-            else:
-                tempSpeakerName = tempSpeakerName.strip()
 
             # Perform replacements specified by preDictionary.
             if userInput[ 'preDictionary' ] != None:
@@ -1536,70 +1578,52 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                     if untranslatedEntry.find( key ) != -1:
                         untranslatedEntry = untranslatedEntry.replace( key, item )
 
-            # if the current 
-            # if the current cell contents are already translated, then just add to history and continue to the next line.
-            if tempList[ 2 ] == True:
-                translatedEntry = tempList[ 3 ]
-                # Update the contextHistory queue.
-                if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True ):
-                    if contextHistory.full() == True():
-                        # This is probably not ideal.
-                        contextHistory = queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
-                        contextHistory.
-                    contextHistory.put( [ untranslatedEntry, translatedEntry, tempSpeakerName  ] )
-
-
-            #contextHistory is formatted as:
-            #contextHistory = [ [ untranslatedString1, translatedString2, speaker ], [ uString1, tString2, None ], [ uString1, tString2, speaker ] ]
-            tempHistory = []
-            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True ) :
-                for i in range( contextHistory.qsize() ):
-                    tempHistory.append( contextHistory.queue[ i ] )
-
             # Perform replacements specified by revertAfterTranslationDictionary.
             if userInput[ 'revertAfterTranslationDictionary' ] != None:
                 for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
                     if untranslatedEntry.find( key ) != -1:
                         untranslatedEntry = untranslatedEntry.replace( key, item )
 
-                # translate entry
-                # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
+            # if the current cell contents are already translated, then just add to history and continue to the next line.
+            if tempList[ 2 ] == True:
+                if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsHistory == True):
+                    if len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ]:
+                        contextHistory.clear()
+                    # ( untranslatedString1, translatedString2, speaker )
+                    contextHistory.append( ( untranslatedEntry, tempList[ 3 ], tempList[1] ) )
 
+                # Append the translated data to the output.
+                postTranslatedList.append( tempList[ 3 ] )
+                continue
 
-                if len( tempHistory ) == 0:
-                    tempHistory = None
+            # Translate entry by submitting the line to the translation engine, along with the current contextHistory.
+            settings[ 'speakerName' ] = tempSpeakerName
+            settings[ 'contextHistory' ] = contextHistory
+            try:
+                translatedEntry = programSettings[ 'translationEngine' ].translate( untranslatedEntry, settings=settings )
+            except Exception as exception:
+                print( 'Error: Internal engine error in for translationEngine=' + userInput[ 'mode' ] )
+                print( exception.__class__.__name__ )
+                translatedEntry = None
+                if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
+                    raise exception
 
-                settings = {}
-                settings[ 'speakerName' ] = tempSpeakerName
-                settings[ 'contextHistory' ] = tempHistory
-                settings[ 'sceneSummary' ] = sceneSummary
+            # Once it is back, check to make sure it is not None or another error value.
+            if ( translatedEntry == None ) or ( translatedEntry == '' ):
+                print( ( 'Unable to translate: ' + untranslatedEntry ).encode( consoleEncoding ) )
+                #currentRow += 1
+                translateMeCounter += 1
+                continue
 
-                try:
-                    translatedEntry = translationEngine.translate( untranslatedEntry, settings=settings )
-                except Exception as exception:
-                    print( 'Error: Internal engine error in for translationEngine=' + userInput[ 'mode' ] )
-                    print( exception.__class__.__name__ )
-                    translatedEntry = None
-                    if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
-                        raise exception
-      
-                # once it is back check to make sure it is not None or another error value
-                if ( translatedEntry == None ) or ( translatedEntry == '' ):
-                    print( ( 'Unable to translate: ' + untranslatedEntry).encode( consoleEncoding) )
-                    currentRow += 1
-                    continue
-
-            # History should be updated before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
+            # After translation, history should be updated before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
             # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
-            # Add it to the dequeue, murdering the oldest entry in the dequeue.
-            # Update the contextHistory queue.
-            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
-                if contextHistory.full() == True:
-                    #contextHistory.get()
+            # Update contextHistory.
+            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsHistory == True):
+
+                if len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ]:
                     # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
-                    # This is probably not ideal. The entire queue should be emptied manually using .get() maybe in a while loop?
-                    contextHistory=queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
-                contextHistory.put( [ rawUntranslatedEntry, translatedEntry, tempSpeakerName ] )
+                    contextHistory.clear()
+                contextHistory.append( ( untranslatedEntry, translatedEntry, tempSpeakerName ) )
 
             # perform replacements specified by revertAfterTranslationDictionary, in reverse
             if userInput[ 'revertAfterTranslationDictionary' ] != None:
@@ -1643,7 +1667,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
             if userInput[ 'backupsEnabled' ] == True:
                 # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
-                backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
+                backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
 
             # and move on to next cell
             currentRow += 1
@@ -1919,7 +1943,8 @@ def old():
 
         if tqdmAvailable == False:
             tempIterable = untranslatedList
-        if tqdmAvailable == True:
+        #elif tqdmAvailable == True:
+        else:
             tempIterable = tqdm.tqdm( untranslatedList )
 
         # for every cell in A, try to translate it.
@@ -1980,7 +2005,7 @@ def old():
 
             if userInput[ 'debug' ] == True:
                 print( 'rawUntranslatedEntry=' + rawUntranslatedEntry )
-                #sys.exit()
+                #sys.exit( 0 )
 
             # First check if cache is enabled, and reTranslate != True. If they are, then check cache for value.
             if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'reTranslate' ] != True ):
@@ -2092,7 +2117,7 @@ def old():
 
             if userInput[ 'backupsEnabled' ] == True:
                 # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
-                backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
+                backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
 
             # and move on to next cell
             currentRow += 1
@@ -2129,7 +2154,8 @@ def main( userInput=None ):
     userInput = readInputFiles( userInput )
 
 
-    # Initialize programSettings dictionary. Instead of making everything global, the idea is to organize variables, including class instances, into this dictionary and pass the dictionary around. This should split variables into 1) userInput, 2) programSettings, or 3) local function variables. Passing the programSettings dictionary as an argument to a function passes a pointer to it in CPython, so there should be no performance ramifications compared to global variables.
+    # Initialize programSettings dictionary.
+    # Instead of making everything global, the idea is to organize variables, including class instances, into this dictionary and pass the dictionary around. This should split variables into 1) userInput, 2) programSettings, or 3) local function variables. Passing the programSettings dictionary as an argument to a function passes a pointer to it in CPython, so there should be no performance ramifications compared to global variables.
     programSettings = {}
 
     # Initialize some counters and other variables.
@@ -2227,19 +2253,23 @@ def main( userInput=None ):
     # Create data structure using fileToTranslateFileName. Whether it is a text file or spreadsheet file is handled internally.
     programSettings[ 'mainSpreadsheet' ] = chocolate.Strawberry( userInput[ 'fileToTranslateFileName' ], fileEncoding=userInput[ 'fileToTranslateEncoding' ], removeWhitespaceForCSV=False, addHeaderToTextFile=True )
 
-    # Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use  backupMainSpreadsheet( userInput=userInput, outputName=outputName, force=False):
+    # Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use  backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=outputName, force=False ):
     #backupsFolder does not have / at the end
     backupsFolderWithDate = backupsFolder + '/' + functions.getYearMonthAndDay()
     pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
     #mainDatabaseWorkbook.save( 'backups/' + functions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
     # This variable is derivative of the fileToTranslateFileNameWithoutPath, hence not incorrect to consider it part of userInput as a derivative variable.
     userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath' ] + '.raw.' + functions.getDateAndTimeFull() + defaultExportExtension
-    #mainSpreadsheet.exportToXLSX( userInput[ 'backupsFileNameWithPathAndDate' ] )
     # TODO: There should be a CLI setting to not create backups. # Update: Done.
     if userInput[ 'backupsEnabled' ] == True:
-        backupMainSpreadsheet( userInput=userInput, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=True )
+        #mainSpreadsheet.exportToXLSX( userInput[ 'backupsFileNameWithPathAndDate' ] )
+        backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=True )
 
-    # Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx? Alternatively, could set the option as a default boolean toggle in the script, but that might be annoying during actual usage. TODO: Implement this as a CLI option later in order to respect the user's decision.
+    # Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx?
+    # Alternatively, could set the option as a default boolean toggle in the script, but that might be annoying during actual usage.
+    # TODO: Implement this as a CLI option later in order to respect the user's decision.
+    # Update: Well, it is problematic to create backups as anything besides .xlsx because .xlsx is considered the fallback format that can have i/o done without any conversion errors. Other formats can have conversion errors, so having a fallback option that always works would provide better overall functionality since the final output can be in a different format. Having an option to remove that fallback functionality that is already optional via the backupsEnabled flag does not make much sense. Output that uses backupsFileNameWithPathAndDate is not the final output anyway. There is a seperate variable for that, so the user's decision in what format intermediary backups are created with is not particularly important since backups of this nature are closer to internal program variables used during data processing in case processing gets interupted. From that perspective, backups of this nature are not even necessarily meant to be modifiable by programs external to this one.
+    # Decision: Leave hardcoded as .xlsx to minimize possibility of conversion errors for intermediary files that are still in the middle of processing.
     userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath '] + '.backup.' + functions.getDateAndTimeFull() + defaultExportExtension
     #print( ( 'Wrote backup to: ' + backupsFileNameWithPathAndDate ).encode( consoleEncoding ) )
 
@@ -2308,6 +2338,7 @@ def main( userInput=None ):
 
         # Debug code.
         if userInput[ 'debug' ] == True:
+            # This is a terrible idea.
             userInput[ 'cache' ].printAllTheThings()
         #if readOnlyCache != True:
         #    userInput[ 'cache' ].export( userInput[ 'cacheFileName' ] )
@@ -2434,7 +2465,13 @@ def main( userInput=None ):
 
     if userInput[ 'testRun' ] != True:
         # Now need to translate stuff.
-        for i in range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'maxBatchSize'] ):
+        if ( tqdmAvailable == False ) or ( programSettings[ 'batchModeEnabled' ] == False ):
+            tempBatchIterable = range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'maxBatchSize'] )
+        #elif ( tqdmAvailable == True ) and ( programSettings[ 'batchModeEnabled' ] == True ):
+        else:
+            tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'maxBatchSize' ] ) )
+
+        for i in tempBatchIterable:
             currentBatchSize = len( untranslatedEntriesColumnFull[ i : i + maxBatchSize ] ) # This will be different than maxBatchSize during the last iteration.
             if userInput[ 'sceneSummaryEnabled' ] == False:
                 sceneSummary = None
@@ -2443,20 +2480,9 @@ def main( userInput=None ):
                 # This returns either None or a string.
                 sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
 
-                # TODO: Update sceneSummaryCache here. TODO: Implement updateSceneSummaryCache() properly.
-                # 1) data is, current lines, the lines themselves,
-                # 2) metadata the fileName_currentRow_currentRow+currentBatchSize as a string
-                # 3) sceneSummary if it is not None and is an instance of a string
-                # rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
-                #def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
-                metadata = userInput[ 'fileToTranslateFileNameWithoutPath' ] + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] ) + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] + currentBatchSize )
-                if isinstance( sceneSummary, str) == True:
-                    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + maxBatchSize ], metadata=metadata, summaryData=sceneSummary )
-                else:
-                    sceneSummary = None
-                #elif sceneSummary is not a string:
-                #else:
+                if ( not isinstance( sceneSummary, str ) == True ) or ( sceneSummary == '' ):
                     # Error generating sceneSummary.
+                    sceneSummary = None
 
             # There is a few special failure case here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated.
             if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False )
@@ -2471,7 +2497,7 @@ def main( userInput=None ):
             assert( len( translatedList ) == currentBatchSize )
 
             # This will attempt to backup mainSpreadsheet after each translation loop. Does this make sense?
-            # No, because processing a batch could take longer, several hours, than the minimum time to save backupMainSpreadsheet(), a few minutes. To avoid losing data due to insufficent mainSpreadsheet backups, there should be an attempt to back it up after every single translation for local LLMs, especially since it is on a minimum timer anyway. However, if updating main spreadsheet here instead of inside the translate() function, then backing up main spreadsheet here is unavoidable because it does not make sense to backupMainSpreadsheet() inside the translate() function since that would back it up prior to updating it. What makes more sense, waiting for the batches to return to update it or updating it within translate() after every entry?
+            # No, because processing a batch could take longer, several hours, than the minimum time to save backupMainSpreadsheet(), a few minutes. To avoid losing data due to insufficent mainSpreadsheet backups, there should be an attempt to back it up after every single translation for local LLMs, especially since it is on a minimum timer anyway. However, if updating main spreadsheet here instead of inside the translate() function, then backing up main spreadsheet here is unavoidable because it does not make sense to backupMainSpreadsheet() inside the translate() function since that would back it up prior to updating it. What makes more sense, waiting for the batches to return to update mainSpreadsheet or updating mainSpreadsheet within translate() after every entry?
             # Normally, it would always make sense to update inside of translate() after every entry, but cache gets updated regardless so there is no lost data. Hummm. Well, that does not consider operations were cache is disabled and backing up mainSpreadsheet() regularly is the only way to save data if an error occurs in that situation. Is cache a required feature? No. Therefore this backupMainSpreadsheet() behavior must be moved inside of translate so it occurs after every translation to minimize loss of data as intended. Thus, that also means the code to update mainSpreadsheet must also take place inside of translate().
             #backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=False )
             # Increment pointer by batch size so next loop begins at the start of the next entry.
