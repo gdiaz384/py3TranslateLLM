@@ -43,7 +43,7 @@ defaultPortForHTTP = 80
 defaultPortForHTTPS = 443
 defaultTimeout = 360 # Per request to translation engine in seconds. Set to 0 to disable.
 
-# LLMs tend to hallucinate, so setting this overly high tends to corrupt the output. It should also be reset back to 0 periodically, like when it gets full, so the corruption of one bad entry does not spread too much.
+# LLMs tend to hallucinate, so setting this overly high tends to corrupt the output. It should also be reset back to 0 periodically, like when it gets full, so the corruption of one bad entry does not spread too much. Sane values are 4-10.
 defaultContextHistoryMaxLength = 6
 # This setting only affects LLMs, not NMTs.
 defaultEnableBatchesForLLMs = False
@@ -76,7 +76,7 @@ defaultSceneSummaryCacheLocation = defaultBackupsFolder + '/sceneSummaryCache' +
 defaultMinimumSaveIntervalForSceneSummaryCache = 540
 
 # These two lists do not determine if the values are True/ False by default. Use action='store_true' and 'store_false' in the CLI options to toggle defaults and then update these two lists. These lists ensure the values are toggled correctly if a different than default setting is specified in program.ini when merging the CLI options with the options from the .ini .
-booleanValuesTrueByDefault = [ 'cache', 'batches', 'backups']
+booleanValuesTrueByDefault = [ 'cache', 'contextHistory', 'contextHistoryReset', 'batches', 'backups']
 booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'overrideWithSpreadsheet', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
 
 translationEnginesAvailable = 'cacheOnly, koboldcpp, py3translationserver, sugoi, deepl_api_free, deepl_api_pro, deepl_web, pykakasi, cutlet'
@@ -173,18 +173,23 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-cf', '--cacheFile', help='The location of the cache file. Must be in a spreadsheet format like .xlsx. Default=' + str( defaultCacheFileLocation ), default=None, type=str )
     commandLineParser.add_argument( '-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true' )
     commandLineParser.add_argument( '-owc', '--overrideWithCache', help='Override any already translated lines in mainSpreadsheet with results from the cache. Default=Do not override already translated lines. This setting is overridden by reTranslate. This setting takes precedence over overrideWithSpreadsheet.', action='store_true' )
-    commandLineParser.add_argument( '-ows', '--overrideWithSpreadsheet', help='Override any already translated lines in the cache using mainSpreadsheet. Default=Do not override already translated lines. This setting is overridden by reTranslate. overrideWithCache takes precedence over this setting.', action='store_true' )
+    commandLineParser.add_argument( '-ows', '--overrideWithSpreadsheet', help='Override any already translated lines in the cache using mainSpreadsheet. Default=Do not override the cache. This setting is overridden by reTranslate. overrideWithCache takes precedence over this setting.', action='store_true' )
     commandLineParser.add_argument( '-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines. This setting takes precedence over overrideWithCache and overrideWithSpreadsheet.', action='store_true' )
     commandLineParser.add_argument( '-roc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it or rebuilding it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file. This setting takes precedence over rebuildCache.', action='store_true' )
-    commandLineParser.add_argument( '-rbc', '--rebuildCache', help='If there is any error detected when generating it, this rebuilds the cache, removing blank lines and duplicates, based upon an existing spreadsheet. Use this if the cache ever becomes corrupt. Rebuilding the cache lowers memory usage. The first column will be used as the untranslated data. Default=Error out if there is any error reading the cache file. The cache cannot be rebuilt if readOnlyCache is enabled.', action='store_true' )
+    commandLineParser.add_argument( '-rbc', '--rebuildCache', help='If there is any error detected when generating cache, this rebuilds the cache based on an existing spreadsheet. Rebuilding cache means removing blank lines and duplicates. Use this if the cache ever becomes corrupt. Rebuilding the cache lowers memory usage. The first column will be used as the untranslated data. Default=Error out if there is any error reading the cache file. The cache cannot be rebuilt if readOnlyCache is enabled.', action='store_true' )
 
     commandLineParser.add_argument( '-ch', '--contextHistory', help='Toggles context history setting. Specifying this will toggle keeping track of or submitting history of previously translated entries to the translation engine. Default=Keep track of previously translated entries and submit them to the translation engines that support history to improve the quality of future translations.', action='store_false' )
-    commandLineParser.add_argument( '-chml', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable contextHistory. Not all translation engines support context. Default=' + str( defaultContextHistoryMaxLength ), default=None, type=int )
+    # TODO: This UI is inconsistent. 0 should mean 'unlimited history' which means never clear history and just keep making the prompt longer and longer, as horrible an idea as that is.
+    # That contextHistory exists only within a given batchSizeLimit context should be considered a bug. Here is an algorithm to recover context history for the first translation despite the history not being part of the current batch:
+    # Algorithm If the rowNumber > 2, take the current rowNumber, like 20. Subtract another number, contextHistoryMaxLength, like 6. Get the range of numbers between the current number and the number after subtraction (13-20). Return every number in that range that is > 2. Use those numbers to lookup previously translated data from mainSpreadsheet and append that data to contextHistory before attempting to translate the first entry of the current batch.
+    # Implementing the above logic might not make sense right now because batchSizeLimit is currently overloaded to mean both interal and external batch sizes to simplify processing of the sceneSummary feature. That may change which might mean reimplementing the above algorithim a second time which is somewhat annoying.
+    commandLineParser.add_argument( '-chml', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable a limit to contextHistory which is a bad idea because LLMs tend to start hallucinating after a while. Not all translation engines support context. The maximum size of contextHistory will always be less than batchSizeLimit and sceneSummaryLength, even if batches are disabled. Default=' + str( defaultContextHistoryMaxLength ), default=None, type=int )
+    commandLineParser.add_argument( '-chr', '--contextHistoryReset', help='Should contextHistory be fully reset when contextHistoryMaxLength is reached or should only the oldest entry be removed? Default=Fully reset contextHistory after reaching contextHistoryMaxLength in order to set a max to LLM hallucination errors that corrupt surrounding entries. Specifying this option means to remove the oldest entry instead of fully reseting the contextHistory buffer.', action='store_false' )
 
     commandLineParser.add_argument( '-ssp', '--sceneSummaryPrompt', help='Experimental feature. The location of the sceneSummaryPrompt.txt file, a text file used to generate a summary of the untranslated text prior to translation. Only valid with specific translation engines. Specifying this text file will enable generating a scene summary prior to translation to potentially boost translation quality. Due to the highly experimental nature of this feature, translations are disabled by default when this feature is enabled in order to provide time to quality check the generated summary before attempting translation and to potentially one engines/APIs to generate the summary and another for the subsequent translation. After quality checking the generated summaries, use -sset --sceneSummaryEnableTranslation to enable translations when using this feature. Actually using the summary during translation requires the following string to be present in either the memory.txt or prompt.txt file: {sceneSummary} Default=Do not generate a summary prior to translation.', default=None, type=str )
     commandLineParser.add_argument( '-sspe', '--sceneSummaryPromptEncoding', help='Experimental feature. The encoding of the sceneSummaryPrompt.txt file. Default=' + defaultTextEncoding, default=None, type=str )
     commandLineParser.add_argument( '-ssl', '--sceneSummaryLength', help='Experimental feature. The number of entries that should be summarized at any one time. If batches are enabled, batches and this will be reduced to the same number depending on whichever is lower. Set to 0 to disable limits when generating a summary. Default=' + str( defaultSceneSummaryLength ), default=None, type=int )
-    commandLineParser.add_argument( '-sset', '--sceneSummaryEnableTranslation', help='Enable the use of summaries of untranslated text when translating data. This setting always requires a sceneSummaryPrompt.txt file. sceneSummaryCache.xlsx will be used as cache. Default= Do not translate when generating a summary. The summary will be inserted in place of {sceneSummary} of memory.txt and prompt.txt', action='store_true' )
+    commandLineParser.add_argument( '-sset', '--sceneSummaryEnableTranslation', help='Enable the use of summaries of untranslated text when translating data. This always requires prompt.txt and sceneSummaryPrompt.txt files. sceneSummaryCache.xlsx will be used as cache. Default=Do not translate when generating a summary. The summary will be inserted in place of {sceneSummary} of memory.txt and prompt.txt', action='store_true' )
     commandLineParser.add_argument( '-sscf', '--sceneSummaryCacheFile', help='Experimental feature. The location of the sceneSummaryCache.xlsx file which stores a cache of every previously generated summary. Default=' + defaultSceneSummaryCacheLocation, default=None, type=str )
 
     commandLineParser.add_argument( '-b', '--batches', help='Toggles if entries should be submitted for translations engines that support them. Enabling batches disables context history. Default=Batches are automatically enabled for NMTs that support batches and web APIs like DeepL, but disabled for LLMs. Specifying this will disable them globally for all engines.', action='store_false' )
@@ -198,7 +203,7 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-bk', '--backups', help='This setting toggles writing backup files for mainSpreadsheet. This setting does not affect cache. Default=Write mainSpreadsheet to backups/[date]/* periodically for use with --resume. Specifying this will disable creating backups.', action='store_false' )
     commandLineParser.add_argument( '-r', '--resume', help='Attempt to resume previously interupted operation. No gurantees. Only checks backups made today and yesterday. Not currently implemented.', action='store_true' )
     commandLineParser.add_argument( '-tr', '--testRun', help='Specifying this will read all input files and import the translation engine, but there will be no translation or output files written. Default=Translate contents and write output.', action='store_true' )
-    commandLineParser.add_argument( '-sf', '--settingsFile', help='The is the ' + defaultScriptSettingsFileExtension + ' file from which to read program settings. Default= The name of the program ' + defaultScriptSettingsFileExtension + ' Example: py3TranslateLLM.ini This file must be encoded as ' + defaultTextEncoding, default=None, type=str )
+    commandLineParser.add_argument( '-sf', '--settingsFile', help='The is the ' + defaultScriptSettingsFileExtension + ' file from which to read program settings. Default= The name of the program ' + defaultScriptSettingsFileExtension + ' Example: py3TranslateLLM.ini This file must be encoded as ' + defaultTextEncoding + '.', default=None, type=str )
 
     commandLineParser.add_argument( '-ieh', '--inputErrorHandling', help='If the wrong input codec is specified, how should the resulting conversion errors be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str( defaultInputTextEncodingErrorHandler ) + '\'.', default=None, type=str )
     commandLineParser.add_argument( '-oeh', '--outputErrorHandling', help='How should output conversion errors between incompatible encodings be handled? See: docs.python.org/3.7/library/codecs.html#error-handlers Default=\'' + str( defaultOutputTextEncodingErrorHandler ) + '\'.', default=None, type=str )
@@ -245,6 +250,7 @@ def createCommandLineOptions():
 
     userInput[ 'contextHistory' ] = commandLineArguments.contextHistory
     userInput[ 'contextHistoryMaxLength' ] = commandLineArguments.contextHistoryMaxLength
+    userInput[ 'contextHistoryReset' ] = commandLineArguments.contextHistoryReset
 
     userInput[ 'sceneSummaryPrompt' ] = commandLineArguments.sceneSummaryPrompt
     userInput[ 'sceneSummaryLength' ] = commandLineArguments.sceneSummaryLength
@@ -796,9 +802,9 @@ def validateUserInput( userInput=None ):
         if ( userInput[ 'readOnlyCache' ] == True ) and ( userInput[ 'rebuildCache' ] == True ):
             userInput[ 'rebuildCache' ] = False
 
-    #if contextHistoryMaxLength was specified as == 0, then disable it.
-    if userInput[ 'contextHistoryMaxLength' ] == 0:
-        userInput[ 'contextHistoryEnabled' ] = False
+    #if contextHistoryMaxLength was specified as == 0, then disable it. Update: 0 should mean unlimited contextHistory
+    #if userInput[ 'contextHistoryMaxLength' ] == 0:
+    #    userInput[ 'contextHistoryEnabled' ] = False
 
     if userInput[ 'sceneSummaryPromptFileName' ] != None:
         functions.verifyThisFileExists( userInput[ 'sceneSummaryPromptFileName' ] )
@@ -817,16 +823,20 @@ def validateUserInput( userInput=None ):
     #elif userInput[ 'summarySize' ] > userInput[ 'batchSize' ]:
     #    userInput[ 'summarySize' ] = userInput[ 'batchSize' ]
 
-    # A batch size of 0 means unlimited. TODO: Implement this later.
-    if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'batchesEnabled' ] == True ):
+    # A batch size of 0 means unlimited.
+    # if sceneSummaryEnabled == True, then reduce the batchSizeLimit and sceneSummaryLength to whatever is lower.
+    # This code must run even if batchesEnabled == False because batchSizeLimit is overloaded and also used to determine the size of batches for internal processing in addition to the batchTranslate processing size for the translationEngine.
+    if ( userInput[ 'sceneSummaryEnabled' ] == True ): # and ( userInput[ 'batchesEnabled' ] == True ):
         if ( userInput[ 'sceneSummaryLength' ] == 0 ) or ( userInput[ 'sceneSummaryLength' ] > userInput[ 'batchSizeLimit' ] ):
             userInput[ 'sceneSummaryLength' ] = userInput[ 'batchSizeLimit' ]
         elif ( userInput[ 'batchSizeLimit' ] == 0 ) or ( userInput[ 'batchSizeLimit' ] > userInput[ 'sceneSummaryLength' ] ):
             userInput[ 'batchSizeLimit' ] = userInput[ 'sceneSummaryLength' ]
         assert( userInput[ 'batchSizeLimit' ] == userInput[ 'sceneSummaryLength' ] )
 
-    # if batches are disabled, then neither sceneSummaryLength nor batchSizeLimit get reduced in size and so should not necessarily match.
-    #if userInput[ 'sceneSummaryEnabled' ] == True:
+    # if sceneSummaryEnabled == False, then neither sceneSummaryLength nor batchSizeLimit get reduced in size and so should not necessarily match.
+    # However, sceneSummaryLength is not used at all after this point since batchSizeLimit must always == sceneSummaryLength to simplify internal processing regarding the scope of sceneSummary. 
+    # Internal processing of data in py3TranslateLLM is always done in batches even if submission of entries to translationEngine as batches are disabled. This means that what 'batches' mean is somewhat overloaded. With fancier and messier logic, this could be de-coupled. Hmmm. Is there any point in de-coupling the sceneSummary code from the internal batch size code though? De-doupling for the sake of de-coupling is pointless especially if the end result would be less readable. What practical benefits are there?
+    #if userInput[ 'sceneSummaryEnabled' ] != True:
     #    assert( userInput[ 'batchSizeLimit' ] == userInput[ 'sceneSummaryLength' ] )
 
     if userInput[ 'verbose' ] == True:
@@ -1272,7 +1282,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     # rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
     #def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
     metadata = userInput[ 'fileToTranslateFileNameWithoutPath' ] + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] ) + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] + untranslatedListSize )
-    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + maxBatchSize ], metadata=metadata, summaryData=sceneSummary )
+    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + batchSizeLimit ], metadata=metadata, summaryData=sceneSummary )
 
 
 
@@ -1520,6 +1530,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
         # Core logic.
         settings[ 'speakerList' ] = translateMeSpeakerList
+        # TODO: This needs to enforce userInput[ 'timeout' ].
         postTranslatedList = programSettings[ 'translationEngine' ].batchTranslate( translateMe, settings=settings )
 
         if userInput[ 'debug' ] == True:
@@ -1532,15 +1543,27 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                     if postTranslatedList[ index ].find( item ) != -1:
                         postTranslatedList[ index ] = postTranslatedList[ index ].replace( item, key )
 
+        # Check with postDictionary, a Python dictionary for possible updates.
+        if userInput[ 'postDictionary' ] != None:
+            for counter,entry in enumerate( postTranslatedList ):
+                for key,item in postDictionary.items():
+                    #print( 'key=', key, 'item=', item )
+                    if postTranslatedList[counter].find( key ) != -1:
+                        if userInput[ 'debug' ] == True:
+                            print( ( 'Found key=' + key + ' at line=' + str( counter ) ).encode( consoleEncoding ) )
+                        postTranslatedList[ counter ] = postTranslatedList[ counter ].replace( key, item )
+
+        # The resulting output is already correct.
 
     #elif programSettings[ 'batchModeEnabled' ] != True:
     else:
        # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength == 0 then it was already disabled,so check for that. contextHistoryMaxLength is always an integer.
         #contextHistory is formatted as:
         #contextHistory = [ ( untranslatedString1, translatedString2, speaker ), ( uString1, tString2, None ), ( uString1, tString2, speaker ) ]
-        contextHistory = None
-        if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsHistory == True ):
+        if userInput[ 'contextHistoryEnabled' ] == True:
             contextHistory = []
+        else:
+            contextHistory = None
 
         if tqdmAvailable == False:
             tempIterable = listForThisBatchRaw
@@ -1560,8 +1583,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # In addition to that, to add untranslatedEntry to contextHistory correctly, the value of untranslatedEntry after preDictionary but before revertAfterTranslationDictionary must also be known since the revert changes are not valid context. Or are they? Whatever is being submitted to the translation engine is the context which means after revertAfterTranslationDictionary is the correct context.
             # Then again, the user might be using revertAfterTranslationDictionary exactly because they do not want something to be part of the context or otherwise remembered in any way, cache, mainSpreadsheet, sceneSummaryCache. revertAfterTranslationDictionary does make the cache less useful. It is a toss up whether to include it or not.
             untranslatedEntry = tempList[ 0 ]
-            #untranslatedEntry_backup =
-            #untranslatedEntry = rawUntranslatedEntry
+
             # Sanity checks.
             assert( tempList[ 0 ] == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( currentRow + counter ) ) )
             # translateMe is a subset of listForThisBatchRaw. Entries from translateMe can only be validated if they happen to overlap with listForThisBatchRaw[i][2] == False
@@ -1586,9 +1608,16 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
             # if the current cell contents are already translated, then just add to history and continue to the next line.
             if tempList[ 2 ] == True:
-                if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsHistory == True):
-                    if len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ]:
-                        contextHistory.clear()
+                if userInput[ 'contextHistoryEnabled' ] == True:
+                    if ( len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ] ) and ( userInput[ 'contextHistoryMaxLength' ] != 0 ):
+                        if userInput[ 'contextHistoryReset' ] == True:
+                            # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
+                            contextHistory.clear()
+                        else:
+                            # Remove only the oldest entry.
+                            # Only for this feature to work correctly, contextHistory should be changed back to a queue since list.pop is an O(n) operation. In queue's it is O(1). Queue is not thread safe which intereferes with most implementation types of userInput[ 'timout' ]. TODO: Update this appropriately. Somehow.
+                            # https://www.w3schools.com/python/ref_list_pop.asp
+                            contextHistory.pop( 0 )
                     # ( untranslatedString1, translatedString2, speaker )
                     contextHistory.append( ( untranslatedEntry, tempList[ 3 ], tempList[1] ) )
 
@@ -1599,6 +1628,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # Translate entry by submitting the line to the translation engine, along with the current contextHistory.
             settings[ 'speakerName' ] = tempSpeakerName
             settings[ 'contextHistory' ] = contextHistory
+            # TODO: This needs to enforce userInput[ 'timeout' ]. Or perhaps the calling code should do it? Well, it needs to be here since this is where the call to the translation engine takes place and timeout refers to each individual translation, not to batches of translations. It only refers to batches if batchModeEnabled.
             try:
                 translatedEntry = programSettings[ 'translationEngine' ].translate( untranslatedEntry, settings=settings )
             except Exception as exception:
@@ -1610,51 +1640,32 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
             # Once it is back, check to make sure it is not None or another error value.
             if ( translatedEntry == None ) or ( translatedEntry == '' ):
-                print( ( 'Unable to translate: ' + untranslatedEntry ).encode( consoleEncoding ) )
+                print( ( 'Unable to translate: ' + untranslatedEntry ' at row ' + str( currentRow + counter ) ).encode( consoleEncoding ) )
                 #currentRow += 1
                 translateMeCounter += 1
+                postTranslatedList.append( None )
                 continue
 
             # After translation, history should be updated before revertAfterTranslationDictionary is applied otherwise there will be invalid data submitted to the translation engine.
             # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
-            # Update contextHistory.
-            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsHistory == True):
-
-                if len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ]:
-                    # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
-                    contextHistory.clear()
+            if userInput[ 'contextHistoryEnabled' ] == True:
+                if ( len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ] ) and ( userInput[ 'contextHistoryMaxLength' ] != 0 ):
+                    if userInput[ 'contextHistoryReset' ] == True:
+                        # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
+                        contextHistory.clear()
+                    else:
+                        # Remove only the oldest entry.
+                        # Only for this feature to work correctly, contextHistory should be changed back to a queue since list.pop is an O(n) operation. In queue's it is O(1). Queue is not thread safe which intereferes with most implementation types of userInput[ 'timout' ]. TODO: Update this appropriately. Somehow.
+                        # https://www.w3schools.com/python/ref_list_pop.asp
+                        contextHistory.pop( 0 )
+                # ( untranslatedString1, translatedString2, speaker )
                 contextHistory.append( ( untranslatedEntry, translatedEntry, tempSpeakerName ) )
 
-            # perform replacements specified by revertAfterTranslationDictionary, in reverse
+            # Perform replacements specified by revertAfterTranslationDictionary, in reverse.
             if userInput[ 'revertAfterTranslationDictionary' ] != None:
                 for key,item in userInput[ 'revertAfterTranslationDictionary' ].items():
                     if translatedEntry.find( item ) != -1:
                         translatedEntry = translatedEntry.replace( item, key )
-
-
-
-
-    assert( len( translateMe ) == len( postTranslatedList ) )
-
-    # Update cache here.
-            # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
-            if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
-                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=rawUntranslatedEntry, translation=translatedEntry )
-
-
-
-
-    # Check with postDictionary, a Python dictionary for possible updates.
-    if userInput[ 'postDictionary' ] != None:
-        for counter,entry in enumerate(finalTranslatedList):
-            for key,item in postDictionary.items():
-                #print( 'key=', key, 'item=', item )
-                if finalTranslatedList[counter].find( key ) != -1:
-                    if debug == True:
-                        print( ( 'found key=' + key + ' at line=' + str( counter ) ).encode( consoleEncoding ) )
-                    finalTranslatedList[ counter ] = finalTranslatedList[ counter ].replace( key, item )
-
-
 
             # Check with postDictionary, a Python dictionary for possible updates.
             if userInput[ 'postDictionary' ] != None:
@@ -1662,17 +1673,43 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                     if translatedEntry.find( key ) != -1:
                         translatedEntry = translatedEntry.replace( key, item )
 
-            # then write translations to mainSpreadsheet cell.
-            mainSpreadsheet.setCellValue( currentTranslatedCellAddress , translatedEntry )
+            postTranslatedList.append( translatedEntry )
 
-            if userInput[ 'backupsEnabled' ] == True:
-                # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
-                backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
-
-            # and move on to next cell
-            currentRow += 1
+            # And move on to next entry.
+            translateMeCounter += 1
             continue
 
+    assert( len( translateMe ) == len( postTranslatedList ) )
+
+    finalOutput = []
+    # This counter points to the current entry in translateMe.
+    postTranslatedListCounter = 0
+
+    # each entry is: ( untranslatedData, speaker, alreadyTranslated, translatedData )
+    for counter,entry in listForThisBatchRaw:
+        # cache and mainSpreadsheet have already been uploaded for alreadyTranslated == True entries, so only consider alreadyTranslated == False entries.
+        if entry[ 2 ] == True:
+            finalOutput.append( entry[ 3 ] )
+        elif entry[ 2 ] == False:
+            # Update cache here.
+            # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
+            if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
+                if postTranslatedList[ postTranslatedListCounter ] != None:
+                    updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=entry[ 0 ], translation=postTranslatedList[ postTranslatedListCounter ] )
+
+            currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow + counter )
+            # then write translations to mainSpreadsheet cell.
+            programSettings[ 'mainSpreadsheet' ].setCellValue( currentTranslatedCellAddress , postTranslatedList[ postTranslatedListCounter ] )
+
+            # Housekeeping.
+            finalOutput.append( postTranslatedList[ postTranslatedListCounter ] )
+            postTranslatedListCounter += 1
+
+    #currentRow = programSettings[ 'currentRow' ]
+
+    if userInput[ 'backupsEnabled' ] == True:
+        # Create a backup. Backups are on a minimum timer, so calling this a lot should not be an issue.
+        backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ] )
 
 
 def old():
@@ -1928,7 +1965,7 @@ def old():
 
 
         # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength == 0 then it was already disabled,so check for that. contextHistoryMaxLength is always an integer.
-        if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
+        if userInput[ 'contextHistoryEnabled' ] == True:
             contextHistory = None
             #https://docs.python.org/3.7/library/queue.html#module-queue
             contextHistory=queue.Queue( maxsize = userInput[ 'contextHistoryMaxLength' ] )
@@ -1975,7 +2012,7 @@ def old():
             currentMainSpreadsheetCellContents = programSettings[ 'mainSpreadsheet' ].getCellValue( currentTranslatedCellAddress )
             if ( currentMainSpreadsheetCellContents != None ) and ( userInput[ 'reTranslate' ] != True ):
                 # Update the contextHistory queue.
-                if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True ):
+                if userInput[ 'contextHistoryEnabled' ] == True:
                     if contextHistory.full() == True():
                         # This is probably not ideal. The entire queue should be emptied manually using .get() maybe in a while loop?
                         contextHistory = queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
@@ -2057,7 +2094,7 @@ def old():
                 # submit the line to the translation engine, along with the current dequeue # TODO: Add options to specify history length of dequeue to the CLI. # Update: Added.
                 tempHistory = []
 
-                if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True ) :
+                if userInput[ 'contextHistoryEnabled' ] == True:
                     for i in range( contextHistory.qsize() ):
                         tempHistory.append( contextHistory.queue[i] )
 
@@ -2088,12 +2125,12 @@ def old():
             # Conversely, it should not be added to the cache until after reversion takes place because the cache should hold a translation that represents the original data as closely as possible.
             # Add it to the dequeue, murdering the oldest entry in the dequeue.
             # Update the contextHistory queue.
-            if ( userInput[ 'contextHistoryEnabled' ] == True ) and ( translationEngine.supportsHistory == True):
+            if userInput[ 'contextHistoryEnabled' ] == True:
                 if contextHistory.full() == True:
                     #contextHistory.get()
                     # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
                     # This is probably not ideal. The entire queue should be emptied manually using .get() maybe in a while loop?
-                    contextHistory=queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
+                    contextHistory = queue.Queue( maxsize=userInput[ 'contextHistoryMaxLength' ] )
                 contextHistory.put( [ rawUntranslatedEntry, translatedEntry, tempSpeakerName ] )
 
             # perform replacements specified by revertAfterTranslationDictionary, in reverse
@@ -2258,7 +2295,7 @@ def main( userInput=None ):
     backupsFolderWithDate = backupsFolder + '/' + functions.getYearMonthAndDay()
     pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
     #mainDatabaseWorkbook.save( 'backups/' + functions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
-    # This variable is derivative of the fileToTranslateFileNameWithoutPath, hence not incorrect to consider it part of userInput as a derivative variable.
+    # This variable is mostly derivative of the fileToTranslateFileNameWithoutPath, hence not incorrect to consider it part of userInput as a derivative variable.
     userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath' ] + '.raw.' + functions.getDateAndTimeFull() + defaultExportExtension
     # TODO: There should be a CLI setting to not create backups. # Update: Done.
     if userInput[ 'backupsEnabled' ] == True:
@@ -2413,15 +2450,22 @@ def main( userInput=None ):
             programSettings[ 'batchModeEnabled' ] = True
         else:
             programSettings[ 'batchModeEnabled' ] = False
+    # Has served its purpose. programSettings[ 'batchModeEnabled' ] will take over from here.
+    userInput.pop( 'batchesEnabled' ) # Should probably keep using this honestly, but logically programSettings makes more sense since it is derivative of the actual translationEngine.
 
     # Debug code.
     #programSettings[ 'batchModeEnabled' ] = False
 
-    if userInput[ 'sceneSummaryEnabled' ] == True:
-        if translationEngine.supportsCreatingSummary == False:
-            print( 'Warning: sceneSummaryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support creating sceneSummary. Disabling feature.' )
-            userInput[ 'sceneSummaryEnabled' ] = False
+    if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( translationEngine.supportsCreatingSummary != True ):
+        print( 'Warning: sceneSummaryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support creating sceneSummary. Disabling feature.' )
+        userInput[ 'sceneSummaryEnabled' ] = False
 
+    if userInput[ 'contextHistoryEnabled' ] == True:
+        # Context history is not valid if the translationEngine does not support it of it batches are enabled. 
+        if ( programSettings[ 'translationEngine' ].supportsHistory != True ) or ( programSettings[ 'batchModeEnabled' ] == True ):
+            # This is enabled by default and it is sort of obvious it is not supported for NMTs, so mentioning it every time would be cumbersome.
+            # print( 'Warning: contextHistoryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support history. Disabling feature.' )
+            userInput[ 'contextHistoryEnabled' ] = False
 
     untranslatedEntriesColumnFull = programSettings[ 'mainSpreadsheet' ].getColumn( 'A' )
     if userInput[ 'debug' ] == True:
@@ -2459,20 +2503,27 @@ def main( userInput=None ):
     # Update: Technically yes, but it could also make sense to limit batch sizes on the application side, like if translating tens of thousands of lines or more, so there should also be a batchSize UI element in addition to any internal engine batch size limitations. Implemented as batchSizeLimit , now just need to implement the batch limiting code. Update: Done.
     # This works because if a list index goes past the maximum size of the list when splicing, then it will just return the rest of the items and not error out.
     # Syntax: range( start, stop, stepAmount ):
-    #for i in range( 0, len( untranslatedList ), maxBatchSize ):
-    #    translateBatchFunction( untranslatedList[ i : i + maxBatchSize ]  )
-    #    print( untranslatedList[ i : i + maxBatchSize ]  )
+    #for i in range( 0, len( untranslatedList ), batchSizeLimit ):
+    #    translateBatchFunction( untranslatedList[ i : i + batchSizeLimit ]  )
+    #    print( untranslatedList[ i : i + batchSizeLimit ]  )
 
     if userInput[ 'testRun' ] != True:
         # Now need to translate stuff.
         if ( tqdmAvailable == False ) or ( programSettings[ 'batchModeEnabled' ] == False ):
-            tempBatchIterable = range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'maxBatchSize'] )
+            if userInput[ 'batchSizeLimit' ] == 0:
+                tempBatchIterable = untranslatedEntriesColumnFull
+            else:
+                tempBatchIterable = range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] )
+
         #elif ( tqdmAvailable == True ) and ( programSettings[ 'batchModeEnabled' ] == True ):
         else:
-            tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'maxBatchSize' ] ) )
+            if userInput[ 'batchSizeLimit' ] == 0:
+                tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
+            else:
+                tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] ) )
 
         for i in tempBatchIterable:
-            currentBatchSize = len( untranslatedEntriesColumnFull[ i : i + maxBatchSize ] ) # This will be different than maxBatchSize during the last iteration.
+            currentBatchSize = len( untranslatedEntriesColumnFull[ i : i + userInput[ 'batchSizeLimit' ] ] ) # This will be different than batchSizeLimit during the last iteration.
             if userInput[ 'sceneSummaryEnabled' ] == False:
                 sceneSummary = None
             #if userInput[ 'sceneSummaryEnabled' ] != None:
