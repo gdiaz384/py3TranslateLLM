@@ -12,7 +12,7 @@ License:
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 
 """
-__version__ = '2024.06.23 alpha'
+__version__ = '2024.07.21 alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -1470,7 +1470,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
         # if both spreadsheet and cache have data, what should happen?
         # By default if both overrideWithCache and overrideWithSpreadsheet are false, then leave the data alone. That means taking the data from the spreadsheet and treating it as translated data.
         # if they are the same data, then do nothing as well. Just treat the data in the spreadsheet as translated and move on.
-        if ( ( ( userInput[ 'overrideWithCache' ] == False ) and ( userInput[ 'overrideWithSpreadsheet' ] == False ) ) or ( dataFromSpreadsheet == dataFromCache ):
+        if ( ( ( userInput[ 'overrideWithCache' ] == False ) and ( userInput[ 'overrideWithSpreadsheet' ] == False ) ) or ( dataFromSpreadsheet == dataFromCache ) ):
             listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromSpreadsheet ) )
             cacheHitCounter += 1
             continue
@@ -1640,7 +1640,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
             # Once it is back, check to make sure it is not None or another error value.
             if ( translatedEntry == None ) or ( translatedEntry == '' ):
-                print( ( 'Unable to translate: ' + untranslatedEntry ' at row ' + str( currentRow + counter ) ).encode( consoleEncoding ) )
+                print( ( 'Unable to translate: ' + untranslatedEntry + ' at row ' + str( currentRow + counter ) ).encode( consoleEncoding ) )
                 #currentRow += 1
                 translateMeCounter += 1
                 postTranslatedList.append( None )
@@ -1918,7 +1918,7 @@ def old():
             #if overrideWithCache != True:
             else:
                 # Consider each entry individually.
-
+                pass
             #print( 'pie pie' )
             #print( 'len( untranslatedList )=', len( untranslatedList ) )
             #print( 'reTranslate=', reTranslate )
@@ -1926,9 +1926,9 @@ def old():
             for listCounter,untranslatedString in enumerate( untranslatedList ):
                 # Searching might be pointless here because the entries should be ordered. It should be possible to simply increment both untranslatedList and translatedList with the same counter.
                 #tempSearchResult = programSettings[ 'cache' ].searchCache( untranslatedString )
-                assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str( currentRow ) )
+                assert( untranslatedString == mainSpreadsheet.getCellValue( 'A' + str( currentRow ) ) )
 
-                currentTranslatedCellAddress= programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow )
+                currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow )
 
                 # Check with postDictionary, a Python dictionary for possible updates.
     #            if postDictionary != None:
@@ -1991,7 +1991,7 @@ def old():
             # Sanity check.
             assert( rawUntranslatedEntry == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( currentRow ) ) )
 
-            currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow ] )
+            currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow )
 
             # Get speaker, if any.
             tempSpeakerName = programSettings[ 'mainSpreadsheet' ].getRow( currentRow )
@@ -2022,7 +2022,7 @@ def old():
                 # Update: Well, the source can be determined by reading the header in the current column and looking up the same column in the cache. If they match perfectly, the model in the mainSpreadsheet and the model in cache.xlsx, then it may be possible to update the cache based upon what is already in the spreadsheet.
                 # if the header (translation engine) of the current column in the mainSpreadsheet matches the header (translation engine) of the cache header
                 # They should always match, right? Will they always match perfectly, or is it possible they will not match perfectly?
-                if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'overrideWithCache' != True ):
+                if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'overrideWithCache' ] != True ):
                     if programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + '1' ) == programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + '1' ):
                         # then update the cache with what was found in the mainSpreadsheet
                         updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=rawUntranslatedEntry, translation=currentMainSpreadsheetCellContents )
@@ -2536,7 +2536,7 @@ def main( userInput=None ):
                     sceneSummary = None
 
             # There is a few special failure case here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated.
-            if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False )
+            if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False ):
                 programSettings[ 'currentRow' ] += currentBatchSize
                 continue
 

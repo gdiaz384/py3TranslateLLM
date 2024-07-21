@@ -74,7 +74,7 @@ Undetermined:
 
 ## Installation guide
 
-`Current version: 2024.07.04 alpha`
+`Current version: 2024.07.21 alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 
@@ -498,8 +498,8 @@ Libraries can also require other libraries.
 - Python standard library's [license](//docs.python.org/3/license.html). For source code, open the Python installation directory on the local system.
 - [openpyxl](//pypi.python.org/pypi/openpyxl)'s [license](//foss.heptapod.net/openpyxl/openpyxl/-/blob/3.1.2/LICENCE.rst) and [source code](//foss.heptapod.net/openpyxl/openpyxl).
 - [chardet](//pypi.org/project/chardet)'s license is [LGPL v2+](//github.com/chardet/chardet/blob/main/LICENSE). [Source code](//github.com/chardet/chardet).
-- [charamel](//pypi.org/project/charamel)'s [license] and [source code].
-- [charset-normalizer](//pypi.org/project/charset-normalizer)'s [license] and [source code].
+- [charamel](//pypi.org/project/charamel)'s [license](//github.com/chomechome/charamel/blob/master/LICENSE) and [source code](//github.com/chomechome/charamel).
+- [charset-normalizer](//pypi.org/project/charset-normalizer)'s [license](//github.com/jawah/charset_normalizer/blob/master/LICENSE) and [source code](//github.com/jawah/charset_normalizer).
 - [xlrd](//pypi.org/project/xlrd)'s [license](//github.com/python-excel/xlrd/blob/master/LICENSE) and [source code](//github.com/python-excel/xlrd).
 - [xlwt](//pypi.org/project/xlwt)'s [license](//github.com/python-excel/xlwt/blob/master/LICENSE) and [source code](//github.com/python-excel).
 - [odfpy](//pypi.org/project/odfpy)'s, license is [GPL v2](//github.com/eea/odfpy/blob/master/GPL-LICENSE-2.txt). [Source code](//github.com/eea/odfpy).
@@ -513,7 +513,7 @@ Libraries can also require other libraries.
     - Sugoi NMT is one part of the 'Sugoi Translator Toolkit' which is itself part of the free-as-in-free-beer distributed 'Sugoi Toolkit' which contains other projects like manga translation and upscaling.
     - The use of Github to post source code for Sugoi Toolkit suggests intent to keep the wrapper code under a permissive license. A more concrete license may be available on discord.
 - py3TranslateLLM.py and the associated libraries under `resources/` are [GNU Affero GPL v3](//www.gnu.org/licenses/agpl-3.0.html).
-    - You are free to use the software as long as you do not infringe on the [freedoms](https://www.gnu.org/philosophy/free-sw.en.html#four-freedoms) of other people.
+    - You are free to use the software as long as you do not infringe on the [freedoms](//www.gnu.org/philosophy/free-sw.en.html#four-freedoms) of other people.
     - Summary: Feel free to use it, modify it, and distribute it to an unlimited extent, but *if you distribute binary files of this program outside of your organization*, then please make the source code for those binaries available.
     - The imperative to make source code available also applies if using this program as part of a server *if that server can be accessed by people outside of your organization*. For additional details, consult the license text.
     - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.

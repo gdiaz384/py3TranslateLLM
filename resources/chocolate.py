@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 """
-__version__ = '2024.07.17'
+__version__ = '2024.07.21'
 
 #set defaults
 #printStuff = True
@@ -797,7 +797,7 @@ class Strawberry:
         if coreHeader == None:
             coreHeader = self.spreadsheet[ 'A1' ].value
 
-        print( 'Rebuilding index using coreHeader=' + str( coreHeader ) ).encode( consoleEncoding ) )
+        print( ( 'Rebuilding index using coreHeader=' + str( coreHeader ) ).encode( consoleEncoding ) )
         print( 'self.spreadsheetName=' + self.spreadsheetName )
 
         # tempDatabase has keys derived from coreHeader. data itself is the rest of the headers and the data
