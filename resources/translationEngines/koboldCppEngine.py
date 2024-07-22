@@ -342,17 +342,11 @@ class KoboldCppEngine:
         print( 'instructionFormat=' + self.instructionFormat )
 
 
-    def getSummary(self, untranslatedList):
-        # Update memory to not include {sceneSummary}.
-        if self.memory != None:
-            tempMemory=self.memory.replace( '{sceneSummary}', '' )
-        else:
-            tempMemory=''
-
-
     # This expects a python list where every entry is a string.
     def batchTranslate( self, untranslatedList, settings=None ):
         print( 'Hello world!' )
+        return None
+
         #debug = True
         if debug == True:
             print( 'len( untranslatedList )=' , len( untranslatedList ) )
@@ -440,9 +434,9 @@ class KoboldCppEngine:
             for entry in contextHistory:
                 if self.instructionFormat == 'instruct':
                     if entry[ 2 ] == None:
-                        tempHistory = tempHistory + self._instructModelStartSequence + entry[ 0 ] + self._instructModelEndSequence + entry[ 1 ]
+                        tempHistory = tempHistory + self._instructModelStartSequence + entry[ 0 ] + self._instructModelEndSequence + entry[ 1 ] + '\n'
                     else:
-                        tempHistory = tempHistory + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ]
+                        tempHistory = tempHistory + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
                 elif self.instructionFormat == 'chat':
                     if entry[ 2 ] == None:
                         tempHistory = tempHistory + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
@@ -568,6 +562,88 @@ class KoboldCppEngine:
             print( ( 'postProcessedTranslatedText=' + translatedText ).encode( consoleEncoding ) )
 
         return translatedText
+
+
+    def getSceneSummary(self, untranslatedList, settings=None):
+        prompt = settings[ 'sceneSummaryPrompt' ]
+
+        # Update memory to not include {sceneSummary}.
+        # When generating the sceneSummary, it will obvious not be present
+        if self.memory != None:
+            tempMemory = self.memory.replace( '{sceneSummary}', '' )
+        else:
+            tempMemory = None
+
+        if 'characterList' in settings:
+            characterList = settings[ 'characterList' ]
+            assert( len( untranslatedList ) == len( characterList )
+        else:
+            characterList = None
+
+
+
+        tempString = ''
+        for entry in untranslatedList:
+            tempString = tempString + entry + '\n'
+
+        a
+
+
+    # Hummmmm.
+    def buildStringFromList( self, inputList=None, speakerList=None ):
+    # Build prompt.
+    # First build history string from history list.
+    if contextHistory != None:
+    tempString = self._instructModelStartSequence
+    for counter,entry in enumerate( inputList ):
+        if self.instructionFormat == 'instruct':
+            if speakerList == None:
+                tempString = tempString + entry + '\n'
+            else:
+                tempString = tempString + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+#tempString=self._instructModelEndSequence
+
+        elif self.instructionFormat == 'chat':
+            if speakerList == None:
+                tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
+            else:
+                tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+        elif self.instructionFormat == 'autocomplete'
+            #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
+            pass
+        else:
+            print( ( 'Warning: Unrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
+            break
+
+    return tempString
+
+
+    # contextHistory should be a list of untranslated and translated pairs in sublists.
+    # contextHistory= [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
+    def buildStringFromHistory( self, contextHistory=None ):
+    if contextHistory == None:
+        return None
+
+    tempString = ''
+    for counter,entry in enumerate( contextHistory ):
+        if self.instructionFormat == 'instruct':
+            if entry[ 2 ] == None:
+                tempString = tempString + self._instructModelStartSequence + entry[ 0 ] + self._instructModelEndSequence + entry[ 1 ] + '\n'
+            else:
+                tempString = tempString + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+        elif self.instructionFormat == 'chat':
+            if entry[ 2 ] == None:
+                tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
+            else:
+                tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+        elif self.instructionFormat == 'autocomplete'
+            #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
+            pass
+        else:
+            print( ( 'Warning: Unrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
+            break
+
+    return tempString
 
 
 """

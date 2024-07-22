@@ -11,16 +11,16 @@ Usage: See below. Like at the bottom.
 
 License: See main program.
 """
-__version__ = '2024.06.22'
+__version__ = '2024.07.22'
 
 
 #set defaults
-printStuff=True
-verbose=False
-debug=False
-#debug=True
-consoleEncoding='utf-8'
-defaultTextFileEncoding='utf-8'
+printStuff = True
+verbose = False
+debug = False
+#debug = True
+consoleEncoding = 'utf-8'
+defaultTextFileEncoding = 'utf-8'
 # Technically, it should be possible to detect the encoding of the file names in .zip files from the header even if they are stored as binary files later in the data structure, so do not add them here. .epub files are a type of zip file.
 knownBinaryFormats = [
 '.7z',
@@ -38,36 +38,35 @@ import os.path                                   # Test if file exists.
 import sys                                         # End program on fail condition.
 try:
     import chardet                              # Detect character encoding from files using heuristics.
-    chardetLibraryAvailable=True
+    chardetLibraryAvailable = True
 except:
-    chardetLibraryAvailable=False
+    chardetLibraryAvailable = False
 try:
     import charamel                            # Detect character encoding from files using machine learning heuristics.
-    charamelLibraryAvailable=True
+    charamelLibraryAvailable = True
 except:
-    charamelLibraryAvailable=False
+    charamelLibraryAvailable = False
 try:
     import charset_normalizer              # Try to figure out which character encoding correctly decodes the text.
-    charsetNormalizerLibraryAvailable=True
+    charsetNormalizerLibraryAvailable = True
 except:
-    charsetNormalizerLibraryAvailable=False
+    charsetNormalizerLibraryAvailable = False
 
 
 #Returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down.
 #detectEncoding() is never really used, so it should probably just be deleted.
 def detectEncoding(myFileName):
     #import chardet
-    detector=chardet.UniversalDetector()
+    detector = chardet.UniversalDetector()
     with open(myFileName, 'rb') as openFile:
         for line in openFile:
             detector.feed(line)
             if detector.done == True:
                 openFile.close()
                 break
-    temp=detector.result['encoding']
-    if printStuff == True:
-        if debug == True:
-            print( (myFileName + ':' + str(detector.result) ).encode(consoleEncoding) )
+    temp = detector.result[ 'encoding' ]
+    if ( printStuff == True ) and ( debug == True ):
+        print( ( myFileName + ':' + str( detector.result ) ).encode( consoleEncoding ) )
     return temp
 
 
@@ -87,14 +86,14 @@ def ofThisFile( myFileName, userInputForEncoding=None, fallbackEncoding=defaultT
     # Check if the file exists.
     if os.path.isfile(myFileName) != True:
         # if the user did not specify an encoding and if the file does not exist, just return the fallbackEncoding
-        if printStuff == True:
-            print( ('Warning: The file:\'' + myFileName + '\' does not exist. Returning:\'' + fallbackEncoding + '\'').encode(consoleEncoding) )
+        if ( printStuff == True ) and ( verbose == True ):
+            print( ( 'Warning: The file:\'' + myFileName + '\' does not exist. Returning:\'' + fallbackEncoding + '\'' ).encode( consoleEncoding ) )
         return fallbackEncoding
 
     # Assume file exists now.
 
     # So, binary spreadsheet files (.xlsx, .xls, .ods) do not have an associated encoding that can be read by charadet because they are binary files. If the user specified option from the command line/.ini has not been used to return already, then return fallbackEncoding for binary files.
-    myFile_NameOnly, myFile_ExtensionOnly = os.path.splitext(myFileName)
+    myFile_NameOnly, myFile_ExtensionOnly = os.path.splitext( myFileName )
     #binaryFile=False
     if myFile_ExtensionOnly in knownBinaryFormats:
         #Files that do not have an extension or unknown extensions will not be caught up in this, so it is fine.
@@ -104,36 +103,36 @@ def ofThisFile( myFileName, userInputForEncoding=None, fallbackEncoding=defaultT
     #chardetLibraryAvailable=False
 
     # TODO: Update this part to support charamel and charset normalizer libraries. It would probably be better to dump the chardet code back into a function for modularity reasons.
-    #if (no encoding specified) and (automaticallyDetectEncoding == True): 
+    #if (no encoding specified) and ( automaticallyDetectEncoding == True ): 
     #if automaticallyDetectEncoding library is available:
     if chardetLibraryAvailable == True:
         # Set encoding to detectEncoding(myFileName)
         # Actually, since this is a library anyway and the conditional import statement was moved elsewhere, then just move the function here to avoid breaking up the code pointlessly.
-        detector=chardet.UniversalDetector()
-        with open(myFileName, 'rb') as openFile:
+        detector = chardet.UniversalDetector()
+        with open( myFileName, 'rb' ) as openFile:
             for line in openFile:
-                detector.feed(line)
+                detector.feed( line )
                 if detector.done == True:
                     openFile.close()
                     break
 
-        temp=detector.result['encoding']
+        temp = detector.result[ 'encoding' ]
         #So sometimes, like when detecting an ascii only file or a utf-8 file filled with only ascii, the chardet library will return with a confidence of 0.0 and the result will be None. When that happens, try to catch it and change the result from None to the default encoding. The assumption is that this also happens if the confidence value is below some threshold like <0.2 or <0.5.
         if temp == None:
-            if (printStuff == True):# and (debug == True):
-                print(('Warning: Unable to detect encoding of file \'' + myFileName + '\' with high confidence. Using the following fallback encoding:\''+fallbackEncoding+'\'').encode(consoleEncoding))
-            temp=fallbackEncoding
+            if ( printStuff == True ):# and ( debug == True ):
+                print( ( 'Warning: Unable to detect encoding of file \'' + myFileName + '\' with high confidence. Using the following fallback encoding:\''+fallbackEncoding+'\'' ).encode( consoleEncoding ) )
+            temp = fallbackEncoding
         else:
             if debug == True:
-                print((myFileName+':'+str(detector.result)).encode(consoleEncoding))
-            print( ('Warning: Using automatic encoding detection for file:\'' + str(myFileName) + '\' as:\'' + str(temp) +'\'').encode(consoleEncoding) )
+                print( ( myFileName + ':' + str( detector.result ) ).encode( consoleEncoding ) )
+            print( ( 'Warning: Using automatic encoding detection for file:\'' + str( myFileName ) + '\' as:\'' + str( temp ) +'\'' ).encode( consoleEncoding ) )
         #temp=detectEncoding(myFileName)
         return temp
 
     elif chardetLibraryAvailable == False:
         #set encoding to default value
-        if (printStuff == True) and (debug == True):
-            print( ('Warning: Using default text encoding for file:\'' + str(myFileName) + '\' as:\'' + fallbackEncoding+'\'').encode(consoleEncoding) )
+        if ( printStuff == True ) and ( debug == True ):
+            print( ( 'Warning: Using default text encoding for file:\'' + str( myFileName ) + '\' as:\'' + fallbackEncoding + '\'' ).encode( consoleEncoding ) )
         return fallbackEncoding
 
 
@@ -149,28 +148,28 @@ def detectLineEndingsFromFile( fileNameWithPath, fileEncoding=defaultTextFileEnc
     #print( inputFileContents )
     #print( r'inputFileContents.find(\n)=', inputFileContents.find('\n') )
     #print( inputFileContents[ inputFileContents.find('\n') - 1 : inputFileContents.find('\n')] )
-    #print( inputFileContents[ inputFileContents.find('\n') - 1 : inputFileContents.find('\n')].encode('utf-8') )
+    #print( inputFileContents[ inputFileContents.find('\n') - 1 : inputFileContents.find('\n')].encode( 'utf-8' ) )
 
-    lineEndingSchema=None
-    lineEndings=None
-    index=inputFileContents.find('\n')
+    lineEndingSchema = None
+    lineEndings = None
+    index = inputFileContents.find( '\n' )
     #if no \n:
     if index == -1:
         # Then it can be either a single line, in which case the line ending schema does not really matter
         # or if there are a lot of \r, it can be an old macintosh file:
-        if inputFileContents.find('\r') != -1:
-            lineEndingSchema='macintosh'
-            lineEndings='\r'
+        if inputFileContents.find( '\r' ) != -1:
+            lineEndingSchema = 'macintosh'
+            lineEndings = '\r'
         else:
             # Single line. Does not really matter. Default to unix.
-            lineEndingSchema='unix'
-            lineEndings='\n'
+            lineEndingSchema = 'unix'
+            lineEndings = '\n'
     elif inputFileContents[ index - 1 : index ] == '\r':
-        lineEndingSchema='windows'
-        lineEndings='\r\n'
+        lineEndingSchema = 'windows'
+        lineEndings = '\r\n'
     else:
-        lineEndingSchema='unix'
-        lineEndings='\n'
+        lineEndingSchema = 'unix'
+        lineEndings = '\n'
 
     return ( lineEndingSchema, lineEndings )
 
