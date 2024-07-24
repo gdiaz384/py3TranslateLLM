@@ -12,7 +12,7 @@ License:
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 
 """
-__version__ = '2024.07.21 alpha'
+__version__ = '2024.07.24 alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -80,7 +80,7 @@ booleanValuesTrueByDefault = [ 'cache', 'contextHistory', 'contextHistoryReset',
 booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'overrideWithSpreadsheet', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
 
 translationEnginesAvailable = 'cacheOnly, koboldcpp, py3translationserver, sugoi, deepl_api_free, deepl_api_pro, deepl_web, pykakasi, cutlet'
-usageHelp = ' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -te KoboldCpp -f myInputFile.ks \n Translation Engines: ' + translationEnginesAvailable + '.'
+usageHelp = ' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -te KoboldCpp -f myInputFile.ks.xlsx \n Translation Engines: ' + translationEnginesAvailable + '.'
 
 
 # import various libraries that py3TranslateLLM depends on.
@@ -91,15 +91,14 @@ import os, os.path                        # Extract extension from filename, and
 import pathlib                               # Works.   #dir(pathlib) does list 'Path', so just always use as pathlib.Path Constructor is pathlib.Path(mystring). Remember to convert it back to a string if printing it out.
 import sys                                    # End program on fail condition.
 import io                                      # Manipulate files (open/read/write/close).
-import random                              # Used to get a random number. Used when writing out cache to write it to a temporary file.
-#from io import IOBase                 # Test if variable is a file object (an "IOBase" object).
+import random                              # Used to get a random number. Used when writing out cache and sceneSummaryCache to a temporary file.
 #import datetime                           # Used to get current date and time.
 import time                                   # Used to write out cache no more than once every 300s and also limit writes to mySpreadsheet.backup.xlsx .
 
-# Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes. # Update: Maybe.
+# Technically, these two are optional for parseOnly. To support or not support such a thing... probably yes. # Update: Maybe. # Update removed parseOnly. Added --testRun functionality as a replacement.
 #from collections import deque  # Used to hold rolling history of translated items to use as context for new translations.
-#import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
-#import queue                               # collections.deque is probably better but it lacks a lot of the methods, like full/empty booleans, that make queue convenient. Just give up and use lists instead.
+import collections                         # Newer syntax. For collections.deque. Used to hold rolling history of translated items to use as context for new translations.
+#import queue                               # collections.deque is probably better but it lacks a lot of the methods, like full/empty booleans, that make queue convenient. Just give up and use lists instead. This needs to be changed to a superset of deque or something. Maybe a custom data structure based on lists?
 import hashlib                              # Allow calculating the sha1 hash for batches of entries when using the experimental sceneSummary feature.
 
 import requests                            # Do basic http stuff, like submitting post/get requests to APIs. Must be installed using: 'pip install requests' # Update: Moved to functions.py # Update: Also imported here because it can be useful to parse exceptions (errors) when submitting entries for translation.
@@ -1123,20 +1122,12 @@ def backupCache( userInput=None, programSettings=None, force=False ):
         programSettings[ 'timeThatCacheWasLastSaved' ] = time.perf_counter()
 
 
-def getHashFromList( listOfStrings=None ):
-    # Calculate sha1 hash from listOfStrings.
-    tempString = ''
-    for entry in listOfStrings:
-        tempString = tempString + str( entry )
-    if len( tempString ) == 0:
-        print( 'Warning: Unable to calculate hash of empty list.' )
-        return None
-    return str( hashlib.sha1( tempString.encode( consoleEncoding ) ).hexdigest() )
-
-
-# rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary. Do not consider speaker data when calculating hash for rawEntries.
-# if hash is not None, then treat it as the valid hash to avoid calling getHashFromList() again.
-def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None, hash=None ):
+# hash was generated from a list of strings. Do not consider speaker data when calculating hash.
+# metadata is filename_startLineNumber_endLineNumberRaw as a string
+# summaryData is the actual summary.
+# TODO: if the data in the cell is already updated and matches the translation, then do not update it regardless of programSettings. Do not allow cacheWasUpdated to be set to True in that case.
+# TODO: Update this.
+def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, metadata=None, summaryData=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
     if programSettings[ 'cacheEnabled' ] == False:
         return None
@@ -1152,12 +1143,20 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=No
     # The +1 is to correct for the header in the spreadsheet which is removed from the data during processing.
     # Update: The +1 is not needed since it is based on currentRow which is already correct.
 
-    # Calculate sha1 hash from rawEntries.
-    if hash == None:
-        hash = getHashFromList( rawEntries )
-
     # tempSearchResult can be a row number (as a string) or None if the string was not found.
     tempSearchResult = programSettings[ 'sceneSummaryCache' ].searchCache( hash )
+
+
+    if tempSearchRow != None:
+        # If it was found, then check the current cell column + row to see if there is any data there.
+        tempSearchResult = programSettings[ 'sceneSummaryCache' ].getCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow ) )
+        if tempSearchResult != None:
+            return None
+        # else:
+            # Then the cell data is none even though there was an entry.
+    #elif tempSearchResult == None:
+        # Then it was not found. Need to ask the translation engine to generate it.
+
 
     # if rawEntries is not in the cache
     if tempSearchResult == None:
@@ -1201,6 +1200,7 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=No
 
 
 # Expects two strings.
+# TODO: if the data in the cell is already updated and matches the translation, then do not update it regardless of programSettings. Do not allow cacheWasUpdated to be set to True in that case.
 def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, translation=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
     if programSettings[ 'cacheEnabled' ] == False:
@@ -1269,24 +1269,25 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     speakerList = programSettings[ 'mainSpreadsheet' ].getColumn( 'B' )[ programSettings[ 'currentRow' ] -1 : programSettings[ 'currentRow' ] -1 + untranslatedListSize ]
 
     # Calculate sha1 hash from untranslatedList.
-    hash = getHashFromList( untranslatedList )
+    tempString = ''
+    for entry in untranslatedList:
+        tempString = tempString + str( entry )
+    if len( tempString ) == 0:
+        print( 'Warning: Unable to calculate hash of empty list.' )
+        return None
+    # It makes sense to hardcode utf-8 here because then the hash does not change even if the user changes their consoleEncoding later. This makes sceneSummaryCache.xlsx more portable and avoids creating strange dependencies between unrelated sets of data.
+    hash = str( hashlib.sha1( tempString.encode( 'utf-8' ) ).hexdigest() )
 
-    # tempSearchRow can be a row number (as a string) or None if the string was not found.
-    tempSearchRow = programSettings[ 'sceneSummaryCache' ].searchCache( hash )
+    # Check to see if it is already in cache.
+    # tempCellData can be a string or None if the string was not found.
+    tempCellData = getCellValueFromSceneSummaryCache( hash )
 
-    if tempSearchRow != None:
-        # If it was found, then check the current cell column + row to see if there is any data there.
-        tempSearchResult = programSettings[ 'sceneSummaryCache' ].getCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow ) )
-        if tempSearchResult != None:
-            return None
-        # else:
-            # Then the cell data is none even though there was an entry.
-    #elif tempSearchResult == None:
-        # Then it was not found. Need to ask the translation engine to generate it.
+    if isinstance( tempCellData, str ) == True:
+        return tempCellData
 
+    # Otherwise, need to generate it.
     settings = userInput.copy()
     settings[ 'speakerList' ] = speakerList
-    settings[ 'sceneSummaryPrompt' ] = userInput[ 'sceneSummaryFileContents' ]
     # Memory is not sent here since that was already sent to the translation engine when creating it.
 
     # Summary needs its own prompt and has its own translationEngine function call. Unlke the other functions, it also returns a summary as a string.
@@ -1304,13 +1305,29 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     # rawEntries is a list of strings, metadata is filename_startLineNumber_endLineNumberRaw as a string, summaryData is the actual summary.
     #def updateSceneSummaryCache( userInput=None, programSettings=None, rawEntries=None, metadata=None, summaryData=None ):
     metadata = userInput[ 'fileToTranslateFileNameWithoutPath' ] + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] ) + defaultMetadataDelimiter + str( programSettings[ 'currentRow' ] + untranslatedListSize )
-    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, rawEntries=untranslatedEntriesColumnFull[ i : i + batchSizeLimit ], metadata=metadata, summaryData=sceneSummary )
-
-
+    updateSceneSummaryCache( userInput=userInput, programSettings=programSettings, hash=hash, metadata=metadata, summaryData=sceneSummary )
 
     return None
 
 
+# Due to cacheAnyMatch, this logic is surprisingly complicated, so split it off into its own function.
+def getCellValueFromSceneSummaryCache( userInput=None, programSettings=None, searchString=None ):
+    consoleEncoding = userInput[ 'consoleEncoding' ]
+    if ( programSettings[ 'cacheEnabled' ] == False ) or ( programSettings[ 'sceneSummaryEnabled' ] == False ):
+        return None
+
+    # This will return None of the rowNumber where the entry was found in the cache.
+    rowNumber = programSettings[ 'sceneSummaryCache' ].searchCache( searchString )
+    if rowNumber == None:
+        return None
+
+    cellData = programSettings[ 'sceneSummaryCache' ].getCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( rowNumber ) )
+    #TODO: Add logic here to consider cacheAnyMatch.
+
+    return cellData
+
+
+# Due to cacheAnyMatch, this logic is surprisingly complicated, so split it off into its own function.
 def getCellValueFromCache( userInput=None, programSettings=None, searchString=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
     if programSettings[ 'cacheEnabled' ] == False:
@@ -1582,11 +1599,14 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
     #elif programSettings[ 'batchModeEnabled' ] != True:
     else:
-       # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength == 0 then it was already disabled,so check for that. contextHistoryMaxLength is always an integer.
+        # if the translation engine supports history, then initalize contextHistory up to the length specified by contextHistoryMaxLength. If contextHistoryMaxLength == 0 then it was already disabled,so check for that. contextHistoryMaxLength is always an integer.
+        # https://docs.python.org/3.7/library/collections.html#collections.deque
+        # queue vs deque: queue has myQueue.full() to check if it is full or not, but deque has myQueue.popleft() which is ideal here. len(myQueue) == contextHistoryMaxLength can be used with deque as a less convenient alternative to myQueue.full().
         #contextHistory is formatted as:
         #contextHistory = [ ( untranslatedString1, translatedString2, speaker ), ( uString1, tString2, None ), ( uString1, tString2, speaker ) ]
         if userInput[ 'contextHistoryEnabled' ] == True:
-            contextHistory = []
+            #contextHistory = []
+            contextHistory = collections.deque()
         else:
             contextHistory = None
 
@@ -1642,7 +1662,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                             # Remove only the oldest entry.
                             # Only for this feature to work correctly, contextHistory should be changed back to a queue since list.pop is an O(n) operation. In queue's it is O(1). Queue is not thread safe which intereferes with most implementation types of userInput[ 'timout' ]. TODO: Update this appropriately. Somehow.
                             # https://www.w3schools.com/python/ref_list_pop.asp
-                            contextHistory.pop( 0 )
+                            contextHistory.popleft()
                     # ( untranslatedString1, translatedString2, speaker )
                     contextHistory.append( ( untranslatedEntry, tempList[ 3 ], tempList[1] ) )
 
@@ -1682,7 +1702,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                         # Remove only the oldest entry.
                         # Only for this feature to work correctly, contextHistory should be changed back to a queue since list.pop is an O(n) operation. In queue's it is O(1). Queue is not thread safe which intereferes with most implementation types of userInput[ 'timout' ]. TODO: Update this appropriately. Somehow.
                         # https://www.w3schools.com/python/ref_list_pop.asp
-                        contextHistory.pop( 0 )
+                        contextHistory.popleft()
                 # ( untranslatedString1, translatedString2, speaker )
                 contextHistory.append( ( untranslatedEntry, translatedEntry, tempSpeakerName ) )
 
@@ -1722,8 +1742,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # Update cache here.
             # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
             if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
-                if postTranslatedList[ postTranslatedListCounter ] != None:
-                    updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=entry[ 0 ], translation=postTranslatedList[ postTranslatedListCounter ] )
+                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=entry[ 0 ], translation=postTranslatedList[ postTranslatedListCounter ] )
 
             currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow + counter )
             # then write translations to mainSpreadsheet cell.
@@ -1734,8 +1753,6 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             postTranslatedListCounter += 1
 
     #currentRow = programSettings[ 'currentRow' ]
-
-
 
 
 # Implement KoboldAPI first, then DeepL.
@@ -1810,6 +1827,8 @@ def main( userInput=None ):
         settingsDictionary[ 'prompt' ] = userInput[ 'promptFileContents' ]
         if userInput[ 'memoryFileName' ] != None:
             settingsDictionary[ 'memory' ] = userInput[ 'memoryFileContents' ]
+        if userInput[ 'sceneSummaryFileContents' ] != None:
+            settingsDictionary[ 'sceneSummaryPrompt' ] = userInput[ 'sceneSummaryFileContents' ]
 
         programSettings[ 'translationEngine' ] = koboldCppEngine.KoboldCppEngine( sourceLanguage=userInput[ 'sourceLanguageFullRow' ], targetLanguage=userInput[ 'targetLanguageFullRow' ], characterDictionary=userInput[ 'characterNamesDictionary' ], settings=settingsDictionary )
 

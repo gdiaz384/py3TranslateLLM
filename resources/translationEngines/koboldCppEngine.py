@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__ = '2024.07.18'
+__version__ = '2024.07.24'
 
 #set defaults
 #printStuff = True
@@ -46,6 +46,9 @@ stopSequenceList=[
 'Translation notes:',
 'Translation note:',
 'Note:',
+]
+stopSequenceListForSceneSummary=[
+'[',
 ]
 
 # For 'chat' models, these are sequences that mark user input and the start of the model's output. 
@@ -162,13 +165,13 @@ class KoboldCppEngine:
 
             # if the translation has an underscore _, then truncate the result.
             if rawTranslatedText.find('_') != -1:
-                rawTranslatedText=rawTranslatedText.partition('_')[0]
+                rawTranslatedText = rawTranslatedText.partition( '_' )[ 0 ]
 
             # if the translation has ( ) but the source does not, then truncate the result.
             if ( rawTranslatedText.find('(') != -1 ): #and ( rawTranslatedText.find(')') != -1 ) #sometimes the ending ) gets cut off by a stop_sequence token.
                 if ( untranslatedText.find( '(' ) == -1 ) and ( untranslatedText.find( '（' ) == -1 ):
-                    index=rawTranslatedText.rfind( '(' )
-                    rawTranslatedText=rawTranslatedText[ :index ].strip()
+                    index = rawTranslatedText.rfind( '(' )
+                    rawTranslatedText = rawTranslatedText[ : index ].strip()
 
             # if the translation has exactly two double quotes on the edges but the source does not, then remove them.
             if ( rawTranslatedText[ 0:1 ] == '"' ) and ( rawTranslatedText[ -1: ] == '"' ) and ( rawTranslatedText.count( '"' ) == 2 ):
@@ -270,6 +273,16 @@ class KoboldCppEngine:
             self.memory = settings[ 'memory' ]
         else:
             self.memory = None
+
+        # Should sceneSummaryPrompt be added here?
+        if 'sceneSummaryPrompt' in settings:
+            self.sceneSummaryPrompt = settings[ 'sceneSummaryPrompt' ]
+            if self.sceneSummaryPrompt.find( r'{sourceLanguage}' ) != -1:
+                self.sceneSummaryPrompt = self.sceneSummaryPrompt.replace( r'{sourceLanguage}', self.sourceLanguage )
+            if self.sceneSummaryPrompt.find( r'{targetLanguage}' ) != -1:
+                self.sceneSummaryPrompt = self.sceneSummaryPrompt.replace( r'{targetLanguage}', self.targetLanguage )
+        else:
+            self.sceneSummaryPrompt = None
 
         if 'instructionFormat' in settings:
             self.instructionFormat = settings[ 'instructionFormat' ]
@@ -382,8 +395,7 @@ class KoboldCppEngine:
         #return translatedList
 
 
-    # This expects a string to translate. contextHistory should be a list of untranslated and translated pairs in sublists.
-    # contextHistory= [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
+    # This expects a string to translate.
     def translate( self, untranslatedString, settings=None ):
         #global debug
         #global verbose
@@ -428,7 +440,10 @@ class KoboldCppEngine:
         # { 'results' : [ {'text': '\n\nBien, gracias.'} ] }
 
         # Build prompt.
-        # First build history string from history list.
+        # First build history string from history list. contextHistory is a collections.queue that has lists of untranslated and translated pairs in tuples for each entry.
+        # contextHistory= [  ( untranslatedString1, translatedString2, speaker ), ( uString1, tString2, None ), ( uString1, tString2, speaker )  ]
+        # Hummmm. Maybe update the code below with buildStringFromHistory() to hide the underlying complicated logic and maintain clarity here?
+        #def buildStringFromHistory( self, contextHistory=None ):
         if contextHistory != None:
             tempHistory = ''
             for entry in contextHistory:
@@ -457,7 +472,7 @@ class KoboldCppEngine:
         else:
             tempPrompt = self.prompt
             if verbose == True:
-                print( r'Warning: Unable to process history. Make sure {history} is in the prompt.' )
+                print( r'Warning: Unable to insert history. To use contextHistory, make sure {history} is in the prompt.' )
 
 #        if contextHistory == None:
 #            tempPrompt=self.prompt
@@ -483,18 +498,18 @@ class KoboldCppEngine:
         # Build request.
         requestDictionary={}
 
+        # None of these values should be hardcoded. If anything, they should be read from the .ini.
         requestDictionary[ 'max_length' ] = 150 # The number of tokens to generate. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
         requestDictionary[ 'max_context_length' ] = self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
+        requestDictionary[ 'trim_stop' ] = True
+        requestDictionary[ 'stop_sequence' ] = stopSequenceList
 
         if self.memory != None:
             requestDictionary[ 'memory' ] = self.memory
         requestDictionary[ 'prompt' ] = tempPrompt # The prompt.
 
-        requestDictionary[ 'trim_stop' ] = True
-        requestDictionary[ 'stop_sequence' ] = stopSequenceList
-
         # Was debug code for qwen. Did not work out.
-        # TODO: Add default values for temperature, <=0.7, and reptition penalties. Update: This is very model specific, so create some defaults and only add them for recognized models.
+        # TODO: Add default values for temperature, <=0.7, and reptition penalties. Update: This is very model specific, so create some defaults and only add them for recognized models. They also need to be user configurable.
         if ( self.instructionFormat == 'chat' ) and ( debug == True ):
             requestDictionary[ 'n' ] = 1
             requestDictionary[ 'temperature' ] = 0.7            
@@ -542,9 +557,9 @@ class KoboldCppEngine:
 
         if returnedRequest.status_code != 200:
             print( ( 'Unable to translate entry: \'' + str(untranslatedString) + '\'' ).encode( consoleEncoding ) )
-            print( 'Status code:', returnedRequest.status_code )
-            print( ( 'Headers:', returnedRequest.headers ).encode( consoleEncoding ) )
-            print( ( 'Body:', returnedRequest.content ).encode( consoleEncoding ) )
+            print( 'Status code:' + str( returnedRequest.status_code ) )
+            print( ( 'Headers:' + str( returnedRequest.headers ) ).encode( consoleEncoding ) )
+            print( ( 'Body:' + str( returnedRequest.content ) ).encode( consoleEncoding ) )
             return None
 
         # Extract the translated text from the request.
@@ -565,86 +580,110 @@ class KoboldCppEngine:
 
 
     def getSceneSummary(self, untranslatedList, settings=None):
-        prompt = settings[ 'sceneSummaryPrompt' ]
+        assert( self.sceneSummaryPrompt != None )
 
         # Update memory to not include {sceneSummary}.
         # When generating the sceneSummary, it will obvious not be present
-        if self.memory != None:
-            tempMemory = self.memory.replace( '{sceneSummary}', '' )
+        if self.memory != None
+            if self.memory.find( '{sceneSummary}' ) != -1:
+                tempMemory = self.memory.replace( '{sceneSummary}', '' )
+            else:
+                tempMemory = None
         else:
             tempMemory = None
 
-        if 'characterList' in settings:
-            characterList = settings[ 'characterList' ]
-            assert( len( untranslatedList ) == len( characterList )
+        if 'speakerList' in settings:
+            speakerList = settings[ 'speakerList' ]
+            assert( len( untranslatedList ) == len( speakerList )
         else:
-            characterList = None
-
-
+            speakerList = None
 
         tempString = ''
-        for entry in untranslatedList:
-            tempString = tempString + entry + '\n'
-
-        a
-
-
-    # Hummmmm.
-    def buildStringFromList( self, inputList=None, speakerList=None ):
-    # Build prompt.
-    # First build history string from history list.
-    if contextHistory != None:
-    tempString = self._instructModelStartSequence
-    for counter,entry in enumerate( inputList ):
-        if self.instructionFormat == 'instruct':
+        for counter,entry in enumerate( inputList ):
             if speakerList == None:
-                tempString = tempString + entry + '\n'
+                tempString = tempString + preProcessText( entry ) + '\n'
             else:
-                tempString = tempString + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-#tempString=self._instructModelEndSequence
+                tempString = tempString + speakerList[ counter ] + ': ' + preProcessText( entry ) + '\n'
 
-        elif self.instructionFormat == 'chat':
-            if speakerList == None:
-                tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
-            else:
-                tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-        elif self.instructionFormat == 'autocomplete'
-            #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
-            pass
-        else:
-            print( ( 'Warning: Unrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
-            break
+        # Build request.
+        requestDictionary={}
+        requestDictionary[ 'max_length' ] = 500 # The number of tokens to generate as a maximum. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
+        requestDictionary[ 'max_context_length' ] = self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
+        requestDictionary[ 'trim_stop' ] = True
+        requestDictionary[ 'stop_sequence' ] = stopSequenceListForSceneSummary
 
-    return tempString
+       if tempMemory != None:
+            requestDictionary[ 'memory' ] = tempMemory
+        # This probably should not be hard coded.
+        requestDictionary[ 'prompt' ] = self.sceneSummaryPrompt.replace( '{scene}', tempString ) # The prompt.
+
+        returnedRequest = requests.post( self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=( 10, self.timeout ) )
+
+        if returnedRequest.status_code != 200:
+            print( ( 'Unable to generate summary from following prompt: \'' + str( requestDictionary[ 'prompt' ] ) + '\'' ).encode( consoleEncoding ) )
+            print( 'Status code:' + str( returnedRequest.status_code ) )
+            print( ( 'Headers:' + str( returnedRequest.headers ) ).encode( consoleEncoding ) )
+            print( ( 'Body:' + str( returnedRequest.content ) ).encode( consoleEncoding ) )
+            return None
+
+        summaryText = returnedRequest.json()[ 'results' ][ 0 ][ 'text' ].strip()
+
+        #if verbose == True:
+            #print( summaryText.encode( consoleEncoding ) )
+
+        return summaryText
 
 
     # contextHistory should be a list of untranslated and translated pairs in sublists.
     # contextHistory= [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
     def buildStringFromHistory( self, contextHistory=None ):
-    if contextHistory == None:
-        return None
+        if contextHistory == None:
+            return None
 
-    tempString = ''
-    for counter,entry in enumerate( contextHistory ):
-        if self.instructionFormat == 'instruct':
-            if entry[ 2 ] == None:
-                tempString = tempString + self._instructModelStartSequence + entry[ 0 ] + self._instructModelEndSequence + entry[ 1 ] + '\n'
+        tempString = ''
+        for counter,entry in enumerate( contextHistory ):
+            if self.instructionFormat == 'instruct':
+                if entry[ 2 ] == None:
+                    tempString = tempString + self._instructModelStartSequence + entry[ 0 ] + self._instructModelEndSequence + entry[ 1 ] + '\n'
+                else:
+                    tempString = tempString + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+            elif self.instructionFormat == 'chat':
+                if entry[ 2 ] == None:
+                    tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
+                else:
+                    tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+            elif self.instructionFormat == 'autocomplete'
+                #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
+                pass
             else:
-                tempString = tempString + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-        elif self.instructionFormat == 'chat':
-            if entry[ 2 ] == None:
-                tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
+                print( ( 'Warning: Unrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
+                break
+
+        return tempString
+
+"""
+
+
+            if self.instructionFormat == 'instruct':
+                if speakerList == None:
+                    tempString = tempString + entry + '\n'
+                else:
+                    tempString = tempString + self._instructModelStartSequence + entry[ 2 ] + ': ' + entry[ 0 ] + self._instructModelEndSequence + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+    #tempString=self._instructModelEndSequence
+
+            elif self.instructionFormat == 'chat':
+                if speakerList == None:
+                    tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
+                else:
+                    tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
+            elif self.instructionFormat == 'autocomplete'
+                #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
+                pass
             else:
-                tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-        elif self.instructionFormat == 'autocomplete'
-            #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
-            pass
-        else:
-            print( ( 'Warning: Unrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
-            break
+                print( ( 'Warning: Unrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
+                break
 
-    return tempString
-
+"""
 
 """
 Usage and concept art:

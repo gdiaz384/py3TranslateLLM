@@ -21,7 +21,7 @@ Notes: Only functions that do not use module-wide variables and have return valu
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__ = '2024.07.05'
+__version__ = '2024.07.24'
 
 #set defaults
 #printStuff = True
@@ -42,16 +42,16 @@ defaultTimeout = 10
 inputErrorHandling = 'strict'
 #outputErrorHandling = 'namereplace'    # This gets updated dynamically later.
 
-translationEngines = 'parseOnly, koboldcpp, deepl_api_free, deepl_api_pro, deepl_web, py3translationserver, sugoi'
-usageHelp = '\n Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -mode KoboldCpp -f myInputFile.ks \n Translation Engines: '+ translationEngines + '.'
+translationEnginesAvailable = 'cacheOnly, koboldcpp, py3translationserver, sugoi, deepl_api_free, deepl_api_pro, deepl_web, pykakasi, cutlet'
+usageHelp = ' Usage: python py3TranslateLLM --help  Example: py3TranslateLLM -te KoboldCpp -f myInputFile.ks.xlsx \n Translation Engines: ' + translationEnginesAvailable + '.'
 
 
 #These must be here or the library will crash even if these modules have already been imported by main program.
 import sys                                   # End program on fail condition.
 import os, os.path                      # Extract extension from filename, and test if file exists.
 #import pathlib                            # For pathlib.Path Override file in file system with another and create subfolders. Sane path handling.
-#import requests                          # Check if internet exists. # Update: Changed to socket library instead, so this is not needed anymore.
-import socket
+import requests                          # Check if internet exists. # Update: Changed to socket library instead, so this is not needed anymore.
+#import socket
 #import io                                      # Manipulate files (open/read/write/close).
 import datetime                          # Used to get current date and time.
 import csv                                    # Read and write to csv files. Example: Read in 'resources/languageCodes.csv'

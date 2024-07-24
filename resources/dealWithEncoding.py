@@ -55,12 +55,12 @@ except:
 
 #Returns a string containing the encoding to use, relied on detectEncoding(filename) but code was merged down.
 #detectEncoding() is never really used, so it should probably just be deleted.
-def detectEncoding(myFileName):
+def detectEncoding( myFileName ):
     #import chardet
     detector = chardet.UniversalDetector()
-    with open(myFileName, 'rb') as openFile:
+    with open( myFileName, 'rb' ) as openFile:
         for line in openFile:
-            detector.feed(line)
+            detector.feed( line )
             if detector.done == True:
                 openFile.close()
                 break
@@ -120,7 +120,7 @@ def ofThisFile( myFileName, userInputForEncoding=None, fallbackEncoding=defaultT
         #So sometimes, like when detecting an ascii only file or a utf-8 file filled with only ascii, the chardet library will return with a confidence of 0.0 and the result will be None. When that happens, try to catch it and change the result from None to the default encoding. The assumption is that this also happens if the confidence value is below some threshold like <0.2 or <0.5.
         if temp == None:
             if ( printStuff == True ):# and ( debug == True ):
-                print( ( 'Warning: Unable to detect encoding of file \'' + myFileName + '\' with high confidence. Using the following fallback encoding:\''+fallbackEncoding+'\'' ).encode( consoleEncoding ) )
+                print( ( 'Warning: Unable to detect encoding of file \'' + myFileName + '\' with high confidence. Using the following fallback encoding:\'' + fallbackEncoding + '\'' ).encode( consoleEncoding ) )
             temp = fallbackEncoding
         else:
             if debug == True:
@@ -138,7 +138,7 @@ def ofThisFile( myFileName, userInputForEncoding=None, fallbackEncoding=defaultT
 
 # detectLineEndingsFromFile() detects the newline schema of input files based upon the first \n that occurs in the file, which is the same way Python internally detects them.
 # This returns ( 'windows', '\r\n' ) or ( 'unix', '\n' ) or ( 'macintosh', '\r' ) .
-# Linux uses unix \n line endings. macintosh \r refers to the very old line ending format used in PPC Macs. OS/X and Intel Macs and newer switched to \n which means most computers use \n .
+# Linux uses unix \n line endings. macintosh \r refers to the very old line ending format used in PPC Macs. OS/X Intel Macs and newer switched to \n which means most computers use \n .
 # The default output for single line input files is unix \n .
 def detectLineEndingsFromFile( fileNameWithPath, fileEncoding=defaultTextFileEncoding ):
     with open( fileNameWithPath, 'rt', encoding=fileEncoding, errors='ignore', newline='' ) as myFileHandle:
