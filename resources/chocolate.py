@@ -739,7 +739,7 @@ class Strawberry:
         if myString.strip() == '' :
             print( 'Warning: Cannot use searchCache to search for myString=empty string.' )
             return None
-        elif myString in self.index.keys():
+        elif myString in self.index.keys(): # The .keys() part is explicit, but even without that, that syntax only searches the keys of the dictionary.
             return self.index[ myString ]
         else:
             return None
