@@ -26,7 +26,7 @@ And provides interoperability for the following formats:
     - DeepL (Web hook).
     - Sugoi Offline Translator.
 - These file formats:
-    - Microsoft Excel 97/2000/XP (.xls).
+    - Microsoft Excel 97/2000/XP/2003 (.xls).
     - OpenDocument spreadsheet (.ods).
 - Generic OpenAI compatible web servers.
     - Example: https://github.com/vllm-project/vllm
@@ -49,7 +49,7 @@ Undetermined:
 - OpenAI's GPT. For now, consider:
     - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports OpenAI's LLM models like v3.5 Turbo, v4.0 Turbo.
 - py3TranslateLLM should (unofficially) work on older Python versions like 3.4.
-    - Older than 3.7 is tricky because dictionaries became ordered in 3.7 and the order might be important for cache.
+    - Older than 3.7 is tricky because dictionaries became ordered in 3.7 and the order might be important for cache, especially cache.rebuildCache().
     - Older than 3.4 might be tricky because:
         - `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4.
         - Same with `pip`.
@@ -74,7 +74,7 @@ Undetermined:
 
 ## Installation guide
 
-`Current version: 2024.07.24 alpha`
+`Current version: 2024.07.25 alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 

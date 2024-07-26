@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__ = '2024.07.24'
+__version__ = '2024.07.25'
 
 #set defaults
 #printStuff = True
@@ -403,21 +403,22 @@ class KoboldCppEngine:
 
         # Unpack some variables.
         if isinstance( settings, dict ) == True:
-            if speakerName in settings:
+            if 'speakerName' in settings:
                 speakerName = settings[ 'speakerName' ]
                 assert( isinstance( speakerName, str ) )
             else:
                 speakerName = None
 
-            if contextHistory in settings:
+            if 'contextHistory' in settings:
                 contextHistory = settings[ 'contextHistory' ]
-                assert( isinstance( contextHistory, list ) )
+                #assert( isinstance( contextHistory, list ) )
+                assert( contextHistory != None )
             else:
                 contextHistory = None
         else:
             settings = {}
-            speakerName = None:
-            contextHistory = None:
+            speakerName = None
+            contextHistory = None
 
 
         #Debug code.
@@ -457,7 +458,7 @@ class KoboldCppEngine:
                         tempHistory = tempHistory + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
                     else:
                         tempHistory = tempHistory + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-                elif self.instructionFormat == 'autocomplete'
+                elif self.instructionFormat == 'autocomplete':
                     #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
                     pass
                 else:
@@ -468,7 +469,7 @@ class KoboldCppEngine:
             if contextHistory != None:
                 tempPrompt = self.prompt.replace( r'{history}', tempHistory )
             else:
-                tempPrompt = self.prompt.replace( r'{history}', '' ).replace( '\n\n', '\n' )
+                tempPrompt = self.prompt.replace( r'{history}', '' ).replace( '\n\n', '\n' ).replace( '\n\n', '\n' )
         else:
             tempPrompt = self.prompt
             if verbose == True:
@@ -545,7 +546,7 @@ class KoboldCppEngine:
 
         if self._pastFirstTranslation == False:
             currentTimeout = self.timeout * defaultTimeoutMulitplierForFirstRun
-            print( ' timeoutForFirstTranslation=' + str( int( timeoutForFirstTranslation / 60 ) ) + ' minutes' )
+            print( ' currentTimeout=' + str( int( currentTimeout / 60 ) ) + ' minutes' )
         else:
             currentTimeout = self.timeout
 
@@ -576,6 +577,9 @@ class KoboldCppEngine:
         if verbose == True:
             print( ( 'postProcessedTranslatedText=' + translatedText ).encode( consoleEncoding ) )
 
+        if self._pastFirstTranslation == False:
+            self._pastFirstTranslation = True
+
         return translatedText
 
 
@@ -584,7 +588,7 @@ class KoboldCppEngine:
 
         # Update memory to not include {sceneSummary}.
         # When generating the sceneSummary, it will obvious not be present
-        if self.memory != None
+        if self.memory != None:
             if self.memory.find( '{sceneSummary}' ) != -1:
                 tempMemory = self.memory.replace( '{sceneSummary}', '' )
             else:
@@ -594,7 +598,7 @@ class KoboldCppEngine:
 
         if 'speakerList' in settings:
             speakerList = settings[ 'speakerList' ]
-            assert( len( untranslatedList ) == len( speakerList )
+            assert( len( untranslatedList ) == len( speakerList ) )
         else:
             speakerList = None
 
@@ -612,7 +616,7 @@ class KoboldCppEngine:
         requestDictionary[ 'trim_stop' ] = True
         requestDictionary[ 'stop_sequence' ] = stopSequenceListForSceneSummary
 
-       if tempMemory != None:
+        if tempMemory != None:
             requestDictionary[ 'memory' ] = tempMemory
         # This probably should not be hard coded.
         requestDictionary[ 'prompt' ] = self.sceneSummaryPrompt.replace( '{scene}', tempString ) # The prompt.
@@ -652,7 +656,7 @@ class KoboldCppEngine:
                     tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
                 else:
                     tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-            elif self.instructionFormat == 'autocomplete'
+            elif self.instructionFormat == 'autocomplete':
                 #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
                 pass
             else:
@@ -676,7 +680,7 @@ class KoboldCppEngine:
                     tempString = tempString + self._chatModelInputName + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 1 ] + '\n'
                 else:
                     tempString = tempString + self._chatModelInputName + ': ' + entry[ 2 ] + ': ' + entry[ 0 ] + '\n' + self._chatModelOutputName + ': ' + entry[ 2 ] + ': ' + entry[ 1 ] + '\n'
-            elif self.instructionFormat == 'autocomplete'
+            elif self.instructionFormat == 'autocomplete':
                 #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
                 pass
             else:

@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 """
-__version__ = '2024.07.21'
+__version__ = '2024.07.25'
 
 #set defaults
 #printStuff = True
@@ -428,7 +428,7 @@ class Strawberry:
             self.exportToXLS( outputFileNameWithPath )
         elif outputFileExtensionOnly == '.ods':
             self.exportToODS( outputFileNameWithPath )
-        if outputFileExtensionOnly == '.tsv':
+        elif outputFileExtensionOnly == '.tsv':
             self.exportToTSV( outputFileNameWithPath, fileEncoding=self.fileEncoding, csvDialect=self.csvDialect)
         elif ( outputFileExtensionOnly == '.txt' ) or ( outputFileExtensionOnly == '.text' ):
             self.exportToTextFile( outputFileNameWithPath, columnToExport=columnToExportForTextFiles, fileEncoding=self.fileEncoding )

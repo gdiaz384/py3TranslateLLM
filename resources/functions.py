@@ -21,7 +21,7 @@ Notes: Only functions that do not use module-wide variables and have return valu
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__ = '2024.07.24'
+__version__ = '2024.07.25'
 
 #set defaults
 #printStuff = True
@@ -103,10 +103,10 @@ def verifyThisFileExists( myFile, nameOfFileToOutputInCaseOfError=None ):
         nameOfFileToOutputInCaseOfError = myFile
     # Check if name of file was never set.
     if myFile == None:
-        print( ( 'Error: Please specify a valid file for: ' + str( nameOfFileToOutputInCaseOfError ) + usageHelp ).encode( consoleEncoding ) )
+        print( ( 'Error: Please specify a valid file for: ' + str( nameOfFileToOutputInCaseOfError ) ).encode( consoleEncoding ) )
         sys.exit( 1 )
     if os.path.isfile( myFile ) != True:
-        print( ( 'Error: Unable to find file \'' + str( nameOfFileToOutputInCaseOfError ) + '\' ' + usageHelp ).encode( consoleEncoding ) )
+        print( ( 'Error: Unable to find file \'' + str( nameOfFileToOutputInCaseOfError ) + '\' ' ).encode( consoleEncoding ) )
         sys.exit( 1 )
 
 # Errors out if myFolder does not exist.
@@ -114,10 +114,10 @@ def verifyThisFolderExists( myFolder, nameOfFileToOutputInCaseOfError=None ):
     if nameOfFileToOutputInCaseOfError == None:
         nameOfFileToOutputInCaseOfError = myFolder
     if myFolder == None:
-        print( ( 'Error: Please specify a valid folder for: ' + str( nameOfFileToOutputInCaseOfError ) + usageHelp ).encode( consoleEncoding ) )
+        print( ( 'Error: Please specify a valid folder for: ' + str( nameOfFileToOutputInCaseOfError ) ).encode( consoleEncoding ) )
         sys.exit( 1 )
     if os.path.isdir( myFolder ) != True:
-        print( ( 'Error: Unable to find folder \'' + str( nameOfFileToOutputInCaseOfError ) + '\' ' + usageHelp ).encode( consoleEncoding ) )
+        print( ( 'Error: Unable to find folder \'' + str( nameOfFileToOutputInCaseOfError ) + '\' ' ).encode( consoleEncoding ) )
         sys.exit( 1 )
 
 #Usage:
