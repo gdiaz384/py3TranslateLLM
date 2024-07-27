@@ -59,7 +59,7 @@ defaultAssignmentOperatorInSettingsFile = '='
 defaultMetadataDelimiter = '_'
 defaultScriptSettingsFileExtension = '.ini'
 # if a column begins with one of these entries, then it will be assumed to be invalid for cacheAnyMatch. Case insensitive.
-defaultBlacklistedHeadersForCache = [ 'rawText', 'speaker', 'metadata' ] #'cache', 'cachedEntry', 'cache entry'
+defaultBlacklistedHeadersForCache = [ 'rawText', 'speaker', 'metadata', 'hashedText' ] #'cache', 'cachedEntry', 'cache entry'
 
 # Currently, these are relative to py3TranslateLLM.py, but it might also make sense to move them either relative to the target or to a system folder intended for holding program data.
 # There is no gurantee that being relative to the target is a sane thing to do since that depends upon runtime usage, and centralized backups also make sense. Leaving it as-is makes sense too as long as py3TranslateLLM is not being used as a library. If it is not being used as a library, then a centralized location under $HOME or %localappdata% makes more sense than relative to py3TranslateLLM.py. Same with the default location for the cache file.
@@ -68,12 +68,13 @@ defaultBlacklistedHeadersForCache = [ 'rawText', 'speaker', 'metadata' ] #'cache
 defaultBackupsFolder = 'backups'
 defaultExportExtension = '.xlsx'
 defaultCacheFileLocation = defaultBackupsFolder + '/cache' + defaultExportExtension
-# Cache is always saved at the end of an operation if there are any new entries, so this is only used for translations that take a very long time.
-#defaultMinimumSaveIntervalForCache = 60 # For debugging.
-defaultMinimumSaveIntervalForCache = 300 # In seconds. 240 is once every four minutes which means that, at most, only four minutes worth of processing time should be lost due to a program or translation engine error. 300 if 5 min.
-defaultMinimumSaveIntervalForMainSpreadsheet = 540 #240 # In seconds. 240 is every 4 minutes. 540 is every 9 minutes
 defaultSceneSummaryCacheLocation = defaultBackupsFolder + '/sceneSummaryCache' + defaultExportExtension
-defaultMinimumSaveIntervalForSceneSummaryCache = 540
+
+# cache and mainSpreadsheet are always saved at the end of an operation, so these timers are only used for translations that take a very long time. cache will not be saved if there were not any new entries added to it.
+defaultMinimumSaveIntervalForMainSpreadsheet = 540 #240 # In seconds. 240 is every 4 minutes. 540 is every 9 minutes
+#defaultMinimumSaveIntervalForCache = 60 # For debugging.
+defaultMinimumSaveIntervalForCache = 300 # In seconds. 300 if 5 min. 240 is once every four minutes which means that, at most, only four minutes worth of processing time should be lost due to a program or translation engine error.
+defaultMinimumSaveIntervalForSceneSummaryCache = 300 # In seconds. 540 is 9 minutes.
 
 # These two lists do not determine if the values are True/ False by default. Use action='store_true' and 'store_false' in the CLI options to toggle defaults and then update these two lists. These lists ensure the values are toggled correctly if a different than default setting is specified in program.ini when merging the CLI options with the options from the .ini .
 booleanValuesTrueByDefault = [ 'cache', 'contextHistory', 'contextHistoryReset', 'batches', 'backups']
@@ -1155,8 +1156,7 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
         # addToCache returns the row as a number, where it was added.
         tempSearchRow = programSettings[ 'sceneSummaryCache' ].addToCache( hash )
         programSettings[ 'sceneSummaryCache' ].setCellValue( 'B' + str( tempSearchRow ), metadata ) # Hardcode metadata into the second column.
-        programSettings[ 'sceneSummaryCache' ].setCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchResult ) , summaryData )
-        #tempSearchResult = programSettings[ 'sceneSummaryCache' ].getCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow ) )
+        programSettings[ 'sceneSummaryCache' ].setCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow ) , summaryData )
         if programSettings[ 'sceneSummaryCacheWasUpdated' ] == False:
             programSettings[ 'sceneSummaryCacheWasUpdated' ] = True
     else:
@@ -1167,7 +1167,6 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
         if programSettings[ 'sceneSummaryCache' ].getCellValue( currentCellAddress ) == None:
             # then replace the value.
             programSettings[ 'sceneSummaryCache' ].setCellValue( currentCellAddress, summaryData )
-            #programSettings[ 'sceneSummaryCache' ].setCellValue( 'B' + str( tempSearchResult ) , metadata ) # Hardcode metadata into the second column.
             if programSettings[ 'sceneSummaryCacheWasUpdated' ] == False:
                 programSettings[ 'sceneSummaryCacheWasUpdated' ] = True
         # elif the cell's value is not empty
@@ -1176,13 +1175,12 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
             if ( userInput[ 'reTranslate' ] == True ) and ( programSettings[ 'sceneSummaryCache' ].getCellValue( currentCellAddress ) != summaryData ):
                 #print( 'Updated sceneSummaryCache')
                 programSettings[ 'sceneSummaryCache' ].setCellValue( currentCellAddress, summaryData )
-                programSettings[ 'sceneSummaryCache' ].setCellValue( 'B' + str( tempSearchResult ) , metadata ) # Hardcode metadata into the second column.
                 if programSettings[ 'sceneSummaryCacheWasUpdated' ] == False:
                     programSettings[ 'sceneSummaryCacheWasUpdated' ] = True
 
     if userInput[ 'debug' ] == True:
         #sceneSummaryCache.printAllTheThings()
-        print( ( 'Updated sceneSummaryCache at row ', tempSearchResult ).encode( consoleEncoding )  )
+        print( ( 'Updated sceneSummaryCache at row ' + str(tempSearchRow) ).encode( consoleEncoding )  )
 
     backupSceneSummaryCache( userInput=userInput, programSettings=programSettings )
 
@@ -1212,25 +1210,25 @@ def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, t
     if userInput[ 'readOnlyCache' ] == True:
         return None
 
-    # tempSearchResult can be a row number (as a string) or None if the string was not found.
+    # tempSearchRow can be a row number (as a string) or None if the string was not found.
     # Technically, searchCache is unnecessary here and makes the program slower because cache.addToCache will always cache.searchCache() internally add the data if it is ineeded. Then addToCache will return the correct row number. However, splitting this into 2 discrete steps increases readability. TODO: Optimize this.
-    tempSearchResult = programSettings[ 'cache' ].searchCache( untranslatedEntry )
+    tempSearchRow = programSettings[ 'cache' ].searchCache( untranslatedEntry )
 
     # if the untranslatedEntry is not in the cache
-    if tempSearchResult == None:
+    if tempSearchRow == None:
         # then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
         # This returns the row number of the found entry as a string.
-        tempSearchResult = programSettings[ 'cache' ].addToCache( untranslatedEntry )
-        programSettings[ 'cache' ].setCellValue( programSettings[ 'currentCacheColumn' ] + str( tempSearchResult ) , translation )
+        tempSearchRow = programSettings[ 'cache' ].addToCache( untranslatedEntry )
+        programSettings[ 'cache' ].setCellValue( programSettings[ 'currentCacheColumn' ] + str( tempSearchRow ) , translation )
         # The idea here is to limit the number of times cacheWasUpdated will be set to True which can be tens of thousands of times in a very short span of time which could potentially trigger a memory write out operation that many times depending upon how sub-programmer level caching is handled. Since CPUs are fast, and CPUs have cache for frequently used variables, this should be faster than writing out to main memory. Whether or not this optimization actually makes sense depends a lot on hardware which makes this questionabe to implement.
         if programSettings[ 'cacheWasUpdated' ] == False:
             programSettings[ 'cacheWasUpdated' ] = True
 
     # elif the untranslatedEntry is in the cache
-    # elif tempSearchResult != None:
+    # elif tempSearchRow != None:
     else:
-        # then get the appropriate cell, the currentCacheColumn + tempSearchResult.
-        currentCellAddress = programSettings[ 'currentCacheColumn' ] + str( tempSearchResult )
+        # then get the appropriate cell, the currentCacheColumn + tempSearchRow.
+        currentCellAddress = programSettings[ 'currentCacheColumn' ] + str( tempSearchRow )
 
         # if the cell's value is None
         if programSettings[ 'cache' ].getCellValue( currentCellAddress ) == None:
@@ -1251,7 +1249,7 @@ def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, t
 
     if userInput[ 'debug' ] == True:
         #programSettings[ 'cache' ].printAllTheThings()
-        print( ( 'Updated cache at row ', tempSearchResult ).encode(consoleEncoding)  )
+        print( ( 'Updated cache at row ', tempSearchRow ).encode(consoleEncoding)  )
 
     #print( 'userInput=', userInput )
 
@@ -1294,7 +1292,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
 
     # Check to see if it is already in cache.
     # tempCellData can be a string or None if the string was not found.
-    tempCellData = getCellValueFromSceneSummaryCache( hash )
+    tempCellData = getCellValueFromSceneSummaryCache( userInput=userInput, programSettings=programSettings, searchString=hash )
 
     if isinstance( tempCellData, str ) == True:
         return tempCellData
@@ -1326,7 +1324,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
 # Due to cacheAnyMatch, this logic is surprisingly complicated, so split it off into its own function.
 def getCellValueFromSceneSummaryCache( userInput=None, programSettings=None, searchString=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    if ( userInput[ 'cacheEnabled' ] == False ) or ( programSettings[ 'sceneSummaryEnabled' ] == False ):
+    if ( userInput[ 'cacheEnabled' ] == False ) or ( userInput[ 'sceneSummaryEnabled' ] == False ):
         return None
 
     # This will return None of the rowNumber where the entry was found in the cache.
@@ -1859,7 +1857,7 @@ def main( userInput=None ):
 
         # Add unique settings for this translation engine.
         settingsDictionary[ 'prompt' ] = userInput[ 'promptFileContents' ]
-        if userInput[ 'memoryFileName' ] != None:
+        if userInput[ 'memoryFileContents' ] != None:
             settingsDictionary[ 'memory' ] = userInput[ 'memoryFileContents' ]
         if userInput[ 'sceneSummaryFileContents' ] != None:
             settingsDictionary[ 'sceneSummaryPrompt' ] = userInput[ 'sceneSummaryFileContents' ]
@@ -2052,6 +2050,18 @@ def main( userInput=None ):
             if userInput[ 'verbose' ] == True:
                 print( ( 'sceneSummaryCache is available at: ' + str( userInput[ 'sceneSummaryCacheFileName' ] ) ).encode( consoleEncoding ) )
 
+            if userInput[ 'rebuildCache' ] == False:
+                # Then error out if there is an error initalizing the index.
+                programSettings[ 'sceneSummaryCache' ].initializeCache()
+            # elif rebuildCache == True:
+            else:
+                # Do a try: except: block that includes rebuilding it.
+                try:
+                    programSettings[ 'sceneSummaryCache' ].initializeCache()
+                except:
+                    programSettings[ 'sceneSummaryCache' ].rebuildCache()
+                    programSettings[ 'sceneSummaryCache' ].initializeCache()
+
             #Set currentSceneSummaryCacheColumn.
             programSettings[ 'currentSceneSummaryCacheColumn' ] = programSettings[ 'sceneSummaryCache' ].searchHeaders( programSettings[ 'translationEngine' ].model )
             if programSettings[ 'currentSceneSummaryCacheColumn' ] == None:
@@ -2177,6 +2187,7 @@ def main( userInput=None ):
         #if userInput[ 'sceneSummaryEnabled' ] != None:
         else:
             # This returns either None or a string.
+            print( ( 'Generating sceneSummary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ' ' + str( programSettings[ 'currentRow'] ) + '-' + str( programSettings[ 'currentRow'] + currentBatchSize ) + ' ...' ).encode(consoleEncoding) )
             sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
 
             if ( not isinstance( sceneSummary, str ) == True ) or ( sceneSummary == '' ):
@@ -2208,16 +2219,23 @@ def main( userInput=None ):
         programSettings[ 'mainSpreadsheet' ].printAllTheThings()
 
     if userInput[ 'testRun' ] != True:
-        programSettings[ 'mainSpreadsheet' ].export( userInput[ 'outputFileName' ], fileEncoding=userInput[ 'outputFileEncoding' ], columnToExportForTextFiles=programSettings[ 'currentMainSpreadsheetColumn' ] )
+        if ( userInput[ 'sceneSummaryEnabled' ] == False ) or ( ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == True ) ):
+            programSettings[ 'mainSpreadsheet' ].export( userInput[ 'outputFileName' ], fileEncoding=userInput[ 'outputFileEncoding' ], columnToExportForTextFiles=programSettings[ 'currentMainSpreadsheetColumn' ] )
 
     # https://openpyxl.readthedocs.io/en/stable/optimized.html
     # readOnlyMode requires manually closing the spreadsheet after use.
     if userInput[ 'cacheEnabled' ] == True:
         if userInput[ 'readOnlyCache' ] == True:
             programSettings[ 'cache' ].close()
-        # There is a bug where cacheWasUpdated is getting set to True even if it is never updated sometimes. # Update: This might have been a scope issue. TODO: Double check if this bug persists after the refactor is complete.
+        # There is a bug where cacheWasUpdated is getting set to True even if it is never updated sometimes. # Update: This might have been a scope issue. TODO: Double check if this bug persists after the refactor is complete. Hummm. Seems to have been fixed. Was likely a scope issue.
         elif programSettings[ 'cacheWasUpdated' ] == True:
             backupCache( userInput=userInput, programSettings=programSettings, force=True )
+
+        if userInput[ 'sceneSummaryEnabled' ] == True:
+            if userInput[ 'readOnlyCache' ] == True:
+                programSettings[ 'sceneSummaryCache' ].close()
+            elif programSettings[ 'sceneSummaryCacheWasUpdated' ] == True:
+                backupSceneSummaryCache( userInput=userInput, programSettings=programSettings, force=True )
 
 
 if __name__ == '__main__':

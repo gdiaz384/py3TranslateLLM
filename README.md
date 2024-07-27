@@ -199,6 +199,7 @@ Variable | Scope | Description
 {targetLanguage} | All | The target language specified at the command prompt. The literal text is the first entry in `languageCodes.csv` 
 {history} | prompt.txt | The rolling history buffer of previously untranslated/translated entry pairs. This gets formatted according to the LLM instruction type: chat, instruct, autocomplete.
 {scene} | sceneSummary.txt | The current untranslated lines to use when generating a summary.
+{sceneSummary} | prompt.txt, memory.txt | The current untranslated lines to use when generating a summary.
 
 Note: If the above is not formatted properly, update the engine.py appropriately or [open an issue] to request support for a specific LLM model.
 
@@ -207,8 +208,9 @@ Note: If the above is not formatted properly, update the engine.py appropriately
 - [This xkcd](//xkcd.com/1319) is my life.
 - The second column in the spreadsheets is reserved for the speakerName. If present, the speakerName is automatically used for LLM translations.
 - If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. Technically `--resume` (`-r`) exists, but it can be overly picky.
-- By default, backups are made at most once every 9 minutes. To alter this behavor change `defaultMinimumBackupSaveInterval` in `py3TranslateLLM.py`.
-- By default, cache is written at most once every 5 minutes. To alter this behavior change `defaultMinimumCacheSaveInterval` in `py3TranslateLLM.py`.
+- By default, backups of fileToTranslate are made at most once every 9 minutes. To alter this behavor change `defaultMinimumSaveIntervalForMainSpreadsheet` in `py3TranslateLLM.py`.
+- By default, cache is written at most once every 5 minutes. To alter this behavior change `defaultMinimumSaveIntervalForCache` in `py3TranslateLLM.py`.
+- By default, sceneSummaryCache is written at most once every 5 minutes. To alter this behavior change `defaultMinimumSaveIntervalForSceneSummaryCache` in `py3TranslateLLM.py`.
 - Settings can be specified at runtime from the command prompt and/or using `py3TranslateLLM.ini`.
     - Settings read from the command prompt take priority over the `.ini`.
     - Values are designated using the following syntax:

@@ -21,8 +21,8 @@ defaultTimeoutMulitplierForFirstRun = 4
 defaultInstructionFormat = 'autocomplete'
 
 # Sometimes, the translation is returned prepended or appended with certain data that must be removed. If these strings appear at the start or end, then remove them during post processing.
-blacklistedStarts=[]
-blacklistedEnd=[]
+blacklistedStarts = []
+blacklistedEnd = []
 
 # For 'instruct' models, these are sequences to start and end input. Not using them results in unstable output.
 alpacaStartSequence = '\n### Instruction:\n'
@@ -40,14 +40,14 @@ defaultInstructionFormatStartSequence = llama2ChatStartSequence
 defaultInstructionFormatEndSequence = llama2ChatEndSequence
 
 # The LLM will stop generating output when it generates any of the following text. \n works well for mixtral8x7b.
-stopSequenceList=[
+stopSequenceList = [
 '\n'
 '[',
 'Translation notes:',
 'Translation note:',
 'Note:',
 ]
-stopSequenceListForSceneSummary=[
+stopSequenceListForSceneSummary = [
 '[',
 ]
 
@@ -156,10 +156,8 @@ class KoboldCppEngine:
 #            self._chatModelInputName = defaultChatInputName
 #            self._chatModelOutputName = defaultChatOutputName
 
-        return rawTranslatedText
+        #return rawTranslatedText
 
-
-        # Old code:
         # Mixtral8x7b-instruct example:
         if self._modelOnly in mixtral8x7bInstructModels:
 
@@ -168,7 +166,7 @@ class KoboldCppEngine:
                 rawTranslatedText = rawTranslatedText.partition( '_' )[ 0 ]
 
             # if the translation has ( ) but the source does not, then truncate the result.
-            if ( rawTranslatedText.find('(') != -1 ): #and ( rawTranslatedText.find(')') != -1 ) #sometimes the ending ) gets cut off by a stop_sequence token.
+            if ( rawTranslatedText.find('(') != -1 ): #and ( rawTranslatedText.find(')') != -1 ) # Sometimes the ending ) gets cut off by a stop_sequence token.
                 if ( untranslatedText.find( '(' ) == -1 ) and ( untranslatedText.find( '（' ) == -1 ):
                     index = rawTranslatedText.rfind( '(' )
                     rawTranslatedText = rawTranslatedText[ : index ].strip()
@@ -397,6 +395,7 @@ class KoboldCppEngine:
 
     # This expects a string to translate.
     def translate( self, untranslatedString, settings=None ):
+        assert( isinstance( untranslatedString, str ) )
         #global debug
         #global verbose
         #speakerName=None, contextHistory=None
@@ -422,7 +421,6 @@ class KoboldCppEngine:
 
 
         #Debug code.
-        assert( isinstance( untranslatedString, str ) )
         #print( 'contextHistory=' + str(contextHistory))
         # Disable history for certain problematic models.
         if self._modelOnly in qwen1_5_chatModels:
@@ -499,7 +497,7 @@ class KoboldCppEngine:
         # Build request.
         requestDictionary={}
 
-        # None of these values should be hardcoded. If anything, they should be read from the .ini.
+        # TODO: None of these values should be hardcoded. If anything, they should be read from the .ini.
         requestDictionary[ 'max_length' ] = 150 # The number of tokens to generate. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
         requestDictionary[ 'max_context_length' ] = self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
         requestDictionary[ 'trim_stop' ] = True
@@ -534,7 +532,6 @@ class KoboldCppEngine:
 #                tempHistory=tempHistory + ' ' + entry
 
         #requestDictionary[ 'authorsnote' ] = # This will be added at the end of the prompt. Highest possible priority.
-        #requestDictionary[ 'authorsnote' ]=
 
         if debug == True:
             print( requestDictionary )
@@ -586,31 +583,35 @@ class KoboldCppEngine:
     def getSceneSummary(self, untranslatedList, settings=None):
         assert( self.sceneSummaryPrompt != None )
 
-        # Update memory to not include {sceneSummary}.
-        # When generating the sceneSummary, it will obvious not be present
+        # Update memory to not include {sceneSummary}. Store the processed results in tempMemory.
+        # When generating the sceneSummary, it will obviously not be present already.
         if self.memory != None:
             if self.memory.find( '{sceneSummary}' ) != -1:
                 tempMemory = self.memory.replace( '{sceneSummary}', '' )
             else:
-                tempMemory = None
+                tempMemory = self.memory
         else:
             tempMemory = None
 
         if 'speakerList' in settings:
             speakerList = settings[ 'speakerList' ]
-            assert( len( untranslatedList ) == len( speakerList ) )
+            if speakerList != None:
+                assert( len( untranslatedList ) == len( speakerList ) )
         else:
             speakerList = None
 
         tempString = ''
-        for counter,entry in enumerate( inputList ):
+        for counter,entry in enumerate( untranslatedList ):
             if speakerList == None:
-                tempString = tempString + preProcessText( entry ) + '\n'
+                tempString = tempString + self.preProcessText( entry ) + '\n'
             else:
-                tempString = tempString + speakerList[ counter ] + ': ' + preProcessText( entry ) + '\n'
+                if speakerList[ counter ] == None:
+                    tempString = tempString + self.preProcessText( entry ) + '\n'
+                else:
+                    tempString = tempString + speakerList[ counter ] + ': ' + self.preProcessText( entry ) + '\n'
 
         # Build request.
-        requestDictionary={}
+        requestDictionary = {}
         requestDictionary[ 'max_length' ] = 500 # The number of tokens to generate as a maximum. Default is 100. Typical lines are 5-30 tokens. Very long responses usually mean the LLM is hallucinating.
         requestDictionary[ 'max_context_length' ] = self._maxContextLength # The maximum number of tokens in the current prompt. The global maximum for any prompt is set at runtime inside of KoboldCpp.
         requestDictionary[ 'trim_stop' ] = True
