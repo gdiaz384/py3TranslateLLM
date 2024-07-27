@@ -186,79 +186,78 @@ Variable name | Description | Examples
 - LLMs supports many different sources of information when translating text. However, since much of this information is dynamic, known only at runtime, or constantly changing, py3TranslateLLM supports replacing certain {keywords} in the instructions to the LLM at runtime. This should ensure the highest quality translation possible while also supporting a very large degree of automation by making it possible to use the same set of LLM instructions, `prompt.txt`, `memory.txt`, and `sceneSummary.txt`, for an entire dataset.
 - LLM translations always require a `prompt.txt`.
     - `prompt.txt` should include the main instructions to the LLM, e.g. translate this text, as well as examples to help the LLM understand how to format the desired output. See resources\templates\* for examples.
+    - Guides:
+        - Microsoft's [prompt engineering guide](//learn.microsoft.com/en-us/ai/playbook/technology-guidance/generative-ai/working-with-llms/prompt-engineering).
+        - Nvidia's [developer blog LLM introduction](//developer.nvidia.com/blog/an-introduction-to-large-language-models-prompt-engineering-and-p-tuning/).
+    - Examples:
+        - https://github.com/0xeb/TheBigPromptLibrary
+        - https://github.com/langgptai/awesome-llama-prompts
+        - [resources/templates](resources/templates)
 - To optionally improve translation quality, it is also recommended to always use `memory.txt`.
     - `memory.txt` should include background information that may or may not be directly relevant to the immediate translation. Examples include a description of the source content (e.g. story, dialogue, novel, subtitles, game), translations for character names, information about the characters and their relationships to one another, and a description of what is happening in the scene currently being translated.
-- Experimental Feature: To optionally improve translation quality, `sceneSummary.txt` can be used.
-    - `sceneSummary.txt` is a specially formatted `prompt.txt` that can be used to automatically generate a summary of the current scene so that summary can be inserted into `memory.txt` prior to translating individual lines.
+- Experimental Feature: To optionally improve translation quality, consider using `sceneSummary.txt`.
+    - `sceneSummary.txt` is a `prompt.txt` with instructions to generate a summary of the current scene being translated so that summary can be inserted into `prompt.txt` and/or `memory.txt` prior to translating individual lines.
 - Keywords:
 
 Variable | Scope | Description
 --- | --- | ---
-{untranslatedText} | prompt.txt | The current line prior to translation.
-{sourceLanguage} | All | The source language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
-{targetLanguage} | All | The target language specified at the command prompt. The literal text is the first entry in `languageCodes.csv` 
-{history} | prompt.txt | The rolling history buffer of previously untranslated/translated entry pairs. This gets formatted according to the LLM instruction type: chat, instruct, autocomplete.
-{scene} | sceneSummary.txt | The current untranslated lines to use when generating a summary.
-{sceneSummary} | prompt.txt, memory.txt | The current untranslated lines to use when generating a summary.
+`{untranslatedText}` | prompt.txt | The current line prior to translation.
+`{sourceLanguage}` | All | The source language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
+{targetLanguage} | All | The target language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
+`{history}` | prompt.txt | The rolling history buffer of previously untranslated/translated entry pairs. This gets formatted according to the LLM instruction type: chat, instruct, autocomplete.
+`{scene}` | sceneSummary.txt | The current batch of untranslated lines to use when generating a summary.
+`{scene}` | prompt.txt, memory.txt | The summary generated from the current untranslated lines.
 
-Note: If the above is not formatted properly, update the engine.py appropriately or [open an issue] to request support for a specific LLM model.
+Note: If the data inserted in the above variables is not formatted properly for a given model, especially `{history}`, then update the code at engine.py appropriately or [open an issue] to request support for a specific LLM model.
 
 ## Release Notes:
 
 - [This xkcd](//xkcd.com/1319) is my life.
-- The second column in the spreadsheets is reserved for the speakerName. If present, the speakerName is automatically used for LLM translations.
-- If interrupted, use one of the backup files created under backups/[date] to continue with minimal loss of data. Resuming from save data in this folder after being interrupted is not automatic. Technically `--resume` (`-r`) exists, but it can be overly picky.
+- Backups of the imported data are written to backups/[date]/* prior to data processing. Use `--backups`, `-bk` to disable this feature.
+- If interrupted, translated entries are still available in the local cache. Running the same command as-is will therefore skip previously translated data starting from the last time cache was written to disk.
+    - Alternatively, use one of the backup files created under backups/[date]/* to continue with minimal loss of translated data. Resuming from save data in this folder after interruptions is not automatic. Technically `--resume` (`-r`) exists for this reason, but only backup files with today and yesterday's date are checked.
+- The second column in the spreadsheets is reserved for the speakerName of the current line. If present, the speakerName is automatically used for LLM translations.
 - By default, backups of fileToTranslate are made at most once every 9 minutes. To alter this behavor change `defaultMinimumSaveIntervalForMainSpreadsheet` in `py3TranslateLLM.py`.
 - By default, cache is written at most once every 5 minutes. To alter this behavior change `defaultMinimumSaveIntervalForCache` in `py3TranslateLLM.py`.
 - By default, sceneSummaryCache is written at most once every 5 minutes. To alter this behavior change `defaultMinimumSaveIntervalForSceneSummaryCache` in `py3TranslateLLM.py`.
-- Settings can be specified at runtime from the command prompt and/or using `py3TranslateLLM.ini`.
-    - Settings read from the command prompt take priority over the `.ini`.
-    - Values are designated using the following syntax:
-        - `commandLineOption=value`
-        - The 'None' keyword for an option indicates no value. Example: `preTranslationDictionary=None`
-        - Whitespace is ignored.
-        - Lines with only whitespace are ignored.
-        - Lines starting with `#` are ignored. In other words, `#` means a comment.
-        - Keys in the key=value pairs are case sensitive. Many values are as well.
-        - Keys in the key=value pairs must match the command line options exactly.
-        - See: `py3TranslateLLM --help` and the **Parameters** enumeration below for valid values.
+- Settings can be specified during runtime from the command prompt/terminal/CLI and/or using `py3TranslateLLM.ini`. See __Regarding Settings Files__ for more information.
 - Aside: LLaMA stands for Large Language Model Meta AI. [Wiki](//en.wikipedia.org/wiki/LLaMA).
     - Therefore [Local LLaMA](//www.reddit.com/r/LocalLLaMA) is about running AI on a local PC.
 
 #### Known Bugs:
 
-- Most features have not been implemented yet.
+- Many features have not been implemented yet.
 - Most features have not been tested yet.
 
 ### Concept art:
 
 - The design concept behind pyTranslateLLM is to produce the highest quality machine and AI translations possible for dialogue and narration by providing NMT and LLM models the information they need to translate to the best of their ability. This includes but is not limited to:
-    - Bunding the source language strings into paragraphs to increase the context of the translated text.
+    - Bunding the untranslated language strings into paragraphs to increase the context of the translated text.
     - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
-    - For LLMs, identifying any speakers by name, sex and optionally other metrics like age and occupation.
-    - For LLMs, providing other arbitrary bits of information in the prompt.
+    - For LLMs and DeepL, identifying any speakers by name, sex and optionally other metrics like age and occupation.
+    - For LLMs and DeepL, providing other arbitrary bits of information in the prompt.
     - Supporting dictionaries that allow removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples in-line text that should be removed or altered: [＠クロエ] [r] [repage] [heart].
         - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
-        - Tip: To automate this, use [escapeLibrary.py] during parsing. 
+        - Tip: To automate this, use [escapeLibrary.py] during parsing.
 - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating languages that are heavily sensitive to context, like Japanese, where much or most of the meaning of the language is not found in the spoken or written words but rather in the surrounding context in which the words are spoken.
     - Aside: For Japanese in particular, context is very important as it is often the only way to identify who is speaking and whom they are talking about.
 - **If translating from context light languages, like English where most of the meaning of the language is found within the language itself, then there should not be any or only small differences in translation quality**. For such languages, use a translation engine that supports batch translations for the maximum possible speed.
 - In addition, substution dictionaries are supported at every step of the translation workflow to fine tune input and output and deal with common mistakes. This should result in a further boost in translation quality.
-- The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, by providing the highest quality MTL baseline possible from which to start editing and supporting multiple translation engines for easy cross referencing.
+- The intent is to increase the productivity of translators by cutting down the time required for the most time consuming aspect of creating quality dialogue translations, the editing phase, by providing the highest quality MTL baseline possible from which to start editing and providing multiple translation engines for easy cross referencing.
 - This program was written as part of a workflow meant to complement other automated parsing and script extraction programs meaning that compatibility with such programs and openness required to adjust workflows as needed are part of the core design concept.
 
 ### Regarding Scope
 
 - This program focuses on translating dialogue that has been input into spreadsheets.
 - Other programs can be used to find and parse small bits of untranslated text in text files and images and handle how to reinsert them.
-- While it is not the emphasis of this program, submitting translations in batches to some NMTs is also supported.
+- While it is not the emphasis of this program, submitting translations in batches to some NMT models is also supported.
 - While it is not the emphasis of this program, there is some code to help translate plain.txt files. This only works in line-by-line mode.
 - For more complicated input, parse the output using a parsing program that can convert it to a spreadsheet format, like .csv, before using py3TranslateLLM. Examples:
-    - [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet). Supports custom parsers via templates but very WIP.
+    - [py3AnyText2Spreadsheet](//github.com/gdiaz384/py3AnyText2Spreadsheet). Supports parsering many common formats via templates but intended more for DIY non-regex parsing.
     - [SExtractor](//github.com/satan53x/SExtractor). Supports regex.
     - [fileTranslate](//github.com/UserUnknownFactor/filetranslate). Supports regex.
     - Consider writing a parser yourself. Assuming plain text files, it should not take more than an afternoon to write a parser in Python due to Python's very large standard library, [available templates], and a very large amount of third party libraries readily availble on [PyPi.org](pypi.org).
-        - Tip: After parsing, use [pyexcel](//github.com/pyexcel/pyexcel), [documentation](//docs.pyexcel.org/en/latest/design.html), or [chocolate.py] to export the data to and out of spreadsheets easily. 
+        - Tip: After parsing, use [pyexcel](//github.com/pyexcel/pyexcel), [documentation](//docs.pyexcel.org/en/latest/design.html) or [chocolate.py] to export the data to and out of spreadsheets easily. 
         - pyexcel and chocolate are wrapper libraries for openpyxl and other libraries that focuses on providing i/o or data structure manipulation for the various spreadsheet formats.
             - Note that pyexcel has a plugin system for various formats and requires those plugins to also be installed in addition to the implemented base libraries. See their [installation](//github.com/pyexcel/pyexcel#installation) section for a lack of guidance on how to install them.
 
@@ -266,14 +265,13 @@ Note: If the above is not formatted properly, update the engine.py appropriately
 
 - py3TranslateLLM uses spreadsheets for its internal data structures. LibreOffice and other spreadsheet manipulation programs can be used to read/write them directly. For more information, see: "Regarding Open Office XML".
 - For the spreadsheet formats, .csv, .xlsx, .xls, .ods, the following apply:
-    - The first row is reserved for headers and is always ignored for data processing otherwise.
+    - The first row, 1st, is reserved for headers and is always ignored for data processing otherwise.
     - The first column is reserved for the source content for translation.
     - Multiple lines within a cell for the first column, called 'paragraphs,' are allowed.
-        - New lines will not be preserved in the output cell. If this behavior is desired, regenerate them dynamically when writing to the output files as needed. Basically, word wrap is outside the scope of this project.
+        - New lines will not be preserved in the output cell. If this behavior is desired, regenerate them dynamically when writing to the output files as needed. Word wrap is outside the scope of this project.
     - The second column, 2nd, is reserved for the character speaking.
-        - Feel free to add the speaker if a speaker could not be automatically determined.
-        - Automatic character name detection is heavily dependent on the settings specified in the parsingSettings.txt file.
-    - The third column, 3th, and columns after it are used for metadata or the translation engines. Currently that is KoboldCPP/modelName, DeepL API, DeepL Web, py3translationServer, Sugoi.
+        - Feel free to add the speaker if a speaker could not be automatically determined during parsing.
+    - The third column, 3rd, and columns after it are used for metadata or the translation engines. Currently that is KoboldCpp, DeepL API Free, DeepL API Pro, py3translationServer, Sugoi.
         - Label the first cell in a column to reserve that column for that translation engine. One translation engine per column.
         - To reserve it for metadata, call it `metadata` or similar.
         - If the current translation engine does not exist as a column, then it will be added dynamically as needed.
@@ -295,12 +293,24 @@ Note: If the above is not formatted properly, update the engine.py appropriately
         - Or use double quotes `""` like: `"""Hello, world!"""` TODO: Test this.
     - Whitespace is ignored for `languageCodes.csv` and for .csv's that contain the untranslated text.
     - Whitespace is preserved for all of the dictionaries.
-- .xls is quite old and supports a maximum of 65,000 rows, which is relatively small. [Source](//github.com/pyexcel/pyexcel-xls#warning). Consider using any other format.
+- .xls is quite old and supports a maximum of ~65,000 rows, which is relatively small. [Source](//github.com/pyexcel/pyexcel-xls#warning). Consider using any other format.
     - Microsoft's [documentation](//learn.microsoft.com/en-us/previous-versions/office/developer/office-2010/gg615597(v=office.14)).
 
 ### Regarding Settings Files:
 
-- The text formats used for templates and settings (.ini .txt) have their own syntax:
+- Settings read from the command prompt take priority over what is specified in the `.ini` text file.
+- By default, the name of the program without an extension + `.ini` is used to determine the name of the settings.ini file from which to read settings. Example: pyTranslateLLM.ini
+- This file can also specified manually at the CLI during runtime by using `--settingsFile`, `-sf`.
+- Values in the settings.ini file are designated using the following syntax:
+    - `commandLineOption=value`
+    - The 'None' keyword for an option indicates no value. Example: `preTranslationDictionary=None`
+    - Whitespace is ignored.
+    - Lines with only whitespace are ignored.
+    - Lines starting with `#` are ignored. In other words, `#` means a comment.
+    - Keys in the key=value pairs are case sensitive.
+    - Keys in the key=value pairs must match the command line options exactly or will be interpreted as user-defined custom values.
+    - See: `py3TranslateLLM --help` and the **Parameters** enumeration below for valid values.
+- The text formats used for settings.ini (.ini .txt) have their own syntax:
     - `#` indicates that line is a comment.
     - Values are specified by using `item=value` Example:
         - `paragraphDelimiter=emptyLine`

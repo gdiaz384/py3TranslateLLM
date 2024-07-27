@@ -1562,7 +1562,8 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
     postTranslatedList = []
     settings = userInput.copy()
-    settings[ 'sceneSummary' ] = sceneSummary
+    if sceneSummary != None:
+        settings[ 'sceneSummary' ] = sceneSummary
 
     if programSettings[ 'batchModeEnabled' ] == True:
         # This preDictionary replacement operation cannot be done outside of the batch code because non-batches need this done to both lines that will be submitted and lines that do not need to be submitted as part of the history feature. Doing it just above here, outside of the batch code, means this preDictionary would be run over the data twice which is incorrect behavior. The translate non-batch code could check for that, but that just complicates the code unnecessarily. Just move the preDictionary code here to gurantee it is only processed once.
@@ -1692,14 +1693,21 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             if contextHistory != None:
                 settings[ 'contextHistory' ] = contextHistory
             # TODO: This needs to enforce userInput[ 'timeout' ]. Or perhaps the calling code should do it? Well, it needs to be here since this is where the call to the translation engine takes place and timeout refers to each individual translation, not to batches of translations. It only refers to batches if batchModeEnabled.
+            translatedEntry = None
             try:
                 translatedEntry = programSettings[ 'translationEngine' ].translate( untranslatedEntry, settings=settings )
-            except Exception as exception:
+            except requests.exceptions.JSONDecodeError:
                 print( 'Error: Internal engine error in for translationEngine=' + userInput[ 'mode' ] )
-                print( exception.__class__.__name__ )
                 translatedEntry = None
-                if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
-                    raise exception
+            except KeyboardInterrupt:
+                raise
+            except:
+                raise
+                #print( exception.__class__.__name__ )
+                #if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
+                #    raise exception
+                #if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
+                #    raise exception
 
             # Once it is back, check to make sure it is not None or another error value.
             if ( translatedEntry == None ) or ( translatedEntry == '' ):
@@ -1755,8 +1763,12 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # And move on to next entry.
             translateMeCounter += 1
 
-
-    assert( len( translateMe ) == len( postTranslatedList ) )
+    try:
+        assert( len( translateMe ) + cacheHitCounter == len( postTranslatedList ) )
+    except:
+        print( 'len( translateMe )=', len( translateMe ) )
+        print( 'len( postTranslatedList )=', len( postTranslatedList ) )
+        raise
 
     finalOutput = []
     # This counter points to the current entry in translateMe.
@@ -1771,7 +1783,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # Update cache here.
             # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
             # This works well for batches, but single translations need this code further up.
-            if programSettings[ 'batchesEnabled' ] == True:
+            if programSettings[ 'batchModeEnabled' ] == True:
                 if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
                     updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=entry[ 0 ], translation=postTranslatedList[ postTranslatedListCounter ] )
 
