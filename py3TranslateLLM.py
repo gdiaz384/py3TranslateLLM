@@ -12,7 +12,7 @@ License:
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 
 """
-__version__ = '2024.07.25 alpha'
+__version__ = '2024.07.28-alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -448,6 +448,7 @@ def validateUserInput( userInput=None ):
     userInput[ 'backupsEnabled' ] = userInput[ 'backups' ]
 
     # Remove old value names.
+    # https://www.w3schools.com/python/python_ref_dictionary.asp
     userInput.pop( 'fileToTranslate' )
     userInput.pop( 'outputFile' )
     userInput.pop( 'promptFile' )
@@ -1149,6 +1150,9 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
     if userInput[ 'readOnlyCache' ] == True:
         return None
 
+    if ( summaryData == None ) or ( summaryData == '' ):
+        return None
+
     # tempSearchRow can be a row number (as a string) or None if the string was not found.
     tempSearchRow = programSettings[ 'sceneSummaryCache' ].searchCache( hash )
 
@@ -1297,6 +1301,8 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     if isinstance( tempCellData, str ) == True:
         return tempCellData
 
+    print( ( 'Generating sceneSummary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ' ' + str( programSettings[ 'currentRow'] ) + '-' + str( programSettings[ 'currentRow'] + untranslatedListSize ) + ' ...' ).encode(consoleEncoding) )
+
     # Otherwise, need to generate it.
     settings = userInput.copy()
     settings[ 'speakerList' ] = speakerList
@@ -1307,7 +1313,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     # postTranslatedList = programSettings[ 'translationEngine' ].batchTranslate( translateMe, settings=settings )
     sceneSummary = programSettings[ 'translationEngine' ].getSceneSummary( untranslatedList, settings=settings )
     if userInput[ 'verbose' ] == True:
-        print( ( 'Returned sceneSummary for lines ' + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + untranslatedListSize ) + '=' + sceneSummary ).encode( consoleEncoding ) )
+        print( ( 'Returned sceneSummary for lines ' + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + untranslatedListSize ) + '=' + str( sceneSummary ) ).encode( consoleEncoding ) )
 
     # TODO: Update sceneSummaryCache here so main function does not have to worry about it. TODO: Implement updateSceneSummaryCache() properly.
     # 1) data is, current lines, the lines themselves,
@@ -2196,20 +2202,21 @@ def main( userInput=None ):
 
         if userInput[ 'sceneSummaryEnabled' ] == False:
             sceneSummary = None
-        #if userInput[ 'sceneSummaryEnabled' ] != None:
+        #if userInput[ 'sceneSummaryEnabled' ] != False:
         else:
             # This returns either None or a string.
-            print( ( 'Generating sceneSummary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ' ' + str( programSettings[ 'currentRow'] ) + '-' + str( programSettings[ 'currentRow'] + currentBatchSize ) + ' ...' ).encode(consoleEncoding) )
             sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
 
             if ( not isinstance( sceneSummary, str ) == True ) or ( sceneSummary == '' ):
                 # Error generating sceneSummary.
+                print( 'Warning: Unable to generate summary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + currentBatchSize ) )
                 sceneSummary = None
 
-        # There is a few special failure case here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated.
-        if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False ):
-            programSettings[ 'currentRow' ] += currentBatchSize
-            continue
+        # There are a few special failure cases here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated. In addition, if sceneSummary failed to generate but it is enabled, then consider it improper to attempt to translate without it.
+        if userInput[ 'sceneSummaryEnabled' ] == True:
+            if ( userInput[ 'sceneSummaryEnableTranslation' ] == False ) or ( sceneSummary == None ):
+                programSettings[ 'currentRow' ] += currentBatchSize
+                continue
 
         # translate() should only consider the size of untranslatedList as valid since it has programSettings[ 'currentRow' ] as the correct pointer to the first entry already and mainSpreadsheet needs to be parsed again to determine which entries already have translations, which entries can be found in the cache, the speaker names, and the order of each entry for {history}. Since it needs to be re-parsed anyway, passing untranslatedListSize makes more sense than passing the untranslatedList[ slice ].
         # translate() returns a list where each entry is a string that represents the translated contents.

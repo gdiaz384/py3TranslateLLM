@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__ = '2024.07.25'
+__version__ = '2024.07.28'
 
 #set defaults
 #printStuff = True
@@ -19,6 +19,7 @@ defaultTimeout = 360
 defaultTimeoutMulitplierForFirstRun = 4
 # Valid options are: autocomplete, instruct, chat.
 defaultInstructionFormat = 'autocomplete'
+defaultTargetLanguageIsHalfWidth = True
 
 # Sometimes, the translation is returned prepended or appended with certain data that must be removed. If these strings appear at the start or end, then remove them during post processing.
 blacklistedStarts = []
@@ -47,18 +48,15 @@ instructSequenceIsAlsoForLLMOutput = False
 # The LLM will stop generating output when it generates any of the following text. \n works well for mixtral8x7b.
 stopSequenceList = [
 '\n',
-'\n\n',
 '[',
+'Translation:',
 'Translation notes:',
 'Translation note:',
 'Note:',
 ]
-stopSequenceList2 = [
-'[',
-'Translation notes:',
-'Translation note:',
-'Note:',
-]
+stopSequenceList2 = stopSequenceList.copy()
+stopSequenceList2.remove( '\n' )
+
 stopSequenceListForSceneSummary = [
 '[',
 ]
@@ -118,8 +116,9 @@ qwen1_5_chatModels = qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
 # https://huggingface.co/google/gemma-2-27b-it
 
 
-import sys
-import requests
+#import sys                  # Default import.
+import requests          # Required to do the thing.
+import unicodedata     # Used to normalize output, convert full width characters to half width, during post processing. 
 
 
 class KoboldCppEngine:
@@ -145,6 +144,10 @@ class KoboldCppEngine:
 
         rawTranslatedText = rawTranslatedText.strip()
 
+        # This converts full width characters to their
+        if self._targetLanguageIsHalfWidth == True:
+            rawTranslatedText = unicodedata.normalize( 'NFKC', rawTranslatedText )
+
         if self.instructionFormat == 'instruct':
             # startswith/endswith + slice is more precise than find/replace.
             if rawTranslatedText.startswith( self._instructModelStartSequence ): # != -1:
@@ -167,7 +170,11 @@ class KoboldCppEngine:
         rawTranslatedText = rawTranslatedText.strip()
 
         # if the translation has new lines, then truncate the result.
-        rawTranslatedText = rawTranslatedText.partition( '\n' )[0].strip()
+        if rawTranslatedText.find( '\n' ) != -1:
+            rawTranslatedText = rawTranslatedText.partition( '\n' )[0].strip()
+
+        if self._modelOnly.find( 'gemma-2') != -1 and ( rawTranslatedText.find( r'```' ) != -1 ):
+            rawTranslatedText = rawTranslatedText.replace( '```', '' ).strip()
 
 #        if ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find( 'llama' ) != -1 ):
         # Remove the speaker name if present.
@@ -175,7 +182,7 @@ class KoboldCppEngine:
             if rawTranslatedText.startswith( speakerName + ':' ):
                 rawTranslatedText = rawTranslatedText[ len( speakerName ) + 1: ].strip()
 
-        if self.characterDictionary != None:
+        if isinstance( self.characterDictionary, dict): # != None
             for key,value in self.characterDictionary.items():
                 if rawTranslatedText.startswith( key + ':' ):
                     rawTranslatedText = rawTranslatedText[ len( key ) + 1: ].strip()
@@ -184,18 +191,22 @@ class KoboldCppEngine:
 
         #return rawTranslatedText
 
-        # Mixtral8x7b-instruct example:
+        # Mixtral8x7b-instruct model quirks:
         if self._modelOnly in mixtral8x7bInstructModels:
-
             # if the translation has an underscore _, then truncate the result.
             if rawTranslatedText.find('_') != -1:
                 rawTranslatedText = rawTranslatedText.partition( '_' )[ 0 ]
 
             # if the translation has ( ) but the source does not, then truncate the result.
-            if ( rawTranslatedText.find('(') != -1 ): #and ( rawTranslatedText.find(')') != -1 ) # Sometimes the ending ) gets cut off by a stop_sequence token.
+            if ( rawTranslatedText.find( '(' ) != -1 ): #and ( rawTranslatedText.find( ')' ) != -1 ) # Sometimes the ending ) gets cut off by a stop_sequence token.
                 if ( untranslatedText.find( '(' ) == -1 ) and ( untranslatedText.find( '（' ) == -1 ):
-                    index = rawTranslatedText.rfind( '(' )
-                    rawTranslatedText = rawTranslatedText[ : index ].strip()
+                    left_index = rawTranslatedText.find( '(' ) + 1
+                    right_index = rawTranslatedText.rfind( ')' )
+                    # if ) does not appear or is not the last character, then only cut off text until the starting (
+                    if ( right_index == -1 ) or ( rawTranslatedText[ - 1 : ] != ')' ):
+                        rawTranslatedText = rawTranslatedText[ left_index : ].strip()
+                    else:
+                        rawTranslatedText = rawTranslatedText[ left_index: right_index ].strip()
 
             # if the translation has exactly two double quotes on the edges but the source does not, then remove them.
             if ( rawTranslatedText[ 0:1 ] == '"' ) and ( rawTranslatedText[ -1: ] == '"' ) and ( rawTranslatedText.count( '"' ) == 2 ):
@@ -211,7 +222,6 @@ class KoboldCppEngine:
                 # There needs to be another condition here with the curly quotes.
                 else:
                     rawTranslatedText=rawTranslatedText[ 1 : -1 ]
-
             # Remove a few blacklist starts.
             if speakerName != None:
                 if rawTranslatedText.startswith( speakerName + ':'):
@@ -229,14 +239,45 @@ class KoboldCppEngine:
             elif rawTranslatedText.lower().strip().endswith( 'note:' ):#This is more of an 'endswith() operation. string[:len('note:') ] ?
                 rawTranslatedText = rawTranslatedText.strip()[ : -len( 'note:' ) ].strip()
 
-#        elif self._modelOnly == another model:
+        # Gemma-2 model quirks.
+        elif self._modelOnly.find( 'gemma-2') != -1:
             # Post processing code for another model goes here.
-#            pass
+            #if rawTranslatedText == r'```':
+                #return None
+
+            # if the translation has ( ) but the source does not, then truncate the result.
+            if ( rawTranslatedText.find( '(' ) != -1 ): #and ( rawTranslatedText.find( ')' ) != -1 ) # Sometimes the ending ) gets cut off by a stop_sequence token.
+                if ( untranslatedText.find( '(' ) == -1 ) and ( untranslatedText.find( '（' ) == -1 ):
+                    left_index = rawTranslatedText.find( '(' ) + 1
+                    right_index = rawTranslatedText.rfind( ')' )
+                    # if ) does not appear or is not the last character, then only cut off text until the starting (
+                    if ( right_index == -1 ) or ( rawTranslatedText[ - 1 : ] != ')' ):
+                        rawTranslatedText = rawTranslatedText[ left_index : ].strip()
+                    else:
+                        rawTranslatedText = rawTranslatedText[ left_index: right_index ].strip()
+
 #        elif self._modelOnly == yet another model:
             # Post processing code for yet another model goes here.
 #            pass
 
-        return rawTranslatedText
+
+#        if ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find( 'llama' ) != -1 ):
+        # Remove the speaker name if present.
+        if speakerName != None:
+            if rawTranslatedText.startswith( speakerName + ':' ):
+                rawTranslatedText = rawTranslatedText[ len( speakerName ) + 1: ].strip()
+
+        if isinstance( self.characterDictionary, dict): # != None
+            for key,value in self.characterDictionary.items():
+                if rawTranslatedText.startswith( key + ':' ):
+                    rawTranslatedText = rawTranslatedText[ len( key ) + 1: ].strip()
+                elif rawTranslatedText.startswith( value + ':' ):
+                    rawTranslatedText = rawTranslatedText[ len( value ) + 1: ].strip()
+
+        if rawTranslatedText == '':
+            return None
+        else:
+            return rawTranslatedText
 
 
 #class KoboldCppEngine:
@@ -259,6 +300,7 @@ class KoboldCppEngine:
         # Process generic input.
         self.characterDictionary = characterDictionary
         self.sourceLanguageList = sourceLanguage
+        # TODO: Put example of data structure here.
         # if DifferentSourceLanguage == True, then use the alternative name.
         if self.sourceLanguageList[ 4 ] == True:
             self.sourceLanguage = self.sourceLanguageList[ 5 ]
@@ -270,6 +312,13 @@ class KoboldCppEngine:
             self.targetLanguage = self.targetLanguageList[ 5 ]
         else:
             self.targetLanguage = self.targetLanguageList[ 0 ]
+
+        if 'targetLanguageIsHalfWidth' in settings:
+            self._targetLanguageIsHalfWidth = settings[ 'targetLanguageIsHalfWidth' ]
+            if not isinstance( self._targetLanguageIsHalfWidth, bool ):
+                self._targetLanguageIsHalfWidth = defaultTargetLanguageIsHalfWidth
+        else:
+            self._targetLanguageIsHalfWidth = defaultTargetLanguageIsHalfWidth 
 
         #debug=True
         if debug == True:
@@ -708,11 +757,15 @@ class KoboldCppEngine:
         #if verbose == True:
             #print( summaryText.encode( consoleEncoding ) )
 
-        return summaryText
+        if ( summaryText == '' ) or ( summaryText == r'```' ):
+            return None
+        else:
+            return summaryText
 
 
     # contextHistory should be a list of untranslated and translated pairs in sublists.
     # contextHistory= [  [untranslatedString1, translatedString2, speaker], [uString1, tString2, None], [uString1, tString2, speaker]  ]
+    # TODO: Old code. Update this code and then update the code in translate() to point to this function.
     def buildStringFromHistory( self, contextHistory=None ):
         if contextHistory == None:
             return None

@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 """
-__version__ = '2024.07.25'
+__version__ = '2024.07.28'
 
 #set defaults
 #printStuff = True
@@ -858,7 +858,7 @@ class Strawberry:
 
         # Create a new worksheet with the same name.
         # This does not seem to be creating the new spreadsheet with the same name as the old spreadsheet. #Update: Fixed.
-        # self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
+        self.workbook.create_sheet( title = self.spreadsheetName , index=0 )
         #print( self.workbook.sheetnames )
         self.spreadsheet = self.workbook[ self.spreadsheetName ]
 
