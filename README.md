@@ -52,6 +52,7 @@ Undetermined:
     - Older than 3.7 is tricky because dictionaries became ordered in 3.7 and the order might be important for cache, especially cache.rebuildCache().
     - Older than 3.4 might be tricky because:
         - `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4.
+            - The exist_ok parameter was not added to pathlib.Path().mkdir() until 3.5.
         - Same with `pip`.
         - 3.4 already requires using an older `openpyxl` version. Using even older versions might incorporate even more already fixed bugs.
         - It is unlikely any `deepl-python` version that supports 3.4 still works with DeepL's contemporary API.

@@ -1566,6 +1566,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
     if len( translateMe ) == 0:
         return listForThisBatchRaw
 
+    # after translation, len( postTranslatedList ) == len( translateMe )
     postTranslatedList = []
     settings = userInput.copy()
     if sceneSummary != None:
@@ -1605,6 +1606,12 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                     if postTranslatedList[ index ].find( item ) != -1:
                         postTranslatedList[ index ] = postTranslatedList[ index ].replace( item, key )
 
+        # Update cache here.
+        # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
+        if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
+            for counter,translatedEntry in enumerate( postTranslatedList ):
+                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=translateMe[ counter ], translation=translatedEntry )
+
         # Check with postDictionary, a Python dictionary for possible updates.
         if userInput[ 'postDictionary' ] != None:
             for counter,entry in enumerate( postTranslatedList ):
@@ -1614,6 +1621,19 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                         if userInput[ 'debug' ] == True:
                             print( ( 'Found key=' + key + ' at line=' + str( counter ) ).encode( consoleEncoding ) )
                         postTranslatedList[ counter ] = postTranslatedList[ counter ].replace( key, item )
+
+        # Update mainSpreadsheet.
+        # Every tempList in listForThisBatchRaw looks like this: ( ( untranslatedData, speaker, alreadyTranslated, translatedData ) )
+        translateMeCounter = 0
+        for counter,tempList in enumerate( listForThisBatchRaw ):
+            # if the current tempList is already translated, then just move on to the next one.
+            if tempList[ 2 ] == True:
+                continue
+
+            currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow + counter )
+            # then write translations to mainSpreadsheet cell.
+            programSettings[ 'mainSpreadsheet' ].setCellValue( currentTranslatedCellAddress , postTranslatedList[ translateMeCounter ] )
+            translateMeCounter += 1
 
         # The resulting output is already correct.
         if userInput[ 'backupsEnabled' ] == True:
@@ -1679,7 +1699,8 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                 if userInput[ 'contextHistoryEnabled' ] == True:
                     if ( len( contextHistory ) >= userInput[ 'contextHistoryMaxLength' ] ) and ( userInput[ 'contextHistoryMaxLength' ] != 0 ):
                         if userInput[ 'contextHistoryReset' ] == True:
-                            # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround. Theoretically, it could make sense to keep history at max for a while and then wipe it later, but for now, just wipe it whenever it hits max.
+                            # LLMs tend to start hallucinating pretty fast and old history can corrupt new entries quickly, so just wipe history every once in a while as a workaround.
+                            # Theoretically, it could make sense to keep history at max for a while and then wipe it later, but it seems like it would be model/dataset/risk level specific for how long to leave it at max. For now, Just wipe it whenever it hits max.
                             contextHistory.clear()
                         else:
                             # Remove only the oldest entry.
@@ -1689,8 +1710,8 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                     # ( untranslatedString1, translatedString2, speaker )
                     contextHistory.append( ( untranslatedEntry, tempList[ 3 ], tempList[1] ) )
 
-                # Append the translated data to the output.
-                postTranslatedList.append( tempList[ 3 ] )
+                # Append the translated data to the output. # This is probably a mistake
+                # postTranslatedList.append( tempList[ 3 ] )
                 continue
 
             # Translate entry by submitting the line to the translation engine, along with the current contextHistory.
@@ -1710,8 +1731,6 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             except:
                 raise
                 #print( exception.__class__.__name__ )
-                #if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
-                #    raise exception
                 #if exception.__class__.__name__ != requests.exceptions.JSONDecodeError:
                 #    raise exception
 
@@ -1744,6 +1763,11 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                     if translatedEntry.find( item ) != -1:
                         translatedEntry = translatedEntry.replace( item, key )
 
+            # Update cache and mainSpreadsheet here.
+            # Update cache.
+            if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
+                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=untranslatedEntry, translation=translatedEntry )
+
             # Check with postDictionary, a Python dictionary for possible updates.
             if userInput[ 'postDictionary' ] != None:
                 for key,items in userInput[ 'postDictionary' ].items():
@@ -1751,11 +1775,6 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
                         translatedEntry = translatedEntry.replace( key, item )
 
             postTranslatedList.append( translatedEntry )
-
-            # Update cache and mainSpreadsheet here.
-            # Update cache.
-            if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
-                updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=untranslatedEntry, translation=translatedEntry )
 
             # Update mainSpreadsheet.
             currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow + counter )
@@ -1770,34 +1789,25 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             translateMeCounter += 1
 
     try:
-        assert( len( translateMe ) + cacheHitCounter == len( postTranslatedList ) )
+        # postTranslatedList is only the entries that have been translated using translateMe. It does not contain anything found in the cache.
+        assert( len( translateMe ) == len( postTranslatedList ) )
+        assert( untranslatedListSize - cacheHitCounter == len( postTranslatedList ) ) 
     except:
         print( 'len( translateMe )=', len( translateMe ) )
+        print( 'cacheHitCounter=', cacheHitCounter )
         print( 'len( postTranslatedList )=', len( postTranslatedList ) )
+        print( 'untranslatedListSize=', untranslatedListSize )
         raise
 
     finalOutput = []
     # This counter points to the current entry in translateMe.
     postTranslatedListCounter = 0
-
     # each entry is: ( untranslatedData, speaker, alreadyTranslated, translatedData )
     for counter,entry in enumerate( listForThisBatchRaw ):
         # cache and mainSpreadsheet have already been uploaded for alreadyTranslated == True entries, so only consider alreadyTranslated == False entries.
         if entry[ 2 ] == True:
             finalOutput.append( entry[ 3 ] )
         elif entry[ 2 ] == False:
-            # Update cache here.
-            # if cache is enabled, then add the untranslated line and the translated line as a pair to the cache file.
-            # This works well for batches, but single translations need this code further up.
-            if programSettings[ 'batchModeEnabled' ] == True:
-                if ( userInput[ 'cacheEnabled' ] == True ) and ( userInput[ 'readOnlyCache' ] == False ):
-                    updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=entry[ 0 ], translation=postTranslatedList[ postTranslatedListCounter ] )
-
-                currentTranslatedCellAddress = programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow + counter )
-                # then write translations to mainSpreadsheet cell.
-                programSettings[ 'mainSpreadsheet' ].setCellValue( currentTranslatedCellAddress , postTranslatedList[ postTranslatedListCounter ] )
-
-            # Housekeeping.
             finalOutput.append( postTranslatedList[ postTranslatedListCounter ] )
             postTranslatedListCounter += 1
 
@@ -2189,14 +2199,23 @@ def main( userInput=None ):
         else:
             tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] ) )
 
+    if userInput[ 'debug' ] == True:
+        print( 'pie' )
+        print( 'len(untranslatedEntriesColumnFull)=', len( untranslatedEntriesColumnFull ) )
+
     for i in tempBatchIterable:
         if userInput[ 'batchSizeLimit' ] == 0:
             currentBatchSize = len( untranslatedEntriesColumnFull )
         else:
             currentBatchSize = len( untranslatedEntriesColumnFull[ i : i + userInput[ 'batchSizeLimit' ] ] ) # This will be different than batchSizeLimit during the last iteration.
 
+        if userInput[ 'debug' ] == True:
+            print( 'currentBatchSize=', currentBatchSize )
+            print( 'programSettings[ currentRow ]=', programSettings[ 'currentRow' ] )
+
+
         # Workaround. if there is no batchSizeLimit, then tempBatchIterable will just be a list. for would normally iterate one by one through that list. However, since currentBatchSize is the entire list when batchSizeLimit == 0, then every entry will be translated in the first batch and there is no second batch. That means attempting to itterate through this code a second time is a mistake, so just break out of the loop.
-        if programSettings[ 'currentRow' ] >= len( untranslatedEntriesColumnFull ):
+        if programSettings[ 'currentRow' ] -1 > len( untranslatedEntriesColumnFull ):
         #if userInput[ 'batchSizeLimit' ] == 0:
             break
 

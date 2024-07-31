@@ -707,8 +707,8 @@ class KoboldCppEngine:
         # Update memory to not include {sceneSummary}. Store the processed results in tempMemory.
         # When generating the sceneSummary, it will obviously not be present already.
         if self.memory != None:
-            if self.memory.find( '{sceneSummary}' ) != -1:
-                tempMemory = self.memory.replace( '{sceneSummary}', '' )
+            if self.memory.find( '{scene}' ) != -1:
+                tempMemory = self.memory.replace( '{scene}', '' )
             else:
                 tempMemory = self.memory
         else:
