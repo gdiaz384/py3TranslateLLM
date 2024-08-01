@@ -741,7 +741,7 @@ class KoboldCppEngine:
         if tempMemory != None:
             requestDictionary[ 'memory' ] = tempMemory
         # This probably should not be hard coded.
-        requestDictionary[ 'prompt' ] = self.sceneSummaryPrompt.replace( '{scene}', tempString ) # The prompt.
+        requestDictionary[ 'prompt' ] = self.sceneSummaryPrompt.replace( '{scene}', tempString[ : -1 ] ) # The prompt. The -1 removes the last newline.
 
         returnedRequest = requests.post( self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=( 10, self.timeout ) )
 

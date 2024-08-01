@@ -1,5 +1,3 @@
-[![Python application](//github.com/gdiaz384/py3TranslateLLM/actions/workflows/python-app.yml/badge.svg)](//github.com/gdiaz384/py3TranslateLLM/actions/workflows/python-app.yml)
-
 # py3TranslateLLM.py
 
 py3TranslateLLM.py uses Artificial Intelligence (AI) to translate files.
@@ -8,7 +6,7 @@ The focus is on producing the highest quality local [Large Language Model (LLM)]
 
 More specifically, this Python program is a CLI wrapper for the following translation engines:
 
-- [KoboldCpp API](//github.com/LostRuins/koboldcpp).
+- [KoboldCpp](//github.com/LostRuins/koboldcpp) [API](//lite.koboldai.net/koboldcpp_api).
 - [py3translationServer](//github.com/gdiaz384/py3translationServer).
 - [pykakasi](//codeberg.org/miurahr/pykakasi).
 
@@ -21,9 +19,8 @@ And provides interoperability for the following formats:
 ## Support is planned for:
 
 - These translation engines:
-    - [DeepL API (Free)](https://www.deepl.com/pro-api).
+    - [DeepL API (Free)](//www.deepl.com/pro-api).
     - DeepL API (Pro).
-    - DeepL (Web hook).
     - Sugoi Offline Translator.
 - These file formats:
     - Microsoft Excel 97/2000/XP/2003 (.xls).
@@ -75,7 +72,7 @@ Undetermined:
 
 ## Installation guide
 
-`Current version: 2024.07.28-alpha`
+`Current version: 2024.07.31-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 

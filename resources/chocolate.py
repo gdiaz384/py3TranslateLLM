@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 
 Copyright (c) 2024 gdiaz384; License: See main program.
 """
-__version__ = '2024.07.28'
+__version__ = '2024.07.31'
 
 #set defaults
 #printStuff = True
@@ -316,7 +316,7 @@ class Strawberry:
             # Rows begin with 1, not 0, so add 1 to the reference row, but not to source list since list starts references at 0.
             self.spreadsheet.cell( row=int( i + 1 ), column=tempColumnNumber ).value = newColumnInAList[ i ]
 
-    #Example: replaceColumn('B',newColumnList)
+    # Example: replaceColumn( 'B', newColumnList )
 
 
     # Return either None if there is no cell with the search term, or the column letter of the cell if it found it. Case and whitespace sensitive search.
@@ -329,33 +329,13 @@ class Strawberry:
             break
         return None
 
-        # Old code.
-        cellFound=None
-        for row in self.spreadsheet[ 1 ]:
-            for i in row:
-                if i.value == searchTerm:
-                    cellFound = i
-                    break
-            #if cellFound != None:
-            #    print('found')
-            #else:
-            #    print('notfound')
-            break #stop searching after first row  #Hummmmmm.
-        if cellFound == None:
-            return None
-        #Slower.
-        #else:
-            #myRowNumber, myColumnLetter = self._getRowAndColumnFromRawCellString(cellFound)
-        #return myColumnLetter
-        return self._getRowAndColumnFromRawCellString( cellFound )[ 1 ]   #Faster.
-
-    #Example:
-    #cellFound=None
-    #isFound=searchHeader(mySpreadsheet,searchTerm)
-    #if isFound == None:
-    #    print('was not found')
-    #else:
-    #    print('searchTerm:\"'+searchTerm+'" was found at:'+str(isFound))
+    # Example:
+    # cellFound = None
+    # isFound = searchHeader( searchTerm )
+    # if isFound == None:
+    #     print('was not found')
+    # else:
+    #     print( 'searchTerm:\'' + searchTerm + '\' was found at:' + str( isFound ) )
 
 
     # This searches the first column for the searchTerm and returns None if not found or the row number if it found it. 
@@ -516,8 +496,7 @@ class Strawberry:
         #tempSpreadsheet = tempWorkbook.active
         #tempSpreadsheet = Strawberry()
 
-        # It looks like quoting fields in csv's that use commas , and new
-        # lines works but only as double quotes " and not single quotes '
+        # It looks like quoting fields in csv's that use commas , and new lines works but only as double quotes " and not single quotes '
         # Spaces are also preserved as-is if they are within the commas (,) by default, so remove them
         # If spaces are intended to be within the entry, then the user can encapslate them in double quotes
         # Need to test. Even double quotes might not preserve them. Tested: They do not.
@@ -529,7 +508,7 @@ class Strawberry:
         #print(inputErrorHandling)
         with open( fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling ) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
             # if csvDialect != None.:
-                # implement code related to csvDialects here. Default options are unix, excel and excel-tab
+                # Implement code related to csvDialects here. Default options are None, unix, excel, and excel-tab
             myCsvHandle = csv.reader( myFile )
 
             for listOfStrings in myCsvHandle:
@@ -561,7 +540,7 @@ class Strawberry:
     def exportToCSV( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=None ):
         with open( fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myOutputFileHandle:
             # if csvDialect != None.:
-                # implement code related to csvDialects here. Default options are unix, excel and excel-tab
+                # Implement code related to csvDialects here. Default options are None, unix, excel, and excel-tab
             myCsvHandle = csv.writer( myOutputFileHandle )
 
             # Get every row for current spreadsheet.

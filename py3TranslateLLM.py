@@ -12,7 +12,7 @@ License:
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 
 """
-__version__ = '2024.07.28-alpha'
+__version__ = '2024.07.31-alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -59,7 +59,7 @@ defaultAssignmentOperatorInSettingsFile = '='
 defaultMetadataDelimiter = '_'
 defaultScriptSettingsFileExtension = '.ini'
 # if a column begins with one of these entries, then it will be assumed to be invalid for cacheAnyMatch. Case insensitive.
-defaultBlacklistedHeadersForCache = [ 'rawText', 'speaker', 'metadata', 'hashedText' ] #'cache', 'cachedEntry', 'cache entry'
+defaultBlacklistedHeadersForCache = [ 'rawText', 'speaker', 'hashedText', 'metadata' ] #'cache', 'cachedEntry', 'cache entry'
 
 # Currently, these are relative to py3TranslateLLM.py, but it might also make sense to move them either relative to the target or to a system folder intended for holding program data.
 # There is no gurantee that being relative to the target is a sane thing to do since that depends upon runtime usage, and centralized backups also make sense. Leaving it as-is makes sense too as long as py3TranslateLLM is not being used as a library. If it is not being used as a library, then a centralized location under $HOME or %localappdata% makes more sense than relative to py3TranslateLLM.py. Same with the default location for the cache file.
@@ -74,7 +74,7 @@ defaultSceneSummaryCacheLocation = defaultBackupsFolder + '/sceneSummaryCache' +
 defaultMinimumSaveIntervalForMainSpreadsheet = 540 #240 # In seconds. 240 is every 4 minutes. 540 is every 9 minutes
 #defaultMinimumSaveIntervalForCache = 60 # For debugging.
 defaultMinimumSaveIntervalForCache = 300 # In seconds. 300 if 5 min. 240 is once every four minutes which means that, at most, only four minutes worth of processing time should be lost due to a program or translation engine error.
-defaultMinimumSaveIntervalForSceneSummaryCache = 300 # In seconds. 540 is 9 minutes.
+defaultMinimumSaveIntervalForSceneSummaryCache = 240 # In seconds. 540 is 9 minutes. 300 is 5 min. SceneSummary tends to be a large number of lines compressed into relatively few entries, and be missing translationEngines that do not support the sceneSummary feature, so it should not grow in size as much as regular cache and mainSpreadsheet. For that reason, backing it up more often should not impose an undo burden on the hardware. 
 
 # These two lists do not determine if the values are True/ False by default. Use action='store_true' and 'store_false' in the CLI options to toggle defaults and then update these two lists. These lists ensure the values are toggled correctly if a different than default setting is specified in program.ini when merging the CLI options with the options from the .ini .
 booleanValuesTrueByDefault = [ 'cache', 'contextHistory', 'contextHistoryReset', 'batches', 'backups']
@@ -186,11 +186,12 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-chml', '--contextHistoryMaxLength', help='The number of previous translations that should be sent to the translation engine to provide context for the current translation. Sane values are 2-10. Set to 0 to disable a limit to contextHistory which is a bad idea because LLMs tend to start hallucinating after a while. Not all translation engines support context. The maximum size of contextHistory will always be less than batchSizeLimit and sceneSummaryLength, even if batches are disabled. Default=' + str( defaultContextHistoryMaxLength ), default=None, type=int )
     commandLineParser.add_argument( '-chr', '--contextHistoryReset', help='Should contextHistory be fully reset when contextHistoryMaxLength is reached or should only the oldest entry be removed? Default=Fully reset contextHistory after reaching contextHistoryMaxLength in order to set a max to LLM hallucination errors that corrupt surrounding entries. Specifying this option means to remove the oldest entry instead of fully reseting the contextHistory buffer.', action='store_false' )
 
-    commandLineParser.add_argument( '-ssp', '--sceneSummaryPrompt', help='Experimental feature. The location of the sceneSummaryPrompt.txt file, a text file used to generate a summary of the untranslated text prior to translation. Only valid with specific translation engines. Specifying this text file will enable generating a scene summary prior to translation to potentially boost translation quality. Due to the highly experimental nature of this feature, translations are disabled by default when this feature is enabled in order to provide time to quality check the generated summary before attempting translation and to potentially use one engines/API to generate the summary and another for the subsequent translation. After quality checking the generated summaries, use -sset --sceneSummaryEnableTranslation to enable translations when using this feature. Actually using the summary during translation requires the following string to be present in either the memory.txt or prompt.txt file: {sceneSummary} Default=Do not generate a summary prior to translation.', default=None, type=str )
+    commandLineParser.add_argument( '-ssp', '--sceneSummaryPrompt', help='Experimental feature. The location of the sceneSummaryPrompt.txt file, a text file used to generate a summary of the untranslated text prior to translation. Only valid with specific translation engines. Specifying this text file will enable generating a scene summary prior to translation to potentially boost translation quality. Due to the highly experimental nature of this feature, translations are disabled by default when this feature is enabled in order to provide time to quality check the generated summary before attempting translation and to potentially use one engines/API to generate the summary and another for the subsequent translation. After quality checking the generated summaries, use -sset --sceneSummaryEnableTranslation to enable translations when using this feature. Actually using the summary during translation requires the following string to be present in either memory.txt or prompt.txt: {scene} Default=Do not generate a summary prior to translation.', default=None, type=str )
     commandLineParser.add_argument( '-sspe', '--sceneSummaryPromptEncoding', help='Experimental feature. The encoding of the sceneSummaryPrompt.txt file. Default=' + defaultTextEncoding, default=None, type=str )
     commandLineParser.add_argument( '-ssl', '--sceneSummaryLength', help='Experimental feature. The number of entries that should be summarized at any one time. If batches are enabled, batches and this will be reduced to the same number depending on whichever is lower. Set to 0 to disable limits when generating a summary. Default=' + str( defaultSceneSummaryLength ), default=None, type=int )
-    commandLineParser.add_argument( '-sset', '--sceneSummaryEnableTranslation', help='Enable the use of summaries of untranslated text when translating data. This always requires prompt.txt and sceneSummaryPrompt.txt files. sceneSummaryCache.xlsx will be used as cache. Default=Do not translate when generating a summary. The summary will be inserted in place of {sceneSummary} of memory.txt and prompt.txt', action='store_true' )
-    commandLineParser.add_argument( '-sscf', '--sceneSummaryCacheFile', help='Experimental feature. The location of the sceneSummaryCache.xlsx file which stores a cache of every previously generated summary. Default=' + defaultSceneSummaryCacheLocation, default=None, type=str )
+    commandLineParser.add_argument( '-sset', '--sceneSummaryEnableTranslation', help='Enable the use of summaries of untranslated text when translating data. This always requires prompt.txt and sceneSummaryPrompt.txt files. sceneSummaryCache.xlsx will be used as cache. Default=Do not translate when generating a summary. The summary will be inserted in place of {scene} of memory.txt and prompt.txt', action='store_true' )
+    commandLineParser.add_argument( '-sscf', '--sceneSummaryCacheFile', help='Experimental feature. The location of the sceneSummaryCache.xlsx which stores a cache of every previously generated summary. Default=' + defaultSceneSummaryCacheLocation, default=None, type=str )
+    commandLineParser.add_argument( '-sscam', '--sceneSummaryCacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits. This setting only affects sceneSummaryCache.', action='store_true' )
 
     commandLineParser.add_argument( '-b', '--batches', help='Toggles if entries should be submitted for translations engines that support them. Enabling batches disables context history. Default=Batches are automatically enabled for NMTs that support batches and web APIs like DeepL, but disabled for LLMs. Specifying this will disable them globally for all engines.', action='store_false' )
     commandLineParser.add_argument( '-bllm', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches and DeepL regardless of this setting. Enabling batches for LLMs disables context history. Default=' + str( defaultEnableBatchesForLLMs ), action='store_true' )
@@ -256,6 +257,7 @@ def createCommandLineOptions():
     userInput[ 'sceneSummaryLength' ] = commandLineArguments.sceneSummaryLength
     userInput[ 'sceneSummaryEnableTranslation' ] = commandLineArguments.sceneSummaryEnableTranslation
     userInput[ 'sceneSummaryCacheFile' ] = commandLineArguments.sceneSummaryCacheFile
+    userInput[ 'sceneSummaryCacheAnyMatch' ] = commandLineArguments.sceneSummaryCacheAnyMatch
 
     userInput[ 'batches' ] = commandLineArguments.batches
     userInput[ 'batchesEnabledForLLMs' ] = commandLineArguments.batchesEnabledForLLMs
@@ -609,7 +611,7 @@ def validateUserInput( userInput=None ):
         userInput[ 'sceneSummaryCacheEnabled' ] = False
     else:
         userInput[ 'sceneSummaryEnabled' ] = True
-        userInput[ 'sceneSummaryCacheEnabled' ] = True # Currently, this will still be disabled if the global setting for cache is disabled. Should this functionality be split to make --cache not global? What is the use-case for that?
+        userInput[ 'sceneSummaryCacheEnabled' ] = True # Currently, this will still be disabled if the global setting for cache is disabled. Should this functionality be split to make --cache not global? What is the use-case for that? # Update: The use case is to generate translations with one engine without intending to create any translations, leaving sceneSummaryEnableTranslation disabled. Since no translations are being performed, there is no need to load the cache for those translations.
     sceneSummaryCachePathObject = pathlib.Path( str( userInput[ 'sceneSummaryCacheFileName' ] ) )
     userInput[ 'sceneSummaryCacheFilePathOnly' ] = str( sceneSummaryCachePathObject.parent )
     userInput[ 'sceneSummaryCacheExtensionOnly' ] = sceneSummaryCachePathObject.suffix
@@ -852,6 +854,7 @@ def validateUserInput( userInput=None ):
     # if sceneSummaryEnabled == False, then neither sceneSummaryLength nor batchSizeLimit get reduced in size and so should not necessarily match.
     # However, sceneSummaryLength is not used at all after this point since batchSizeLimit must always == sceneSummaryLength to simplify internal processing regarding the scope of sceneSummary. 
     # Internal processing of data in py3TranslateLLM is always done in batches even if submission of entries to translationEngine as batches are disabled. This means that what 'batches' mean is somewhat overloaded. With fancier and messier logic, this could be de-coupled. Hmmm. Is there any point in de-coupling the sceneSummary code from the internal batch size code though? De-doupling for the sake of de-coupling is pointless especially if the end result would be less readable. What practical benefits are there?
+    # Maybe simplified explanations of how the batch options work to users? A mere explanation alone does not justify the increase in complexity. What other benefits are there?
     #if userInput[ 'sceneSummaryEnabled' ] != True:
     #    assert( userInput[ 'batchSizeLimit' ] == userInput[ 'sceneSummaryLength' ] )
 
@@ -1092,7 +1095,7 @@ def backupMainSpreadsheet( userInput=None, programSettings=None, outputName=None
 
 def backupSceneSummaryCache( userInput=None, programSettings=None, force=False ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    if userInput[ 'cacheEnabled' ] == False:
+    if userInput[ 'sceneSummaryCacheEnabled' ] == False:
         return None
 
     if ( userInput[ 'readOnlyCache' ] == True ) or ( programSettings[ 'sceneSummaryCacheWasUpdated' ] == False ):
@@ -1144,7 +1147,7 @@ def backupCache( userInput=None, programSettings=None, force=False ):
 # summaryData is the actual summary.
 def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, metadata=None, summaryData=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    if userInput[ 'cacheEnabled' ] == False:
+    if userInput[ 'sceneSummaryCacheEnabled' ] == False:
         return None
 
     if userInput[ 'readOnlyCache' ] == True:
@@ -1269,7 +1272,6 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     if untranslatedListSize <= 1:
         return None
 
-
     # What format should sceneSummaryCache take?
     # entry, engine # What is entry? A hash? 50 raw text entries? How about the sha1 hash?
     # Since that is too cryptic and since 50 raw texts is too long, then there must also be a metadata column to make the data human readable and debuggable.
@@ -1295,6 +1297,10 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     hash = str( hashlib.sha1( tempString.encode( 'utf-8' ) ).hexdigest() )
 
     # Check to see if it is already in cache.
+    # Right now, this will always check the cache in a specific order. if sceneSummaryCacheAnyMatch == True, then it will retrieve the summary and send it back. It might be better to try to re-create the summary using the current translation engine and only then check sceneSummaryCacheAnyMatch if both there is not one in the sceneSummaryCache and also if the current translation engine cannot produce. Of course, this still needs to be checked now for a perfect match.
+    # Then again, is such a feature desirable? It is somewhat intended to modify the summary before using it, regardless of the translation engine used to generate it, so trying to generate a perfect match after the user adjusted the summary and deliberately enabled sceneSummaryCacheAnyMatch would ignore that manually checked valid data. It is also somewhat a given that some translation engines are better at generating summaries than others. Presumably, the best engine for translations is a different one so creating summaries with one engine and translating with another is a typical use case.
+    # if not finding a perfect match means the software always tries to generate one over just using sceneSummaryCacheAnyMatch, then that has a high chance of going against the user's intent.
+    # Therefore, the above behavior change must not be implmented or available to alter to the user.
     # tempCellData can be a string or None if the string was not found.
     tempCellData = getCellValueFromSceneSummaryCache( userInput=userInput, programSettings=programSettings, searchString=hash )
 
@@ -1315,7 +1321,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     if userInput[ 'verbose' ] == True:
         print( ( 'Returned sceneSummary for lines ' + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + untranslatedListSize ) + '=' + str( sceneSummary ) ).encode( consoleEncoding ) )
 
-    # TODO: Update sceneSummaryCache here so main function does not have to worry about it. TODO: Implement updateSceneSummaryCache() properly.
+    # TODO: Update sceneSummaryCache here so main function does not have to worry about it. TODO: Implement updateSceneSummaryCache() properly. # Update. This should be done now.
     # 1) data is, current lines, the lines themselves,
     # 2) metadata the fileName_currentRow_currentRow+untranslatedListSize as a string
     # 3) sceneSummary if it is not None and is an instance of a string
@@ -1330,7 +1336,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
 # Due to cacheAnyMatch, this logic is surprisingly complicated, so split it off into its own function.
 def getCellValueFromSceneSummaryCache( userInput=None, programSettings=None, searchString=None ):
     consoleEncoding = userInput[ 'consoleEncoding' ]
-    if ( userInput[ 'cacheEnabled' ] == False ) or ( userInput[ 'sceneSummaryEnabled' ] == False ):
+    if ( userInput[ 'sceneSummaryCacheEnabled' ] == False ) or ( userInput[ 'sceneSummaryEnabled' ] == False ):
         return None
 
     # This will return None of the rowNumber where the entry was found in the cache.
@@ -1343,8 +1349,25 @@ def getCellValueFromSceneSummaryCache( userInput=None, programSettings=None, sea
     if cellData != None:
         return cellData
     #elif cellData == None:
-    # TODO: Add logic here to consider cacheAnyMatch.
+    elif userInput[ 'sceneSummaryCacheAnyMatch' ] != True:
+        return None
+    #elif cellData == None and userInput[ 'sceneSummaryCacheAnyMatch' ] == True:
 
+    # This should not be necessary.
+    #if len( programSettings[ 'validColumnLettersForSceneSummaryCacheAnyMatch' ] ) == 0:
+    #    return None
+
+    if userInput[ 'debug' ] == True:
+        print('validColumnLettersForSceneSummaryCacheAnyMatch=', programSettings[ 'validColumnLettersForSceneSummaryCacheAnyMatch' ] )
+
+    translatedEntry = None
+    for columnLetter in programSettings[ 'validColumnLettersForSceneSummaryCacheAnyMatch' ]:
+        tempCellContents = programSettings[ 'sceneSummaryCache' ].getCellValue( columnLetter + str( rowNumber ) )
+        if tempCellContents != None:
+            # Keep updating translatedEntry to favor the right-most translation engine.
+            translatedEntry = tempCellContents
+
+    return translatedEntry
 
 
 # Due to cacheAnyMatch, this logic is surprisingly complicated, so split it off into its own function.
@@ -1361,8 +1384,23 @@ def getCellValueFromCache( userInput=None, programSettings=None, searchString=No
     cellData = programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + str( rowNumber) )
     if cellData != None:
         return cellData
-    #elif cellData == None:
-    # TODO: Add logic here to consider cacheAnyMatch.
+    #elif ( cellData == None ) and
+    elif userInput[ 'cacheAnyMatch' ] != True:
+        return None
+    #elif cellData == None and userInput[ 'cacheAnyMatch' ] == True:
+
+    # This should not be necessary.
+    #if len( programSettings[ 'validColumnLettersForCacheAnyMatch' ] ) == 0:
+    #    return None
+
+    translatedEntry = None
+    for columnLetter in programSettings[ 'validColumnLettersForCacheAnyMatch' ]:
+        tempCellContents = programSettings[ 'cache' ].getCellValue( columnLetter + str( rowNumber ) )
+        if tempCellContents != None:
+            # Keep updating translatedEntry to favor the right-most translation engine.
+            translatedEntry = tempCellContents
+
+    return translatedEntry
 
 """
     # if entryInList/translatedData exists as a key in translationCacheDictionary,
@@ -1936,6 +1974,15 @@ def main( userInput=None ):
         sys.exit(1)
 
 
+    # Now that the translation has been initialized, a few more settings can be validated. This validation code would normally go further down until after spreadsheet/cache have also been read in order to validate all the settings together, but there is a special failure case here where if sceneSummaryEnabled == True, and sceneSummaryEnableTranslation == False, then nothing should be translated. Since nothing needs to be translated, the translation cache is not needed, so disable it as a small runtime optimization. 
+    if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsCreatingSummary != True ):
+        print( 'Warning: sceneSummaryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support creating sceneSummary. Disabling feature.' )
+        userInput[ 'sceneSummaryEnabled' ] = False
+
+    if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False ):
+        userInput[ 'cacheEnabled' ] = False
+
+
     # Next turn fileToTranslateFileName into a data structure. How? Read the file, then create data structure from that file.
     # chocolate.Strawberry() is a wrapper class for the onenpyxl.workbook class with additional methods.
     # The interface has no concept of workbooks vs spreadsheets. That distinction is handled only inside the class. Syntax:
@@ -1995,12 +2042,15 @@ def main( userInput=None ):
     # Currently, cache consideres multiple language pairs using different sheets. Each sheet in the workbook is a different sourceLanguage_targetLanguage pair marked by 3 letter words. Syntax: source_target Examples: jpn_eng, chi_eng, eng_spn
 
     print( 'cacheEnabled=', userInput[ 'cacheEnabled' ] )
+    if userInput[ 'sceneSummaryEnabled' ] == True:
+        print( 'sceneSummaryCacheEnabled=', userInput[ 'sceneSummaryCacheEnabled' ] )
 
     if userInput[ 'cacheEnabled' ] == True:
         #First, initialize cache.xlsx file under backups/
         # Has same structure as mainSpreadsheet except for no speaker and no metadata. Still has a header row of course. Multiple columns with each one as a different translation engine.
 
         #if the path for cache does not exist, then create it.
+        # exist_ok requires Python 3.5+
         pathlib.Path( userInput[ 'cacheFilePathOnly' ] ).mkdir( parents = True, exist_ok = True )
 
         # if cache.xlsx exists, then the cache file will be read into a chocolate.Strawberry(), otherwise, a new one will be created only in memory.
@@ -2068,41 +2118,57 @@ def main( userInput=None ):
                     programSettings[ 'validColumnLettersForCacheAnyMatch' ].append( programSettings[ 'cache' ].searchHeaders( header ) )
 
 
-        if userInput[ 'sceneSummaryCacheEnabled' ] == True:
-            programSettings[ 'sceneSummaryCache' ] = chocolate.Strawberry( myFileName=userInput[ 'sceneSummaryCacheFileName' ], fileEncoding=defaultTextEncoding, spreadsheetNameInWorkbook=userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode' ], readOnlyMode=userInput[ 'readOnlyCache' ] )
+    if userInput[ 'sceneSummaryCacheEnabled' ] == True:
+        programSettings[ 'sceneSummaryCache' ] = chocolate.Strawberry( myFileName=userInput[ 'sceneSummaryCacheFileName' ], fileEncoding=defaultTextEncoding, spreadsheetNameInWorkbook=userInput[ 'internalSourceLanguageThreeCode' ] + '_' + userInput[ 'internalDestinationLanguageThreeCode' ], readOnlyMode=userInput[ 'readOnlyCache' ] )
 
-            if functions.checkIfThisFileExists( userInput[ 'sceneSummaryCacheFileName' ] ) != True:
-                # if the chocolate.Strawberry() is brand new, add header row.
-                programSettings[ 'sceneSummaryCache' ].appendRow( [ 'hashedText', 'metadata' ] )
+        if functions.checkIfThisFileExists( userInput[ 'sceneSummaryCacheFileName' ] ) != True:
+            # if the chocolate.Strawberry() is brand new, add header row.
+            programSettings[ 'sceneSummaryCache' ].appendRow( [ 'hashedText', 'metadata' ] )
 
-            if userInput[ 'verbose' ] == True:
-                print( ( 'sceneSummaryCache is available at: ' + str( userInput[ 'sceneSummaryCacheFileName' ] ) ).encode( consoleEncoding ) )
+        if userInput[ 'verbose' ] == True:
+            print( ( 'sceneSummaryCache is available at: ' + str( userInput[ 'sceneSummaryCacheFileName' ] ) ).encode( consoleEncoding ) )
 
-            if userInput[ 'rebuildCache' ] == False:
-                # Then error out if there is an error initalizing the index.
+        if userInput[ 'rebuildCache' ] == False:
+            # Then error out if there is an error initalizing the index.
+            programSettings[ 'sceneSummaryCache' ].initializeCache()
+        # elif rebuildCache == True:
+        else:
+            # Do a try: except: block that includes rebuilding it.
+            try:
                 programSettings[ 'sceneSummaryCache' ].initializeCache()
-            # elif rebuildCache == True:
-            else:
-                # Do a try: except: block that includes rebuilding it.
-                try:
-                    programSettings[ 'sceneSummaryCache' ].initializeCache()
-                except:
-                    programSettings[ 'sceneSummaryCache' ].rebuildCache()
-                    programSettings[ 'sceneSummaryCache' ].initializeCache()
+            except:
+                programSettings[ 'sceneSummaryCache' ].rebuildCache()
+                programSettings[ 'sceneSummaryCache' ].initializeCache()
 
-            #Set currentSceneSummaryCacheColumn.
+        #Set currentSceneSummaryCacheColumn.
+        programSettings[ 'currentSceneSummaryCacheColumn' ] = programSettings[ 'sceneSummaryCache' ].searchHeaders( programSettings[ 'translationEngine' ].model )
+        if programSettings[ 'currentSceneSummaryCacheColumn' ] == None:
+            # Then the model is not currently in the sceneSummaryCache, so need to add it. Update currentSceneSummaryCacheColumn after it has been updated.
+            headers = programSettings[ 'sceneSummaryCache' ].getRow( 1 )
+            headers.append( programSettings[ 'translationEngine' ].model )
+            programSettings[ 'sceneSummaryCache' ].replaceRow( 1, headers )
             programSettings[ 'currentSceneSummaryCacheColumn' ] = programSettings[ 'sceneSummaryCache' ].searchHeaders( programSettings[ 'translationEngine' ].model )
             if programSettings[ 'currentSceneSummaryCacheColumn' ] == None:
-                # Then the model is not currently in the sceneSummaryCache, so need to add it. Update currentSceneSummaryCacheColumn after it has been updated.
-                headers = programSettings[ 'sceneSummaryCache' ].getRow( 1 )
-                headers.append( programSettings[ 'translationEngine' ].model )
-                programSettings[ 'sceneSummaryCache' ].replaceRow( 1, headers )
-                programSettings[ 'currentSceneSummaryCacheColumn' ] = programSettings[ 'sceneSummaryCache' ].searchHeaders( programSettings[ 'translationEngine' ].model )
-                if programSettings[ 'currentSceneSummaryCacheColumn' ] == None:
-                    print( 'un spe cified error.' )
-                    sys.exit( 1 )
+                print( 'un spe cified error.' )
+                sys.exit( 1 )
 
+        # Prepare some static data for sceneSummaryCacheAnyMatch so that it does not have to be prepared while in the loop on every loop.
+        if userInput[ 'sceneSummaryCacheAnyMatch' ] == True:
+            programSettings[ 'blacklistedHeadersForSceneSummaryCacheAnyMatch' ] = defaultBlacklistedHeadersForCache.copy()
+            programSettings[ 'blacklistedHeadersForSceneSummaryCacheAnyMatch' ].append( programSettings[ 'translationEngine' ].model )
 
+            # To help with a case insensitive search, make everything lowercase.
+            for counter,blacklistedHeader in enumerate( programSettings[ 'blacklistedHeadersForSceneSummaryCacheAnyMatch' ] ):
+                programSettings[ 'blacklistedHeadersForSceneSummaryCacheAnyMatch' ][ counter ] = blacklistedHeader.lower()
+
+            headers = programSettings[ 'sceneSummaryCache' ].getRow( 1 )
+            programSettings[ 'validColumnLettersForSceneSummaryCacheAnyMatch' ] = []
+            for header in headers:
+                if not str( header ).lower() in programSettings[ 'blacklistedHeadersForSceneSummaryCacheAnyMatch' ]:
+                    # This should append the column letter, not the literal text, to the list.
+                    programSettings[ 'validColumnLettersForSceneSummaryCacheAnyMatch' ].append( programSettings[ 'sceneSummaryCache' ].searchHeaders( header ) )
+
+    # Now that the translation engine has been initialized and datastructures have been instantiated, validate a few more of the program settings that could not have been done prior to this point.
     # batchModeEnabled Algorithim:
     # if requiresPrompt = True and supportsBatches = True, then is an LLM,
         # if batchesEnabledForLLMs, then batchModeEnabled=True
@@ -2132,10 +2198,6 @@ def main( userInput=None ):
 
     # Debug code.
     #programSettings[ 'batchModeEnabled' ] = False
-
-    if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsCreatingSummary != True ):
-        print( 'Warning: sceneSummaryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support creating sceneSummary. Disabling feature.' )
-        userInput[ 'sceneSummaryEnabled' ] = False
 
     if userInput[ 'contextHistoryEnabled' ] == True:
         # Context history is not valid if the translationEngine does not support it of it batches are enabled. 
@@ -2269,11 +2331,11 @@ def main( userInput=None ):
         elif programSettings[ 'cacheWasUpdated' ] == True:
             backupCache( userInput=userInput, programSettings=programSettings, force=True )
 
-        if userInput[ 'sceneSummaryEnabled' ] == True:
-            if userInput[ 'readOnlyCache' ] == True:
-                programSettings[ 'sceneSummaryCache' ].close()
-            elif programSettings[ 'sceneSummaryCacheWasUpdated' ] == True:
-                backupSceneSummaryCache( userInput=userInput, programSettings=programSettings, force=True )
+    if userInput[ 'sceneSummaryCacheEnabled' ] ==   userInput[ 'sceneSummaryEnabled' ] == True:
+        if userInput[ 'readOnlyCache' ] == True:
+            programSettings[ 'sceneSummaryCache' ].close()
+        elif programSettings[ 'sceneSummaryCacheWasUpdated' ] == True:
+            backupSceneSummaryCache( userInput=userInput, programSettings=programSettings, force=True )
 
 
 if __name__ == '__main__':
