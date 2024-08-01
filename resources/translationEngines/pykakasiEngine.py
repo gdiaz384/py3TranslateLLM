@@ -20,17 +20,20 @@ This plugin uses the pykakasi library that is copyright (C) 2010-2024 by Hiroshi
 pykakasi is licensed as GNU GPLv3: https://codeberg.org/miurahr/pykakasi/src/branch/master/COPYING
 See the source code for additional details: https://codeberg.org/miurahr/pykakasi
 """
-__version__='2024.05.23'
+__version__ = '2024.07.14'
 
 #set defaults
-#printStuff=True
-verbose=False
-debug=False
-consoleEncoding='utf-8'
+#printStuff = True
+verbose = False
+debug = False
+consoleEncoding = 'utf-8'
+
+validPykakasiRomajiFormats = [ 'hepburn', 'kunrei', 'passport', 'hira', 'kana' ]
+validCutletRomajiFormats = [ 'hepburn', 'kunrei', 'nihon', 'kunreisiki', 'nihonsiki' ]
 
 # romajiFormat can be 'hepburn', 'kunrei', 'passport' # Technically, 'hira' and 'kana' are valid as well.
-defaultRomajiFormat='hepburn'
-punctuationList=[ '。', '「', '」', '、', '…', '？', '♪']
+defaultRomajiFormat = 'hepburn'
+punctuationList = [ '。', '「', '」', '、', '…', '？', '♪']
 
 import sys
 
@@ -38,7 +41,7 @@ import sys
 class PyKakasiEngine:
     # Insert any custom code to pre process the untranslated text here. This is very dataset specific.
     # https://www.w3schools.com/python/python_strings_methods.asp
-    def preProcessText(self, untranslatedText):
+    def preProcessText( self, untranslatedText ):
         #return untranslatedText
 
         untranslatedText=untranslatedText.strip()               # Remove any whitespaces along the edges.
@@ -70,9 +73,9 @@ class PyKakasiEngine:
 
 
     # Insert any custom code to post process the output text here. This is very dataset specific.
-    def postProcessText(self, rawTranslatedText, untranslatedText, speakerName=None):
+    def postProcessText( self, rawTranslatedText, untranslatedText, speakerName=None ):
+        rawTranslatedText = rawTranslatedText.strip()
 
-        rawTranslatedText=rawTranslatedText.strip()
         if rawTranslatedText.find( '  ' ) != -1:
             rawTranslatedText=rawTranslatedText.replace( '  ',' ' ).replace( '  ', ' ' )  # In the middle, replace any two blank spaces with a single blank space.
 
@@ -101,94 +104,96 @@ class PyKakasiEngine:
     def __init__( self, sourceLanguage=None, targetLanguage=None, characterDictionary=None, settings={} ): 
 
         # Set generic API static values for this engine.
-        self.supportsBatches=True
-        self.supportsHistory=False
-        self.requiresPrompt=False
+        self.supportsBatches = True
+        self.supportsHistory = False
+        self.requiresPrompt = False
+        self.promptOptional = False
+        self.supportsCreatingSummary = False
 
         # Set generic API variables for this engine.
-        self.model=None
-        self.version=None
+        self.model = None
+        self.version = None
 
         # Process generic input.
-        self.characterDictionary=characterDictionary
-        self.sourceLanguage=sourceLanguage
-        self.targetLanguage=targetLanguage
+        self.characterDictionary = characterDictionary
+        self.sourceLanguage = sourceLanguage
+        self.targetLanguage = targetLanguage
 
         # Debug code.
-        #print('settings=' + str(settings) )
-        #sys.exit(0)
+        if debug == True:
+            print( ( 'settings=' + str( settings ) ).encode( consoleEncoding ) )
 
         # romajiFormat can be 'hepburn', 'kunrei', 'passport'
         if 'romajiFormat' in settings:
-            if settings['romajiFormat'] != None:
-                self.romajiFormat=settings['romajiFormat'].lower()
+            if settings[ 'romajiFormat' ] != None:
+                self.romajiFormat = settings[ 'romajiFormat' ].lower()
             else:
-                self.romajiFormat=defaultRomajiFormat
+                self.romajiFormat = defaultRomajiFormat
         else:
-            self.romajiFormat=defaultRomajiFormat
+            self.romajiFormat = defaultRomajiFormat
 
         # Process engine specific input and associated variables.
-        self.reachable=False
+        self.reachable = False
         # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
 
-        self.model=None
-        self.version=None
-        print( 'Importing pykakasi... ', end='')
+        self.model = None
+        self.version = None
+        print( 'Importing pykakasi... ', end='' )
         try:
             import pykakasi
             try:
                 from importlib import metadata as importlib_metadata
             except ImportError:
                 import importlib_metadata
-            self.version = importlib_metadata.distribution('pykakasi').version
-            self.model='pykakasi/' + str(self.version) + '/' + self.romajiFormat # pykakasi/2.2.1/hepburn, pykakasi/2.2.1/kunrei
-            self.kakasi=pykakasi.kakasi()
+            self.version = importlib_metadata.distribution( 'pykakasi' ).version
+            self.model = 'pykakasi/' + str( self.version ) + '/' + self.romajiFormat # pykakasi/2.2.1/hepburn, pykakasi/2.2.1/kunrei
+            self.kakasi = pykakasi.kakasi()
             print( 'Success.')
 
-            if (self.romajiFormat == 'hepburn') or (self.romajiFormat == 'kunrei') or (self.romajiFormat == 'passport'):
+            if ( self.romajiFormat == 'hepburn' ) or ( self.romajiFormat == 'kunrei' ) or ( self.romajiFormat == 'passport' ):
                 # Developer hard coded these for the old API, so have to match the case exactly.
                 if self.romajiFormat == 'hepburn':
-                    self.kakasi.setMode('r', 'Hepburn')
+                    self.kakasi.setMode( 'r', 'Hepburn' )
                 elif self.romajiFormat == 'kunrei':
-                    self.kakasi.setMode('r', 'Kunrei')
+                    self.kakasi.setMode( 'r', 'Kunrei' )
                 elif self.romajiFormat == 'passport':
-                    self.kakasi.setMode('r', 'Passport')
+                    self.kakasi.setMode( 'r', 'Passport' )
 
                 # Convert all the things, but...
-                self.kakasi.setMode('H','a') # Hiragana.
-                self.kakasi.setMode('K','a') # Katakana.
-                self.kakasi.setMode('J','a') # Kanji.
-                self.kakasi.setMode('E','a') # E is full length roman characters. This converts them back to half length. The developer calls this option 'kigou' which means 'symbol.'
+                self.kakasi.setMode( 'H','a' ) # Hiragana.
+                self.kakasi.setMode( 'K','a' ) # Katakana.
+                self.kakasi.setMode( 'J','a' ) # Kanji.
+                self.kakasi.setMode( 'E','a' ) # E is full length roman characters. This converts them back to half length. The developer calls this option 'kigou' which means 'symbol.'
                 # ...leave well enough alone.
-                self.kakasi.setMode('a',None)
+                self.kakasi.setMode( 'a', None )
 
-            elif (self.romajiFormat == 'hira'):
+            elif ( self.romajiFormat == 'hira' ):
                 #print('pie')
                 # Convert all the things, but...
-                #self.kakasi.setMode('H',None) # Hiragana.
-                self.kakasi.setMode('K','H') # Katakana.
-                self.kakasi.setMode('J','H') # Kanji.
-                self.kakasi.setMode('E','H') # E is full length roman characters. This converts them back to half length.
-                self.kakasi.setMode('a','H') # Normal half-length roman characters.
+                #self.kakasi.setMode( 'H', None ) # Hiragana.
+                self.kakasi.setMode( 'K', 'H' ) # Katakana.
+                self.kakasi.setMode( 'J', 'H' ) # Kanji.
+                self.kakasi.setMode( 'E', 'H' ) # E is full length roman characters. This converts them back to half length.
+                self.kakasi.setMode( 'a', 'H' ) # Normal half-length roman characters.
 
             elif (self.romajiFormat == 'kana'):
                 # Convert all the things, but...
-                self.kakasi.setMode('H','K') # Hiragana.
-                #self.kakasi.setMode('K',None) # Katakana.
-                self.kakasi.setMode('J','K') # Kanji.
-                self.kakasi.setMode('E','K') # E is full length roman characters. This converts them back to half length.
-                self.kakasi.setMode('a','K') # Normal half-length roman characters.
+                self.kakasi.setMode( 'H', 'K' ) # Hiragana.
+                #self.kakasi.setMode( 'K', None ) # Katakana.
+                self.kakasi.setMode( 'J', 'K' ) # Kanji.
+                self.kakasi.setMode( 'E', 'K' ) # E is full length roman characters. This converts them back to half length.
+                self.kakasi.setMode( 'a', 'K' ) # Normal half-length roman characters.
 
             # Add spaces to output.
-            self.kakasi.setMode('s',True)
+            self.kakasi.setMode( 's', True )
 
         #except requests.exceptions.ConnectTimeout:
         except ImportError:
             print( 'Failure.')
-            print( 'Unable to import py3kakasi. Please install it with \'pip install py3kakasi\' and try again.' )
+            print( 'Unable to import pykakasi. Please install it with \'pip install pykakasi\' and try again.' )
 
         if self.model != None:
-            self.reachable=True
+            self.reachable = True
 
         # self.characterDictionary uses japanese (Kanji) -> target language conversion, not necessarily romaji names.
         # Since Kanji-> target language has multiple mappings and converting verbatim to romaji will always mess up, especially the capitalization, using manual mapping for characterNames is best for quality.
@@ -203,42 +208,70 @@ class PyKakasiEngine:
 
 
     # This expects a python list where every entry is a string.
-    def batchTranslate(self, untranslatedList):
+    def batchTranslate( self, untranslatedList, settings=None ):
         #debug=True
         if debug == True:
-            print( 'len(untranslatedList)=' , len(untranslatedList) )
-            print( ( 'untranslatedList=' + str(untranslatedList) ).encode(consoleEncoding) )
+            print( 'len(untranslatedList)=' , len( untranslatedList ) )
+            print( ( 'untranslatedList=' + str( untranslatedList ) ).encode( consoleEncoding ) )
 
         translatedList = []
         for entry in untranslatedList:
-            translatedList.append( self.translate(entry) )
+            translatedList.append( self.translate( entry ) )
 
-        # print(len(untranslatedList))
-        # print(len(translatedList))
-        assert( len(untranslatedList) == len(translatedList) )
+        try:
+            assert( len( untranslatedList ) == len( translatedList ) )
+        except:
+            print( 'Warning: Library did not return same about entries sent to it. Returning None.' )
+            print( 'len( untranslatedList )=' + str( len( untranslatedList ) ) )
+            print( 'len( translatedList )=' + str( len( translatedList ) ) )
+            return None
 
         if debug == True:
-            print( ( 'translatedList=' + str(translatedList) ).encode(consoleEncoding) )
+            print( 'len(translatedList)=' , len( translatedList ) )
+            print( ( 'translatedList=' + str( translatedList ) ).encode( consoleEncoding ) )
 
         return translatedList
 
 
     # This expects a string to translate.
-    def translate(self, untranslatedString, speakerName=None, contextHistory=None):
+    def translate( self, untranslatedString, settings=None ):
         #assert string
 
-        untranslatedStringAfterPreProcessing=self.preProcessText(untranslatedString)
+        untranslatedStringAfterPreProcessing = self.preProcessText(untranslatedString)
 
         # New API. Very broken.
-        #translatedString=self.kakasi.convert(untranslatedStringAfterPreProcessing)[0][self.romajiFormat]
+        #translatedString = self.kakasi.convert( untranslatedStringAfterPreProcessing )[ 0 ][ self.romajiFormat ]
 
         # Old API. Works.
-        translatedString=self.kakasi.getConverter().do(untranslatedStringAfterPreProcessing)
+        translatedString = self.kakasi.getConverter().do( untranslatedStringAfterPreProcessing )
 
-        return self.postProcessText(translatedString, untranslatedString, speakerName)
+        return self.postProcessText( translatedString, untranslatedString )
 
 
 """
+TODO: Integrate this code above.
+if ( userInput[ 'mode' ] == 'pykakasi' ) and ( userInput[ 'romajiFormat' ] != None ):
+    userInput[ 'romajiFormat' ] = userInput[ 'romajiFormat' ].lower()
+
+    if userInput[ 'romajiFormat' ] in validPykakasiRomajiFormats:
+        pass
+    else:
+        print( ( 'Warning: romajiFormat \'' + userInput[ 'romajiFormat' ] + '\' is not valid with pykakasi. Reverting to default.' ).encode(consoleEncoding) )
+        userInput[ 'romajiFormat' ] = None
+
+
+if ( userInput[ 'mode' ] == 'cutlet' ) and ( userInput[ 'romajiFormat' ] != None ):
+    userInput[ 'romajiFormat' ] = userInput[ 'romajiFormat' ].lower()
+    if userInput[ 'romajiFormat' ] in validCutletRomajiFormats:
+        pass
+    else:
+        print( ( 'Warning: romajiFormat \'' + userInput[ 'romajiFormat' ] + '\' is not valid with cutlet. Reverting to default.' ).encode(consoleEncoding) )
+        userInput[ 'romajiFormat' ] = None
+    if userInput[ 'romajiFormat' ] == 'kunreisiki':
+        userInput[ 'romajiFormat' ] = 'kunrei'
+    elif userInput[ 'romajiFormat' ] == 'nihonsiki':
+        userInput[ 'romajiFormat' ] = 'nihon'
+
 Usage and concept art:
 # TODO: This section.
 

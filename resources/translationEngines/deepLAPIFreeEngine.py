@@ -19,9 +19,18 @@ defaultTimeout = 360
 
 import sys
 import requests
+# Library must be available.
+try:
+    import deepl
+except:
+    print( 'DeepL\'s python library is not available. Please install using: pip install deepl' )
+    sys.exit( 1 )
+
+# Environmental variable syntax:
+# os.environ[ 'CT2_VERBOSE' ] = '1'
 
 
-class Py3translationServerEngine:
+class DeepLApiFreeEngine:
     # Insert any custom code to pre process the untranslated text here. This is very model, prompt, and dataset specific.
     # https://www.w3schools.com/python/python_strings_methods.asp
     def preProcessText(self, untranslatedText):
@@ -34,8 +43,6 @@ class Py3translationServerEngine:
             untranslatedText = untranslatedText.replace( '\n',' ' ).strip() # Remove new lines and replace them with a single empty space.
         if untranslatedText.find( '  ' ) != -1:
             untranslatedText = untranslatedText.replace( '  ',' ' ).replace( '  ', ' ' )  # In the middle, replace any two blank spaces with a single blank space.
-
-        # Dataset specific fixes go here.
 
         return untranslatedText
 
@@ -65,7 +72,7 @@ class Py3translationServerEngine:
         self.supportsBatches = True
         self.supportsHistory = False
         self.requiresPrompt = False
-        self.promptOptional = False
+        self.promptOptional = True
         self.supportsCreatingSummary = False
 
         # Set generic API variables for this engine.
@@ -74,36 +81,47 @@ class Py3translationServerEngine:
 
         # Process generic input.
         self.characterDictionary = characterDictionary
-        self.sourceLanguage = sourceLanguage
-        self.targetLanguage = targetLanguage
+        self.sourceLanguageList = sourceLanguage
+        # if DifferentSourceLanguage == True, then use the alternative name.
+        if self.sourceLanguageList[ 4 ] == True:
+            self.sourceLanguage = self.sourceLanguageList[ 5 ]
+        else:
+            self.sourceLanguage = self.sourceLanguageList[ 0 ]
+
+        self.targetLanguageList = targetLanguage
+        if self.targetLanguageList[ 4 ] == True:
+            self.targetLanguage = self.targetLanguageList[ 5 ]
+        else:
+            self.targetLanguage = self.targetLanguageList[ 0 ]
+
+        #debug=True
+        if debug == True:
+            print( str( settings ).encode( consoleEncoding ) )
+            print( self.sourceLanguage )
+            print( self.targetLanguageList )
+            print( self.targetLanguage )
 
         # Process engine specific input and associated variables.
-        self.address = settings[ 'address' ]
-        self.port = settings[ 'port' ]
-        self.addressFull = self.address + ':' + str(self.port)
         if 'timeout' in settings:
             self.timeout = settings[ 'timeout' ]
         else:
             self.timeout = defaultTimeout
+        # Probe for where the API key is here.
 
         self.reachable = False
-        # Some sort of test to check if the server is reachable goes here. Maybe just try to get model/version and if they are returned, then the server is declared reachable?
+        # Do some sort of test to check if the server is reachable.
 
         self.model = None
         self.version = None
-        print( 'Connecting to py3translationServer at ' + self.addressFull + ' ... ', end='')
-        if ( self.address != None ) and ( self.port != None ):
-            try:
-                self.model = requests.get( self.addressFull + '/api/v1/model', timeout=10 ).text
-                self.version = requests.get( self.addressFull + '/api/v1/version', timeout=10 ).text
-                print( 'Success.' )
-            #except requests.exceptions.ConnectTimeout:
-            except:
-                print( 'Failure.' )
-                print( 'Unable to connect to py3translationServer. Please check the connection settings and try again.' )
-        else:
-            print( 'Failure.')
-            print( 'Unable to connect to py3translationServer. Please specify a valid address and port before trying again. The address must have the correct protocol.' )
+        print( 'Connecting to DeepL API (Free)... ', end='')
+        try:
+            # stuff goes here
+            pass
+            # Set self.model and self.version to something.
+            print( 'Success.' )
+        except:
+            print( 'Failure.' )
+            print( 'Unable to connect to py3translationServer. Please check the connection settings and try again.' )
 
         if self.model != None:
             self.reachable = True
@@ -121,8 +139,8 @@ class Py3translationServerEngine:
             #print( str( entry ).encode( consoleEncoding ) )
             untranslatedList[ counter ] = self.preProcessText( entry )
 
-        # https://docs.python-requests.org/en/latest/user/advanced/#timeouts
-        translatedList = requests.post( self.addressFull, json = dict ( [ ( 'content' , untranslatedList ), ( 'message' , 'translate sentences') ] ), timeout=( 10, self.timeout ) ).json()
+        # Translate the list.
+        translatedList = []
 
         if debug == True:
             print( ( 'translatedListBeforePostProcessing=' + str( translatedList ) ).encode( consoleEncoding ) )
@@ -135,7 +153,7 @@ class Py3translationServerEngine:
             print( 'len( translatedList )=' + str( len( translatedList ) ) )
             return None
 
-        # strip whitespace
+        # Postprocess text.
         for counter,entry in enumerate( translatedList ):
             translatedList[ counter ] = self.postProcessText( entry, untranslatedList[ counter ] )
 
@@ -148,9 +166,9 @@ class Py3translationServerEngine:
     # This expects a string to translate.
     def translate( self, untranslatedString, settings=None ):
         #assert type is a string
-        assert( isinstance( untranslatedString, str ) ) 
 
         return str( self.batchTranslate( [ untranslatedString ] )[ 0 ] ) # Lazy.
+
 
 
 """
