@@ -1,0 +1,1 @@
+[INST]In {targetLanguage}, provide a concise summary of this story text: {scene}[/INST]

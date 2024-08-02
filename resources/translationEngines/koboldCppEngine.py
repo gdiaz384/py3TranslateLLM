@@ -114,6 +114,8 @@ qwen1_5_chatModels = qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
 # https://ai.google.dev/gemma/docs/formatting
 # https://huggingface.co/google/gemma-2-27b-itc
 # https://huggingface.co/google/gemma-2-27b-it
+# Has problems producing output consistently. It messes up when creating a sceneSummary a lot because it outputs its own stop token immediately. Likely a prompt or model settings issue.
+# Conclusion: Superb quality. When it works, consistently better than mixtral8x7b. More consistant at producing quality summaries than mixtral8x7b.
 
 
 #import sys                  # Default import.

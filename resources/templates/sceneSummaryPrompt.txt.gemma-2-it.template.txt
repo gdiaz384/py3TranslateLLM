@@ -1,0 +1,2 @@
+<start_of_turn>In {targetLanguage}, provide a concise summary of this story text: {scene}<end_of_turn>
+<start_of_turn>
