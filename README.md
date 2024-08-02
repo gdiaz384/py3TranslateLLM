@@ -72,7 +72,7 @@ Undetermined:
 
 ## Installation guide
 
-`Current version: 2024.07.31-alpha`
+`Current version: 2024.08.01-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 

@@ -8,7 +8,7 @@ Usage: See below. Like at the bottom.
 Copyright (c) 2024 gdiaz384; License: See main program.
 
 """
-__version__ = '2024.07.28'
+__version__ = '2024.08.01'
 
 #set defaults
 #printStuff = True
@@ -379,9 +379,10 @@ class KoboldCppEngine:
                 self.version = self.version[ 'result' ] + '/' + self.version[ 'version' ]
                 self._maxContextLength = int( requests.get( self.addressFull + '/api/extra/true_max_context_length', timeout=10 ).json()[ 'value' ] )
                 print( 'Success.')
-                print( ( 'koboldcpp model=' + self.model ).encode( consoleEncoding ) )
-                print( ( 'koboldcpp version=' + self.version ).encode( consoleEncoding ) )
-                print( ( 'koboldcpp maxContextLength=' + str( self._maxContextLength ) ).encode( consoleEncoding ) )
+                # Moved to main program.
+                #print( ( 'koboldcpp model=' + self.model ).encode( consoleEncoding ) )
+                #print( ( 'koboldcpp version=' + self.version ).encode( consoleEncoding ) )
+                #print( ( 'koboldcpp maxContextLength=' + str( self._maxContextLength ) ).encode( consoleEncoding ) )
             #except requests.exceptions.ConnectTimeout:
             except:
                 print( 'Failure.')
@@ -417,6 +418,8 @@ class KoboldCppEngine:
             elif self._modelOnly.find('gemma-2') != -1:
                 self._instructModelStartSequence = gemma2StartSequence
                 self._instructModelEndSequence = gemma2EndSequence
+                global instructSequenceIsAlsoForLLMOutput
+                instructSequenceIsAlsoForLLMOutput = True
             #TODO: Add more model detection schemes here.
             else:
                 self._instructModelStartSequence = defaultInstructionFormatStartSequence
@@ -556,7 +559,7 @@ class KoboldCppEngine:
                     #TODO: format autocomplete model history here. How? Maybe just use same as chat syntax?
                     pass
                 else:
-                    print( ( 'Warning: Uncrecognized instructionFormat' + str(self.instructionFormat) ).encode( consoleEncoding ) )
+                    print( ( 'Warning: Uncrecognized instructionFormat' + str( self.instructionFormat ) ).encode( consoleEncoding ) )
             # if the last character is a \n, then remove it.
             if tempHistory[ len( tempHistory ) - 1 : ] == '\n':
                 tempHistory = tempHistory[ : -1 ]
@@ -753,6 +756,9 @@ class KoboldCppEngine:
             return None
 
         summaryText = returnedRequest.json()[ 'results' ][ 0 ][ 'text' ].strip()
+
+        if summaryText.find( '\n\n' ) != -1:
+            summaryText = summaryText.replace( '\n\n','\n' ).replace( '\n\n','\n' )
 
         #if verbose == True:
             #print( summaryText.encode( consoleEncoding ) )

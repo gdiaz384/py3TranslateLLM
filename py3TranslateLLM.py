@@ -12,7 +12,7 @@ License:
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 
 """
-__version__ = '2024.07.31-alpha'
+__version__ = '2024.08.01-alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -50,7 +50,7 @@ defaultEnableBatchesForLLMs = False
 # Valid options for defaultBatchSizeLimit are an integer or None. Sensible limits are 100-10000 depending upon hardware. In addition to this setting, translation engines also have internal limiters.
 #defaultBatchSizeLimit = None
 defaultBatchSizeLimit = 1000
-defaultSceneSummaryLength = 50
+defaultSceneSummaryLength = 40
 defaultInputTextEncodingErrorHandler = 'strict'
 #defaultOutputTextEncodingErrorHandler = 'namereplace'  # This get set dynamically further below.
 
@@ -139,7 +139,7 @@ elif sys.version_info.minor < 5:
 
 def createCommandLineOptions():
     # Add command line options.
-    commandLineParser=argparse.ArgumentParser( description='Description: Translates text using various NMT and LLM models.\n ' + usageHelp )
+    commandLineParser = argparse.ArgumentParser( description='Description: Translates text using various NMT and LLM models.\n ' + usageHelp )
     commandLineParser.add_argument( '-te', '--translationEngine', help='Specify translation engine to use, options=' + translationEnginesAvailable + '. Not all engines have been implemented.', type=str )
 
     commandLineParser.add_argument( '-f', '--fileToTranslate', help='Either the raw file to translate or the spreadsheet file to resume translating from, including path.', default=None, type=str )
@@ -188,14 +188,14 @@ def createCommandLineOptions():
 
     commandLineParser.add_argument( '-ssp', '--sceneSummaryPrompt', help='Experimental feature. The location of the sceneSummaryPrompt.txt file, a text file used to generate a summary of the untranslated text prior to translation. Only valid with specific translation engines. Specifying this text file will enable generating a scene summary prior to translation to potentially boost translation quality. Due to the highly experimental nature of this feature, translations are disabled by default when this feature is enabled in order to provide time to quality check the generated summary before attempting translation and to potentially use one engines/API to generate the summary and another for the subsequent translation. After quality checking the generated summaries, use -sset --sceneSummaryEnableTranslation to enable translations when using this feature. Actually using the summary during translation requires the following string to be present in either memory.txt or prompt.txt: {scene} Default=Do not generate a summary prior to translation.', default=None, type=str )
     commandLineParser.add_argument( '-sspe', '--sceneSummaryPromptEncoding', help='Experimental feature. The encoding of the sceneSummaryPrompt.txt file. Default=' + defaultTextEncoding, default=None, type=str )
-    commandLineParser.add_argument( '-ssl', '--sceneSummaryLength', help='Experimental feature. The number of entries that should be summarized at any one time. If batches are enabled, batches and this will be reduced to the same number depending on whichever is lower. Set to 0 to disable limits when generating a summary. Default=' + str( defaultSceneSummaryLength ), default=None, type=int )
+    commandLineParser.add_argument( '-ssl', '--sceneSummaryLength', help='Experimental feature. The number of entries that should be summarized at any one time. If batches are enabled, batches and this will be reduced to the same number depending on whichever is lower. Set to 0 to disable limits when generating a summary. Reasonable amounts are 40-100. Default=' + str( defaultSceneSummaryLength ), default=None, type=int )
     commandLineParser.add_argument( '-sset', '--sceneSummaryEnableTranslation', help='Enable the use of summaries of untranslated text when translating data. This always requires prompt.txt and sceneSummaryPrompt.txt files. sceneSummaryCache.xlsx will be used as cache. Default=Do not translate when generating a summary. The summary will be inserted in place of {scene} of memory.txt and prompt.txt', action='store_true' )
     commandLineParser.add_argument( '-sscf', '--sceneSummaryCacheFile', help='Experimental feature. The location of the sceneSummaryCache.xlsx which stores a cache of every previously generated summary. Default=' + defaultSceneSummaryCacheLocation, default=None, type=str )
     commandLineParser.add_argument( '-sscam', '--sceneSummaryCacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits. This setting only affects sceneSummaryCache.', action='store_true' )
 
     commandLineParser.add_argument( '-b', '--batches', help='Toggles if entries should be submitted for translations engines that support them. Enabling batches disables context history. Default=Batches are automatically enabled for NMTs that support batches and web APIs like DeepL, but disabled for LLMs. Specifying this will disable them globally for all engines.', action='store_false' )
     commandLineParser.add_argument( '-bllm', '--batchesEnabledForLLMs', help='For translation engines that support both batches and single translations, should batches be enabled? Batches are automatically enabled for NMTs that support batches and DeepL regardless of this setting. Enabling batches for LLMs disables context history. Default=' + str( defaultEnableBatchesForLLMs ), action='store_true' )
-    commandLineParser.add_argument( '-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. If the scene summary feature is enabled, this and sceneSummaryLength will be reduced to the same number depending on whichever is lower. Some translation engines might also have their own internal limiters not affected by this setting. Default=' + str( defaultBatchSizeLimit ), default=None, type=int )
+    commandLineParser.add_argument( '-bsl', '--batchSizeLimit', help='Specify the maximum number of translations that should be sent to the translation engine if that translation engine supports batches. Not all translation engines support batches. Set to 0 to not place any limits on the size of batches. Some translation engines might also have their own internal limiters not affected by this setting. If the scene summary feature is enabled, this and sceneSummaryLength will be reduced to the same number depending on whichever is lower. Default=' + str( defaultBatchSizeLimit ), default=None, type=int )
 
     commandLineParser.add_argument( '-a', '--address', help='Specify the protocol and IP for NMT/LLM server, Example: http://192.168.0.100', default=None,type=str )
     commandLineParser.add_argument( '-port', '--port', help='Specify the port for the NMT/LLM server. Example: 5001', default=None, type=int )
@@ -1153,8 +1153,11 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
     if userInput[ 'readOnlyCache' ] == True:
         return None
 
+    onlyAddRow = False
+    # Even if the summaryData was not created sucessfully, a near-empty row should should still be added for easy debugging and so the user has the option to easily add one later manually. Without this, only a successfully generated sceneSummary would be added which would mean there would be large gaps in the data but the sceneSummaryCache file would not show any.
     if ( summaryData == None ) or ( summaryData == '' ):
-        return None
+        onlyAddRow = True
+        #return None
 
     # tempSearchRow can be a row number (as a string) or None if the string was not found.
     tempSearchRow = programSettings[ 'sceneSummaryCache' ].searchCache( hash )
@@ -1163,10 +1166,11 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
         # addToCache returns the row as a number, where it was added.
         tempSearchRow = programSettings[ 'sceneSummaryCache' ].addToCache( hash )
         programSettings[ 'sceneSummaryCache' ].setCellValue( 'B' + str( tempSearchRow ), metadata ) # Hardcode metadata into the second column.
-        programSettings[ 'sceneSummaryCache' ].setCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow ) , summaryData )
         if programSettings[ 'sceneSummaryCacheWasUpdated' ] == False:
             programSettings[ 'sceneSummaryCacheWasUpdated' ] = True
-    else:
+        if onlyAddRow == False:
+            programSettings[ 'sceneSummaryCache' ].setCellValue( programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow ) , summaryData )
+    elif onlyAddRow == False:
         # if it was found, then then get the appropriate cell, the currentCacheColumn + tempSearchRow, to see if there is any data there.
         currentCellAddress = programSettings[ 'currentSceneSummaryCacheColumn' ] + str( tempSearchRow )
 
@@ -1190,22 +1194,6 @@ def updateSceneSummaryCache( userInput=None, programSettings=None, hash=None, me
         print( ( 'Updated sceneSummaryCache at row ' + str(tempSearchRow) ).encode( consoleEncoding )  )
 
     backupSceneSummaryCache( userInput=userInput, programSettings=programSettings )
-
-
-"""
-    # if rawEntries is not in the cache
-    if tempSearchResult == None:
-        # then just append a new row with one entry, retrieve that row number, then set the appropriate column's value.
-        # This returns the row number of the found entry as a string.
-        tempSearchResult = programSettings[ 'sceneSummaryCache' ].addToCache( hash )
-        programSettings[ 'sceneSummaryCache' ].setCellValue( currentCacheColumn + str( tempSearchResult ) , summaryData )
-        programSettings[ 'sceneSummaryCache' ].setCellValue( 'B' + str( tempSearchResult ) , metadata ) # Hardcode metadata into the second column.
-
-
-    # elif the rawEntries is in the sceneSummaryCache
-    # elif tempSearchResult != None:
-    else:
-""" 
 
 
 # Expects two strings.
@@ -1307,7 +1295,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     if isinstance( tempCellData, str ) == True:
         return tempCellData
 
-    print( ( 'Generating sceneSummary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ' ' + str( programSettings[ 'currentRow'] ) + '-' + str( programSettings[ 'currentRow'] + untranslatedListSize ) + ' ...' ).encode(consoleEncoding) )
+    print( ( 'Generating sceneSummary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ':' + str( programSettings[ 'currentRow'] ) + '-' + str( programSettings[ 'currentRow'] + untranslatedListSize ) + ' ...' ).encode(consoleEncoding) )
 
     # Otherwise, need to generate it.
     settings = userInput.copy()
@@ -1401,71 +1389,6 @@ def getCellValueFromCache( userInput=None, programSettings=None, searchString=No
             translatedEntry = tempCellContents
 
     return translatedEntry
-
-"""
-    # if entryInList/translatedData exists as a key in translationCacheDictionary,
-    # if entryInList/untranslatedData exists in the cache's first column
-    tempRowForCacheMatch = programSettings[ 'cache' ].searchCache( untranslatedEntry )
-
-    # if untranslatedEntry is not in the cache
-    if tempRowForCacheMatch == None:
-        tempRequestList.append( [ untranslatedEntry , False, untranslatedEntry ] )
-        translateMe.append( untranslatedEntry )
-    #if tempRowForCacheMatch != None:
-    else:
-        # then check if the appropriate column in the cache is a match.
-        # This will return either None or the cell's contents.
-        tempCellContents = programSettings[ 'cache' ].getCellValue( programSettings[ 'currentCacheColumn' ] + str( tempRowForCacheMatch ) )
-        if tempCellContents != None:
-            # if there is a match, then a perfect hit exists, so append the translatedEntry to tempRequestList
-            tempRequestList.append( [ untranslatedEntry, True, tempCellContents ] )
-            cacheHitCounter += 1
-
-        # elif the cache for that cell is currently empty, then the untranslatedEntry exists in the cache, but there was no cache hit for that model.
-        elif tempCellContents == None:
-        #else:
-
-            # Check if other models should be considered cache hits regardless of not being perfect matches.
-            # determine which columns should be considered to have possible matches
-            # Maybe check all entries past the first 3 blindly? Not valid for spreadsheets without speaker or metadata
-            # How about checking header for known bad headers and putting all other column letters into a list?
-            #cache.convertColumnNumberToColumnLetter()
-            # Known bad headers are...  rawText speaker metadata and currentModel
-            # Update: Moved header code up and out of function.
-            if ( userInput [ 'cacheAnyMatch' ] == True ) and ( len(validColumnLettersForCacheAnyMatch) > 0 ):
-            # if len(list) != 0, If it is 0, then do not bother. The length of that list could be 0 because even though the current model should always be added to cache and it could be returned, the current model should be blacklisted since the relevant cell was already checked.
-
-                # create a tempList=None
-                tempList = []
-                # for every column letter in the list
-                for columnLetter in validColumnLettersForCacheAnyMatch:
-                    # prepend row, tempRowForCacheMatch, and return the individual cell contents.
-                    # if the cell contents are not None,
-                        # then tempList = [ rawEntry, thisValueIsFromCache=True, translatedData ]
-                    # Keep updating the tempList to favor the right-most translation engine.
-
-                    tempCellContents = programSettings[ 'cache' ].getCellValue( columnLetter + str( tempRowForCacheMatch ) )
-                    if tempCellContents != None:
-                        tempList.append( [ untranslatedEntry, True, tempCellContents ] )
-
-                # if tempList != None:
-                if len(tempList) > 0:
-                    # then take the contents of the right-most/last list in tempList and append them to tempRequestList
-                    # tempRequestList.append( [tempList[ 0 ], tempList[ 1 ], tempList[ 2 ] ] )
-                    # len( tempList ) returns the number of items in a list. To get the last item, take the total items and subtract 1 because indexes start with 0.
-                    tempRequestList.append( tempList[ len( tempList ) - 1 ] )
-                    cacheHitCounter += 1
-
-
-
-    # Non-batch code.
-    if ( translatedEntry == None ) and ( cacheAnyMatch == True ) and ( len(userInput[ 'validColumnLettersForCacheAnyMatch' ] ) > 0 ):
-        for columnLetter in userInput[ 'validColumnLettersForCacheAnyMatch' ]:
-            tempCellContents = cache.getCellValue( columnLetter + str( tempRowNumberForCache ) )
-            if tempCellContents != None:
-                # Keep updating translatedEntry to favor the right-most translation engine.
-                translatedEntry = tempCellContents
-"""
 
 
 # translate() recieves untranslatedList which is a list of untranslated strings with programSettings[ 'currentRow' ] pointing to mainSpreadsheet entry that corresponds to the first item in that list. This function is responsible for translating untranslatedList and always returning the same number of entries as the input. This function must also handle updating the cache, reinserting the translated entries into mainSpreadsheet, and backing up cache/mainSpreadsheet regularly.
@@ -1599,9 +1522,17 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
     # Sanity check.
     assert( ( len( translateMe ) + cacheHitCounter ) == untranslatedListSize )
 
+    #print('pie')
+    #sys.exit(1)
+
     # if all entries were found in mainSpreadsheet or in cache, just return here.
     # Since mainSpreadsheet and cache have already been updated, there is no reason to continue.
     if len( translateMe ) == 0:
+        # Update the mainSpreadsheet appropraitely, and then return.
+        for counter,entry in enumerate( listForThisBatchRaw ):
+            # listForThisBatchRaw.append( ( untranslatedData, speaker, alreadyTranslated, translatedData ) )
+            programSettings[ 'mainSpreadsheet' ].setCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( currentRow + counter ), entry[ 3 ] )
+
         return listForThisBatchRaw
 
     # after translation, len( postTranslatedList ) == len( translateMe )
@@ -1755,8 +1686,14 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             # Translate entry by submitting the line to the translation engine, along with the current contextHistory.
             if tempSpeakerName != None:
                 settings[ 'speakerName' ] = tempSpeakerName
+            elif 'speakerName' in settings:
+                    settings.pop( 'speakerName' )
             if contextHistory != None:
                 settings[ 'contextHistory' ] = contextHistory
+            elif 'contextHistory' in settings:
+                    settings.pop( 'contextHistory' )
+
+
             # TODO: This needs to enforce userInput[ 'timeout' ]. Or perhaps the calling code should do it? Well, it needs to be here since this is where the call to the translation engine takes place and timeout refers to each individual translation, not to batches of translations. It only refers to batches if batchModeEnabled.
             translatedEntry = None
             try:
@@ -1972,13 +1909,17 @@ def main( userInput=None ):
     if programSettings[ 'translationEngine' ].reachable != True:
         print( 'TranslationEngine \''+ userInput[ 'mode' ] +'\' is not reachable. Check the connection or API settings and try again. --address must contain the protocol.' )
         sys.exit(1)
+    else:
+        print( ( userInput[ 'mode'] + ' model=' + programSettings[ 'translationEngine' ].model ).encode( consoleEncoding ) )
+        print( ( userInput[ 'mode'] + ' version=' + programSettings[ 'translationEngine' ].version ).encode( consoleEncoding ) )
 
-
-    # Now that the translation has been initialized, a few more settings can be validated. This validation code would normally go further down until after spreadsheet/cache have also been read in order to validate all the settings together, but there is a special failure case here where if sceneSummaryEnabled == True, and sceneSummaryEnableTranslation == False, then nothing should be translated. Since nothing needs to be translated, the translation cache is not needed, so disable it as a small runtime optimization. 
+    # Now that the translation has been initialized, a few more settings can be validated. This validation code would normally go further down until after spreadsheet/cache have also been read in order to validate all the settings together, but there is a special failure case here where if sceneSummaryEnabled == True, and sceneSummaryEnableTranslation == False, then nothing should be translated. Since nothing needs to be translated, the translation cache is not needed, so disable it as a small runtime optimization.
     if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( programSettings[ 'translationEngine' ].supportsCreatingSummary != True ):
         print( 'Warning: sceneSummaryEnabled=True but translationEngine ' + userInput[ 'mode' ] + ' does not support creating sceneSummary. Disabling feature.' )
         userInput[ 'sceneSummaryEnabled' ] = False
 
+    # This optimization conflicts with a different optimization where if cache is loaded and -cam and -sscam are both enabled leading to all translated data being found in the cache, generating a sceneSummary will be skipped.
+    # It could be argued that if -cam and/or -sscam are enabled, then cache should be left enabled since the user is trying to strongly imply that they want cache considered. Hummmmm.
     if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False ):
         userInput[ 'cacheEnabled' ] = False
 
@@ -1992,16 +1933,16 @@ def main( userInput=None ):
     programSettings[ 'mainSpreadsheet' ] = chocolate.Strawberry( userInput[ 'fileToTranslateFileName' ], fileEncoding=userInput[ 'fileToTranslateEncoding' ], removeWhitespaceForCSV=False, addHeaderToTextFile=True )
 
     # Before doing anything, just blindly create a backup. #This code should probably be moved into a local function so backups can be created easier. Update: Done. Use  backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=outputName, force=False ):
-    #backupsFolder does not have / at the end
+    # backupsFolder does not have / at the end.
     backupsFolderWithDate = userInput[ 'backupsFolder' ] + '/' + functions.getYearMonthAndDay()
     pathlib.Path( backupsFolderWithDate ).mkdir( parents = True, exist_ok = True )
     #mainDatabaseWorkbook.save( 'backups/' + functions.getYearMonthAndDay() + '/rawUntranslated-' + currentDateAndTimeFull+'.xlsx')
     # This variable is mostly derivative of the fileToTranslateFileNameWithoutPath, hence not incorrect to consider it part of userInput as a derivative variable.
-    userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath' ] + '.raw.' + functions.getDateAndTimeFull() + defaultExportExtension
-    # TODO: There should be a CLI setting to not create backups. # Update: Done.
-    if userInput[ 'backupsEnabled' ] == True:
+    #userInput[ 'backupsFileNameWithPathAndDate' ] = backupsFolderWithDate + '/'+ userInput[ 'fileToTranslateFileNameWithoutPath' ] + '.raw.' + functions.getDateAndTimeFull() + defaultExportExtension
+    # TODO: There should be a CLI setting to not create backups. # Update: Done. #Update 2: py3TranslateLLM is no longer handling parsing logic and so can read spreadsheets fairly reliably now. It is also not likely to corrupt the original data especially since it is very resistant to writing over the original spreadsheet. The user must specificially state they want to override their data before py3TranslateLLM will do it since by default translated.xlsx is appended to the outputfile. Due to that, there is minimal risk of corruption meaning that the spreadsheet that has the original data no longer needs to be backed up as soon as it is created. Disable it by default unless needed later.
+    #if userInput[ 'backupsEnabled' ] == True:
         #mainSpreadsheet.exportToXLSX( userInput[ 'backupsFileNameWithPathAndDate' ] )
-        backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=True )
+        #backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=True )
 
     # Should subsequent backups always be created as .xlsx or should they, after the initial backup, use the user's chosen spreadsheet format? Answer: Maybe let the user decide via a CLI flag but default to .xlsx?
     # Alternatively, could set the option as a default boolean toggle in the script, but that might be annoying during actual usage.
@@ -2207,12 +2148,15 @@ def main( userInput=None ):
             userInput[ 'contextHistoryEnabled' ] = False
 
     untranslatedEntriesColumnFull = programSettings[ 'mainSpreadsheet' ].getColumn( 'A' )
+
     if userInput[ 'debug' ] == True:
         # Debug code.
         for counter,untranslatedString in enumerate( untranslatedEntriesColumnFull ):
             assert( untranslatedString == programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( counter + 1 )) )
         print( len( untranslatedEntriesColumnFull ) )
+ 
     untranslatedEntriesColumnFull.pop( 0 ) # This removes the header and returns the header.
+
     # Debug code.
     if userInput[ 'debug' ] == True:
         print( len( untranslatedEntriesColumnFull ) )
@@ -2275,7 +2219,6 @@ def main( userInput=None ):
             print( 'currentBatchSize=', currentBatchSize )
             print( 'programSettings[ currentRow ]=', programSettings[ 'currentRow' ] )
 
-
         # Workaround. if there is no batchSizeLimit, then tempBatchIterable will just be a list. for would normally iterate one by one through that list. However, since currentBatchSize is the entire list when batchSizeLimit == 0, then every entry will be translated in the first batch and there is no second batch. That means attempting to itterate through this code a second time is a mistake, so just break out of the loop.
         if programSettings[ 'currentRow' ] -1 > len( untranslatedEntriesColumnFull ):
         #if userInput[ 'batchSizeLimit' ] == 0:
@@ -2285,17 +2228,41 @@ def main( userInput=None ):
             sceneSummary = None
         #if userInput[ 'sceneSummaryEnabled' ] != False:
         else:
-            # This returns either None or a string.
-            sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
+            # There is not any point in generating a sceneSummary for entries that have already been translated or are in the cache, so check for that here.
+            # tempList=[]
+            # programSettings=[]
 
-            if ( not isinstance( sceneSummary, str ) == True ) or ( sceneSummary == '' ):
-                # Error generating sceneSummary.
-                print( 'Warning: Unable to generate summary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + currentBatchSize ) )
+            alreadyTranslated = True
+            # range( start, stop, step )
+            # This probably has an off by 1 error.
+            for tempCurrentRow in range( programSettings[ 'currentRow' ], programSettings['currentRow'] + currentBatchSize, 1 ):
+                if userInput[ 'cacheEnabled' ] == True:
+                    untranslatedEntry = programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( tempCurrentRow ) )
+                    entryFromCache = getCellValueFromCache( userInput=userInput, programSettings=programSettings, searchString=untranslatedEntry )
+                    entryFromMainSpreadsheet = programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( tempCurrentRow ) )
+                    if ( entryFromCache == None ) and ( entryFromMainSpreadsheet == None ):
+                        alreadyTranslated = False
+                        break
+                else:
+                    if programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( tempCurrentRow ) ) == None:
+                        alreadyTranslated = False
+                        break
+
+            if alreadyTranslated == True:
                 sceneSummary = None
+            else:
+                # This returns either None or a string.
+                sceneSummary = getSceneSummary( userInput=userInput, programSettings=programSettings, untranslatedListSize=currentBatchSize )
+
+                if ( not isinstance( sceneSummary, str ) == True ) or ( sceneSummary == '' ):
+                    # Error generating sceneSummary.
+                    print( 'Warning: Unable to generate summary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ':' + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + currentBatchSize ) + ' Skipping.' )
+                    sceneSummary = None
 
         # There are a few special failure cases here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated. In addition, if sceneSummary failed to generate but it is enabled, then consider it improper to attempt to translate without it.
         if userInput[ 'sceneSummaryEnabled' ] == True:
-            if ( userInput[ 'sceneSummaryEnableTranslation' ] == False ) or ( sceneSummary == None ):
+            # Only skip the current batch if there was an error or if there is no scene summary. if everything was alreadyTranslated, then do not skip the current batch so mainSpreadsheet can get updated.
+            if ( ( userInput[ 'sceneSummaryEnableTranslation' ] == False ) or ( sceneSummary == None ) ) and ( alreadyTranslated != True ):
                 programSettings[ 'currentRow' ] += currentBatchSize
                 continue
 
@@ -2312,7 +2279,6 @@ def main( userInput=None ):
         #backupMainSpreadsheet( userInput=userInput, programSettings=programSettings, outputName=userInput[ 'backupsFileNameWithPathAndDate' ], force=False )
         # Increment pointer by batch size so next loop begins at the start of the next entry.
         programSettings[ 'currentRow' ] += currentBatchSize
-
 
     if userInput[ 'debug' ] == True:
         print( 'mainSpreadsheet.printAllTheThings():' )
@@ -2331,7 +2297,7 @@ def main( userInput=None ):
         elif programSettings[ 'cacheWasUpdated' ] == True:
             backupCache( userInput=userInput, programSettings=programSettings, force=True )
 
-    if userInput[ 'sceneSummaryCacheEnabled' ] ==   userInput[ 'sceneSummaryEnabled' ] == True:
+    if ( userInput[ 'sceneSummaryCacheEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnabled' ] == True ):
         if userInput[ 'readOnlyCache' ] == True:
             programSettings[ 'sceneSummaryCache' ].close()
         elif programSettings[ 'sceneSummaryCacheWasUpdated' ] == True:
