@@ -12,7 +12,7 @@ License:
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 
 """
-__version__ = '2024.08.01-alpha'
+__version__ = '2024.08.02-alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -812,7 +812,7 @@ def validateUserInput( userInput=None ):
             sys.exit(1)
 
         # overrideWithCache means to ignore the current translation and fill it in with entries from the cache. overrideWithSpreadsheet means to ignore what is in the cache and replace it with a translation from mainSpreadsheet. reTranslate means to ignore the current translation and fill it in with fresh entries from the translation engine. These settings directly conflict. When then conflict, reTranslate should take precedence.
-        if ( userInput[ 'overrideWithCache' ] == True ) and ( userInput[ 'reTranslate' ] == True ):
+        if userInput[ 'reTranslate' ] == True: #userInput[ 'overrideWithCache' ] == True ) and ( 
             userInput[ 'overrideWithCache' ] = False
             userInput[ 'overrideWithSpreadsheet' ] = False
 
@@ -1920,8 +1920,10 @@ def main( userInput=None ):
 
     # This optimization conflicts with a different optimization where if cache is loaded and -cam and -sscam are both enabled leading to all translated data being found in the cache, generating a sceneSummary will be skipped.
     # It could be argued that if -cam and/or -sscam are enabled, then cache should be left enabled since the user is trying to strongly imply that they want cache considered. Hummmmm.
+    # This also conflicts with reTranslate. reTranslate means generate the summary again, generate data based off that summary again, update mainSpreadsheet, update the cache, and update sceneSummaryCache.
     if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False ):
-        userInput[ 'cacheEnabled' ] = False
+        if ( userInput[ 'cacheAnyMatch' ] != True ) and ( userInput[ 'sceneSummaryCacheAnyMatch' ] != True ) and ( userInput[ 'reTranslate' ] != True ):
+            userInput[ 'cacheEnabled' ] = False
 
 
     # Next turn fileToTranslateFileName into a data structure. How? Read the file, then create data structure from that file.
@@ -2232,21 +2234,24 @@ def main( userInput=None ):
             # tempList=[]
             # programSettings=[]
 
-            alreadyTranslated = True
-            # range( start, stop, step )
-            # This probably has an off by 1 error.
-            for tempCurrentRow in range( programSettings[ 'currentRow' ], programSettings['currentRow'] + currentBatchSize, 1 ):
-                if userInput[ 'cacheEnabled' ] == True:
-                    untranslatedEntry = programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( tempCurrentRow ) )
-                    entryFromCache = getCellValueFromCache( userInput=userInput, programSettings=programSettings, searchString=untranslatedEntry )
-                    entryFromMainSpreadsheet = programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( tempCurrentRow ) )
-                    if ( entryFromCache == None ) and ( entryFromMainSpreadsheet == None ):
-                        alreadyTranslated = False
-                        break
-                else:
-                    if programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( tempCurrentRow ) ) == None:
-                        alreadyTranslated = False
-                        break
+            if userInput[ 'reTranslate' ] == True:
+                alreadyTranslated = False
+            else:
+                alreadyTranslated = True
+                # range( start, stop, step )
+                # This probably has an off by 1 error.
+                for tempCurrentRow in range( programSettings[ 'currentRow' ], programSettings['currentRow'] + currentBatchSize, 1 ):
+                    if userInput[ 'cacheEnabled' ] == True:
+                        untranslatedEntry = programSettings[ 'mainSpreadsheet' ].getCellValue( 'A' + str( tempCurrentRow ) )
+                        entryFromCache = getCellValueFromCache( userInput=userInput, programSettings=programSettings, searchString=untranslatedEntry )
+                        entryFromMainSpreadsheet = programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( tempCurrentRow ) )
+                        if ( entryFromCache == None ) and ( entryFromMainSpreadsheet == None ):
+                            alreadyTranslated = False
+                            break
+                    else:
+                        if programSettings[ 'mainSpreadsheet' ].getCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( tempCurrentRow ) ) == None:
+                            alreadyTranslated = False
+                            break
 
             if alreadyTranslated == True:
                 sceneSummary = None
@@ -2259,10 +2264,26 @@ def main( userInput=None ):
                     print( 'Warning: Unable to generate summary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ':' + str( programSettings[ 'currentRow' ] ) + '-' + str( programSettings[ 'currentRow' ] + currentBatchSize ) + ' Skipping.' )
                     sceneSummary = None
 
-        # There are a few special failure cases here where if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated. In addition, if sceneSummary failed to generate but it is enabled, then consider it improper to attempt to translate without it.
+
+        # There are a few special failure cases here:
+        # if sceneSummaryEnabled == True but sceneSummaryEnableTranslation == False, then nothing should be translated regardless of other settings.
+        if ( userInput[ 'sceneSummaryEnabled' ] == True ) and ( userInput[ 'sceneSummaryEnableTranslation' ] == False ):
+            programSettings[ 'currentRow' ] += currentBatchSize
+            continue
+
+#        if sceneSummaryEnabled:
+#            sceneSummary None, alreadyTranslated == True
+#                pass
+#            sceneSummary != None, alreadyTranslated == True
+#                pass
+#            sceneSummary None, alreadyTranslated == False
+#                error out
+#            sceneSummary != None, alreadyTranslated == False
+#                pass
+        # if sceneSummary failed to generate but it is enabled, then consider it improper to attempt to translate without it.
+        # However, if the contents of the spreadsheet are already translated, then go ahead and write output as normal.
         if userInput[ 'sceneSummaryEnabled' ] == True:
-            # Only skip the current batch if there was an error or if there is no scene summary. if everything was alreadyTranslated, then do not skip the current batch so mainSpreadsheet can get updated.
-            if ( ( userInput[ 'sceneSummaryEnableTranslation' ] == False ) or ( sceneSummary == None ) ) and ( alreadyTranslated != True ):
+            if ( sceneSummary == None ) and ( alreadyTranslated == False ):
                 programSettings[ 'currentRow' ] += currentBatchSize
                 continue
 

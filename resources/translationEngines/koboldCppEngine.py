@@ -15,8 +15,11 @@ __version__ = '2024.08.01'
 verbose = False
 debug = False
 consoleEncoding = 'utf-8'
+# The maximum amount of time, in seconds, that any one request can take.
 defaultTimeout = 360
+# Most tokens are cached after the first run, but before they get cached, processing the raw prompt can take quite a while.
 defaultTimeoutMulitplierForFirstRun = 4
+defaultTimeoutMulitplierForSceneSummary = 2
 # Valid options are: autocomplete, instruct, chat.
 defaultInstructionFormat = 'autocomplete'
 defaultTargetLanguageIsHalfWidth = True
@@ -114,7 +117,9 @@ qwen1_5_chatModels = qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
 # https://ai.google.dev/gemma/docs/formatting
 # https://huggingface.co/google/gemma-2-27b-itc
 # https://huggingface.co/google/gemma-2-27b-it
-# Has problems producing output consistently. It messes up when creating a sceneSummary a lot because it outputs its own stop token immediately. Likely a prompt or model settings issue.
+# Has problems producing output consistently.
+# - It messes up when creating a sceneSummary a lot because it outputs its own stop token immediately. Likely a prompt or model settings issue.
+# - This model is heavily aligned/censored.
 # Conclusion: Superb quality. When it works, consistently better than mixtral8x7b. More consistant at producing quality summaries than mixtral8x7b.
 
 
@@ -748,7 +753,7 @@ class KoboldCppEngine:
         # This probably should not be hard coded.
         requestDictionary[ 'prompt' ] = self.sceneSummaryPrompt.replace( '{scene}', tempString[ : -1 ] ) # The prompt. The -1 removes the last newline.
 
-        returnedRequest = requests.post( self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=( 10, self.timeout ) )
+        returnedRequest = requests.post( self.addressFull + '/api/v1/generate', json=requestDictionary, timeout=( 10, int ( self.timeout * defaultTimeoutMulitplierForSceneSummary ) ) )
 
         if returnedRequest.status_code != 200:
             print( ( 'Unable to generate summary from following prompt: \'' + str( requestDictionary[ 'prompt' ] ) + '\'' ).encode( consoleEncoding ) )
