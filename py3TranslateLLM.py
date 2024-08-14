@@ -718,16 +718,16 @@ def validateUserInput( userInput=None ):
         import resources.translationEngines.pykakasiEngine as pykakasiEngine
         implemented = True
         if userInput[ 'cacheEnabled' ] == True:
-            print( 'Info: Disabling cache for local pykakasi library.')
+            print( 'Info: Disabling cache for local pykakasi library.' )
             userInput[ 'cacheEnabled' ] = False # Since pykakasi is a local library with a fast dictionary, enabling cache would only make things slower.
     elif ( userInput[ 'translationEngine' ].lower() == 'cutlet' ):
         userInput[ 'mode' ] = 'cutlet'
         global cutletEngine
         import resources.translationEngines.cutletEngine as cutletEngine
-        implemented = False
+        implemented = True
         if userInput[ 'cacheEnabled' ] == True:
-            print( 'Info: Disabling cache for local cutlet library.')
-            userInput [ 'cacheEnabled' ] = False # Is enabling cache worth it for cutlet?
+            print( 'Info: Disabling cache for local cutlet library.' )
+            userInput [ 'cacheEnabled' ] = False # Is enabling cache worth it for cutlet? Unlikely.
     else:
         print( ( 'Error. Invalid translation engine specified: \'' + userInput[ 'translationEngine' ] + '\'' + usageHelp ).encode( consoleEncoding ))
         sys.exit( 1 )
@@ -750,7 +750,7 @@ def validateUserInput( userInput=None ):
     # promptFileName only needs to exist if using an LLM. If using an LLM, make sure it exists. Technically, it is not needed if the summary feature is enabled and also if translations are disabled, but since it will be needed soon after, just require it anyway. In addition, if the user specified it, even if it is not needed, then verify it exists.
     #if userInput[ 'mode' ] == 'koboldcpp':
     if ( userInput[ 'translationEngineIsAnLLM' ] == True ) or ( userInput[ 'promptFileName' ] != None ):
-        functions.verifyThisFileExists( userInput[ 'promptFileName' ], 'promptFile')
+        functions.verifyThisFileExists( userInput[ 'promptFileName' ], 'promptFile' )
 
     # memoryFileName never has to exist, but if it is specified, then make sure it exists.
     if userInput[ 'memoryFileName' ] != None:
@@ -758,19 +758,19 @@ def validateUserInput( userInput=None ):
 
     functions.verifyThisFileExists( userInput[ 'languageCodesFileName' ], 'languageCodesFile' )
     if not pathlib.Path( userInput[ 'languageCodesFileName' ] ).suffix in validSpreadsheetExtensions:
-        print( ('\n Error: languageCodesFile must have a spreadsheet extension instead of \''+ pathlib.Path( userInput[ 'languageCodesFileName' ] ).suffix +'\'').encode(consoleEncoding) )
-        print( 'validSpreadsheetExtensions=' + str(validSpreadsheetExtensions) )
-        print( ( 'cacheFile: \'' + str( userInput[ 'languageCodesFileName' ] ) ).encode(consoleEncoding) )
-        sys.exit(1)
+        print( ('\n Error: languageCodesFile must have a spreadsheet extension instead of \''+ pathlib.Path( userInput[ 'languageCodesFileName' ] ).suffix + '\'' ).encode( consoleEncoding ) )
+        print( 'validSpreadsheetExtensions=' + str( validSpreadsheetExtensions ) )
+        print( ( 'cacheFile: \'' + str( userInput[ 'languageCodesFileName' ] ) ).encode( consoleEncoding) )
+        sys.exit( 1 )
 
     # The target language is required to be present, but source language can be optional for NMTs, LLMs, and DeepL.
     # The problem with not specifying the source language, even if the translationEngine itself does not need it, is that the source language is still used for selecting the correct sheet in the cache.xlsx workbook. So only cache == disabled would be valid. The same is true for the summary feature. Therefore, always require it and add an "Unknown" option to the languageCodes.csv for user to use if they are unsure.
     if userInput[ 'sourceLanguageRaw' ] == None:
         print( 'Error: A source language must be specified.' )
-        sys.exit(1)
+        sys.exit( 1 )
     if userInput[ 'targetLanguageRaw' ] == None:
         print( 'Error: A target language must be specified.' )
-        sys.exit(1)
+        sys.exit( 1 )
 
     # TODO: Some of this should be moved to the deepLTranslationEngine, but that engine needs to be implemented first.
     if userInput[ 'sourceLanguageRaw' ] != None:
@@ -788,7 +788,7 @@ def validateUserInput( userInput=None ):
         if userInput[ 'targetLanguageRaw' ].lower() == 'english':
             userInput[ 'targetLanguageRaw' ] = 'English (American)'
         elif userInput[ 'targetLanguageRaw' ].lower() == 'castilian':
-            userInput[ 'targetLanguageRaw' ] ='Spanish'
+            userInput[ 'targetLanguageRaw' ] = 'Spanish'
 
     # if any dictionaries were specified, then make sure they exist.
     if userInput[ 'characterNamesDictionaryFileName' ] != None:
@@ -804,15 +804,15 @@ def validateUserInput( userInput=None ):
 
     # The cache file does not need to exist. if it does not exist, then it will be created dynamically when it is needed as a chocolate.Strawberry(), so only verify the extension.
     if userInput[ 'cacheEnabled' ] == True:
-        # Verify cache file extension is .xlsx. Shouldn't .csv also work? .csv would be harder for user to edit but might take less space on disk. Need to check. # Update: It was backwards. .csv files take more space on disk but can be potentially the most compatible. They might compress the best via lzma2 with python's zip library. In practice, .ods should be the most compatible in exchange for larger file size compared to .xlsx, but .ods support is not yet implemented in chocolate library.
+        # Verify cache file extension is .xlsx. Shouldn't .csv also work? .csv would be harder for user to edit but might take less space on disk. Need to check. # Update: It was backwards. .csv files take more space on disk but can be potentially the most compatible. They might compress the best via lzma2 with python's zip library. In practice, .ods should be the most compatible in exchange for larger file size compared to .xlsx, but .ods support is not yet implemented in chocolate.py library.
         if not userInput[ 'cacheFileExtensionOnly' ] in validSpreadsheetExtensions:
-            print( ('\n Error: cacheFile must have a spreadsheet extension instead of \''+ userInput[ 'cacheFileExtensionOnly' ] +'\'').encode(consoleEncoding) )
-            print( 'validSpreadsheetExtensions=' + str(validSpreadsheetExtensions) )
-            print( ( 'cacheFile: \'' + str( userInput[ 'cacheFileName' ] ) ).encode(consoleEncoding) )
-            sys.exit(1)
+            print( ( '\n Error: cacheFile must have a spreadsheet extension instead of \''+ userInput[ 'cacheFileExtensionOnly' ] +'\'' ).encode( consoleEncoding ) )
+            print( 'validSpreadsheetExtensions=' + str( validSpreadsheetExtensions ) )
+            print( ( 'cacheFile: \'' + str( userInput[ 'cacheFileName' ] ) ).encode( consoleEncoding ) )
+            sys.exit( 1 )
 
         # overrideWithCache means to ignore the current translation and fill it in with entries from the cache. overrideWithSpreadsheet means to ignore what is in the cache and replace it with a translation from mainSpreadsheet. reTranslate means to ignore the current translation and fill it in with fresh entries from the translation engine. These settings directly conflict. When then conflict, reTranslate should take precedence.
-        if userInput[ 'reTranslate' ] == True: #userInput[ 'overrideWithCache' ] == True ) and ( 
+        if userInput[ 'reTranslate' ] == True: # userInput[ 'overrideWithCache' ] == True ) and ()
             userInput[ 'overrideWithCache' ] = False
             userInput[ 'overrideWithSpreadsheet' ] = False
 
@@ -866,11 +866,6 @@ def validateUserInput( userInput=None ):
         userInput[ 'batchesEnabledForLLMs' ] = False
 
 
-    # if using parseOnly...
-    if userInput[ 'mode' ] == 'parseOnly':
-        pass
-
-
     # if using cacheOnly...
     if userInput[ 'mode' ] == 'cacheOnly':
         pass
@@ -879,7 +874,7 @@ def validateUserInput( userInput=None ):
     # Check for local LLMs/NMTs. Warn if defaulting to default address or default port. Validate specific port assignment.
     if ( userInput[ 'mode' ] == 'koboldcpp' ) or ( userInput[ 'mode' ] == 'py3translationserver' ) or ( userInput[ 'mode' ] == 'sugoi' ):
         if addressIsDefault == True:
-            print( ( 'Warning: No address was specified for: '+ userInput[ 'mode' ] +'. Defaulting to: '+ defaultAddress +' This is probably incorrect.' ).encode(consoleEncoding) )
+            print( ( 'Warning: No address was specified for: '+ userInput[ 'mode' ] +'. Defaulting to: '+ defaultAddress + ' This is probably incorrect.' ).encode(consoleEncoding) )
         if portIsDefault == True:
                 print( 'Warning: No port specified for ' + userInput[ 'mode' ] + ' translation engine. Using default port of: ' + str( userInput[ 'port' ] ) )
         try:

@@ -21,7 +21,7 @@ And provides interoperability for the following formats:
 - These translation engines:
     - [DeepL API (Free)](//www.deepl.com/pro-api).
     - DeepL API (Pro).
-    - Sugoi Offline Translator.
+    - Sugoi Offline Translator from Sugoi Toolkit v4-9.
 - These file formats:
     - Microsoft Excel 97/2000/XP/2003 (.xls).
     - OpenDocument spreadsheet (.ods).
@@ -44,7 +44,7 @@ Undetermined:
     - Which ones that can be used for translation are expected to be long lived and have unlimited use APIs?
     - Or is web hooking any of them worthwhile?
 - OpenAI's GPT. For now, consider:
-    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports OpenAI's LLM models like v3.5 Turbo, v4.0 Turbo.
+    - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports OpenAI's LLM models like v3.5 Turbo, v4.0 Turbo, GPT-4o.
 - py3TranslateLLM should (unofficially) work on older Python versions like 3.4.
     - Older than 3.7 is tricky because dictionaries became ordered in 3.7 and the order might be important for cache, especially cache.rebuildCache().
     - Older than 3.4 might be tricky because:
