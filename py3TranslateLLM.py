@@ -10,7 +10,6 @@ License:
 - https://www.gnu.org/licenses/agpl-3.0.html
 - Exclusion: The libraries under resources/translationEngines/* may each have different licenses.
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
-
 """
 __version__ = '2024.08.02-alpha'
 
@@ -130,13 +129,16 @@ elif sys.version_info.minor < 5:
     defaultOutputTextEncodingErrorHandler = 'backslashreplace'    
 
 
-# So, py3translateLLM.py also supports reading program settings from py3translateLLM.ini in addition to the command prompt.
-# Rule is that settings from the command line take #1 precedence
+# py3translateLLM.py supports reading program settings from py3translateLLM.ini in addition to the command prompt.
+# Rule #1) is that settings from the command line take precedence.
 # Then #2) entries from .ini
-# Then #3) settings hardcoded in .py
+# Then #3) backup settings hardcoded in .py
 # So, initialize all non-boolean CLI settings to None. Then, only change them using settings.ini or defaultSettings if they are still None after reading from CLI. Any settings that are not None were set using the CLI, so leave them alone.
-# For boolean values, they are all False by default. Only change to True if the scriptSettingsDictionary set them to True. Well, that means any CLI settings as intended to be default of 'False' will be overriden to True. Well, that is a user error. Let them deal with it since they were the ones that decided to change the default settings.
+# For boolean values, they are not set default. Only toggle True/False value if the scriptSettings set them.
 
+
+# TODO:
+# Implement -w --warning flag to warn if the spreadsheet has any None values by the end when it is time to output.
 def createCommandLineOptions():
     # Add command line options.
     commandLineParser = argparse.ArgumentParser( description='Description: Translates text using various NMT and LLM models.\n ' + usageHelp )

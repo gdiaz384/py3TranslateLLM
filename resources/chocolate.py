@@ -54,7 +54,7 @@ elif sys.version_info.minor < 5:
 class Strawberry:
     # self is not a keyword. It can be anything, like pie, but it must be the first argument for every function in the class. 
     # Quirk: It can be different string/word for each method, and they all still refer to the same object.
-    def __init__( self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=False, spreadsheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None ):
+    def __init__( self, myFileName=None, fileEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=False, addHeaderToTextFile=True, spreadsheetNameInWorkbook=None, readOnlyMode=False, csvDialect=None ):
         # https://openpyxl.readthedocs.io/en/stable/api/openpyxl.workbook.workbook.html
         self.fileEncoding = fileEncoding
         self.workbook = openpyxl.Workbook()
@@ -391,7 +391,7 @@ class Strawberry:
 
     #Old example: printAllTheThings(mySpreadsheet)
     #New syntax: 
-    #mySpreadsheet= Strawberry()
+    #mySpreadsheet = Strawberry()
     #mySpreadsheet.printAllTheThings()
 
 
@@ -416,10 +416,10 @@ class Strawberry:
             print( ( 'Warning: Unable to export chocolate.Strawberry() to file with unknown extension of \''+ outputFileExtensionOnly + '\' Full path: '+ str(outputFileNameWithPath) ).encode( consoleEncoding ) )
 
 
-    # Supports line by line parsing only. Header should already be part of text file.
+    # Supports line by line parsing only. Text files do not have headers, so insert one as long as it is a spreadsheet. Remove header header from outputfile.
     def importFromTextFile(self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, addHeaderToTextFile=False):
-        if addHeaderToTextFile == True:
-            self.appendRow( [ 'rawText', 'reserved', 'metadata' ] )
+        #if addHeaderToTextFile == True:
+        self.appendRow( [ 'rawText', 'reserved', 'metadata' ] )
         # Open file as text file with specified encoding and input error handler.
         with open( fileNameWithPath, 'rt', newline='', encoding=fileEncoding, errors=inputErrorHandling ) as myFileHandle:
         # Create a list from every line and append that list to the current spreadsheet.
@@ -507,9 +507,16 @@ class Strawberry:
         # New problem: How to expose this functionality to user? Partial solution. Just use sensible defaults and have users fix their input.
         #print(inputErrorHandling)
         with open( fileNameWithPath, newline='', encoding=myFileNameEncoding, errors=inputErrorHandling ) as myFile: #shouldn't this be codecs.open and with error handling options? codecs seems to be an alias or something? #Edit: Turns out codecs was a relic from python 2 days. Python 3 integrated all of that, so codecs.open is not needed at all anymore.
-            # if csvDialect != None.:
-                # Implement code related to csvDialects here. Default options are None, unix, excel, and excel-tab
-            myCsvHandle = csv.reader( myFile )
+            if csvDialect == None:
+                myCsvHandle = csv.reader( myFile )
+            else:
+                # TODO: Implement code related to csvDialects here. Default options are None, unix, excel, and excel-tab. #Update: Partly done. Now need to create UI in class above and import/export functions.
+                if csvDialect == 'unix':
+                    myCsvHandle = csv.reader(myFile,dialect='unix')
+                if csvDialect == 'excel':
+                    myCsvHandle = csv.reader(myFile,dialect='excel')
+                if csvDialect == 'excel-tab':
+                    myCsvHandle = csv.reader(myFile,dialect='excel-tab')
 
             for listOfStrings in myCsvHandle:
                 if debug == True:
@@ -537,11 +544,18 @@ class Strawberry:
             self.printAllTheThings()
 
 
-    def exportToCSV( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding,csvDialect=None ):
+    def exportToCSV( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, csvDialect=None ):
         with open( fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myOutputFileHandle:
-            # if csvDialect != None.:
-                # Implement code related to csvDialects here. Default options are None, unix, excel, and excel-tab
-            myCsvHandle = csv.writer( myOutputFileHandle )
+            # Implement code related to csvDialects here. Default options are None, unix, excel, and excel-tab
+            if csvDialect == None:
+                myCsvHandle = csv.writer( myOutputFileHandle )
+            else:
+                if csvDialect == 'unix':
+                    myCsvHandle = csv.writer(myOutputFileHandle,dialect='unix')
+                if csvDialect == 'excel':
+                    myCsvHandle = csv.writer(myOutputFileHandle,dialect='excel')
+                if csvDialect == 'excel-tab':
+                    myCsvHandle = csv.writer(myOutputFileHandle,dialect='excel-tab')
 
             # Get every row for current spreadsheet.
             # For every row, get each item's value in a list.
@@ -604,6 +618,7 @@ class Strawberry:
         #print( ( 'Wrote: ' + fileNameWithPath ).encode( consoleEncoding ) )
 
 
+    # Does csvDialect apply to .tsv files?
     def importFromTSV( self, fileNameWithPath, myFileNameEncoding=defaultTextFileEncoding, removeWhitespaceForCSV=True, csvDialect=None ):
         print( ( 'Reading from: ' + fileNameWithPath ).encode( consoleEncoding ) )
         print( 'Hello world.' )
@@ -658,6 +673,7 @@ class Strawberry:
             self.printAllTheThings()
 
 
+    # Does csvDialect apply to .tsv files?
     def exportToTSV( self, fileNameWithPath, fileEncoding=defaultTextFileEncoding, csvDialect=None ):
         print( 'Hello world.' )
         with open( fileNameWithPath, 'w', newline='', encoding=fileEncoding, errors=outputErrorHandling ) as myOutputFileHandle:

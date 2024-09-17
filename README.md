@@ -28,7 +28,7 @@ And provides interoperability for the following formats:
 - Generic OpenAI compatible web servers.
     - Example: https://github.com/vllm-project/vllm
 - Certain cloud based NMT translation engines: Google Translate, Google Cloud NMT, Bing Translate, Microsoft Azure NMT, Yandrex, etc.
-    - Use software like [this](//github.com/JustFrederik/aiotranslator) for now.
+    - Use software like [this](//github.com/JustFrederik/aiotranslator) or [this](//github.com/Bikatr7/Kudasai) for now.
 
 Not Planned:
 
@@ -45,7 +45,7 @@ Undetermined:
     - Or is web hooking any of them worthwhile?
 - OpenAI's GPT. For now, consider:
     - [DazedMTL](//github.com/dazedanon/DazedMTLTool) - Supports OpenAI's LLM models like v3.5 Turbo, v4.0 Turbo, GPT-4o.
-- py3TranslateLLM should (unofficially) work on older Python versions like 3.4.
+- py3TranslateLLM should unofficially work on older Python versions like 3.4.
     - Older than 3.7 is tricky because dictionaries became ordered in 3.7 and the order might be important for cache, especially cache.rebuildCache().
     - Older than 3.4 might be tricky because:
         - `pathlib`, which contains `Path` that is used by py3TranslateLLM to create folders, was not included in the Python standard library before 3.4.
@@ -113,19 +113,19 @@ Install/configure these other projects as needed:
             - TODO: Put stuff here.
     - [DeepL Web](//www.deepl.com/translator) and DeepL's [native clients](//www.deepl.com/en/app) do not seem to have usage limits, and the Windows client at least does not require an account. They might do IP bans after a while.
     - All usage of DeepL's translation services and is governed by their [Terms of Use](//www.deepl.com/en/pro-license).
-- LLM support is currently implemented using the KoboldCPP's API which requires KoboldCPP:
-    - CPU/Nvidia GPUs: [KoboldCPP](//github.com/LostRuins/koboldcpp), [FAQ](//github.com/LostRuins/koboldcpp/wiki).
-    - AMD GPUs: [KoboldCPP-ROCM](//github.com/YellowRoseCx/koboldcpp-rocm).
-    - Developed and tested using `KoboldCPP_nocuda.exe` v1.53 which implements KoboldCPP API v1.
-- [fairseq](//github.com/facebookresearch/fairseq) is a library released by Facebook/Meta for data training.
-    - Sugoi NMT is a wrapper for fairseq that comes preconfigured with a Japanese->English dictionary.
+- LLM support is currently implemented using the KoboldCpp's API which requires KoboldCpp:
+    - CPU/Nvidia GPUs: [KoboldCpp](//github.com/LostRuins/koboldcpp), [FAQ](//github.com/LostRuins/koboldcpp/wiki).
+    - AMD GPUs: [KoboldCpp-ROCM](//github.com/YellowRoseCx/koboldcpp-rocm).
+    - Developed and tested using `KoboldCpp_nocuda` v1.65 which implements KoboldCpp API v1.
+    - [fairseq](//github.com/facebookresearch/fairseq) is a library released by Facebook/Meta for data training.
     - To install and use fairseq outside of Jpn->Eng translation, refer to fairseq's [documentation](//fairseq.readthedocs.io/en/latest) and obtain an appropriately trained model.
-- Sugoi NMT only does Jpn->Eng translation. It requires Sugoi Offline Translator which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
+- Sugoi NMT only does Jpn->Eng translation. It requires the Sugoi Offline Translator model which is part of the [Sugoi Toolkit](//sugoitoolkit.com).
+    - Sugoi NMT is a wrapper for fairseq that comes preconfigured with a Japanese->English dictionary.
     - DL: [here](//www.patreon.com/mingshiba/about) or [here](//archive.org/search?query=Sugoi+Toolkit).
     - Reccomended: Remove some of the included spyware.
         - Open: `Sugoi-Translator-Toolkit\Code\backendServer\Program-Backend\Sugoi-Japanese-Translator\main.js`
         - Comment out `/*  */` or delete the analytics.
-    - Tested using Sugoi Offline Translator 4.0 which is part of Sugoi Toolkit 6.0-8.0+.
+    - Tested using Sugoi Offline Translator 4.0 which is part of Sugoi Toolkit 6.0-8.0. v5-8 of the Sugoi Toolkit contain the v4 model in the native PyTorch format. v9+ contain the v4 model in CTranslate2 format.
 
 ## Usage:
 
@@ -154,9 +154,9 @@ TODO: This section.
 
 Parameter | Description | Example(s)
 --- | --- | ---
-`-mode`, `--translationEngine` | The engine used for translation. Use `parseOnly` to read from source files but not translate them. | `parseOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `deepl-web`, `py3translationserver`, `sugoi`
+`-te`, `--translationEngine` | The engine used for translation. | `cacheOnly`, `koboldcpp`, `deepl-api-free`, `deepl-api-pro`, `py3translationserver`, `sugoi`
 `-a`, `--address` | A valid network address including the protocol but not the port number. | `--address=http://192.168.1.100`, `-a=http://localhost`
-`--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
+`-port`, `--port` | The port number associated with the `--address` listed above. | `--port=5001`, `--port=8080`, `--port=443`
 
 ### The following files are required:
 
@@ -170,8 +170,7 @@ Variable name | Description | Examples
 Variable name | Description | Examples
 --- | --- | ---
 `py3TranslateLLM.ini` | This file may be used instead of the CLI to specify input options. Keys in the key=value pairs are case sensitive. | `py3TranslateLLM.ini`, `renamedBinary.ini`
-`parsingSettingsFile` | Defines how to read and write to `fileToTranslate`. Not required if working only with spreadsheet formats but required if reading from or writing to text files. | `resources/ templates/ KAG3_kirikiri_parsingTemplate.txt`
-`outputFile` | The name and path of the file to use as output. Will be same as input if not specified. Specify a spreadsheet format to dump the raw data or a text file to output only the preferred translation. | `None`, `output.csv`, `myFolder/ output.xlsx`
+`outputFile` | The name and path of the file to use as output. Will be same as input with 'translated.xlsx' appended if not specified. Specify a spreadsheet to output all data. Specify a .txt file to dump the raw translated output only the preferred translation. | `None`, `output.csv`, `myFolder/ output.xlsx`
 `promptFile` | This file has the prompt for the LLM. Only needed if using an LLM. | `resources/ templates/ prompt.Mixtral8x7b.example.txt`
 `revertAfterTranslationDictionary` | Entries will be submitted to the translation engine but then replaced back to the original text after translation. | `resources/ templates/ characterNamesDictionary_example.csv`
 `preTranslationDictionary` | Entries will be replaced prior to submission to the translation engine. | `preTranslationDictionary.csv`
