@@ -77,7 +77,7 @@ defaultMinimumSaveIntervalForSceneSummaryCache = 240 # In seconds. 540 is 9 minu
 
 # These two lists do not determine if the values are True/ False by default. Use action='store_true' and 'store_false' in the CLI options to toggle defaults and then update these two lists. These lists ensure the values are toggled correctly if a different than default setting is specified in program.ini when merging the CLI options with the options from the .ini .
 booleanValuesTrueByDefault = [ 'cache', 'contextHistory', 'contextHistoryReset', 'batches', 'backups']
-booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overrideWithCache', 'overrideWithSpreadsheet', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
+booleanValuesFalseByDefault = [ 'cacheAnyMatch', 'overwriteWithCache', 'overwriteWithSpreadsheet', 'reTranslate', 'readOnlyCache', 'sceneSummaryEnableTranslation', 'batchesEnabledForLLMs', 'rebuildCache', 'resume', 'testRun', 'verbose', 'debug', 'version' ]
 
 translationEnginesAvailable = 'cacheOnly, koboldcpp, py3translationserver, sugoi, deepl_api_free, deepl_api_pro, deepl_web, pykakasi, cutlet'
 usageHelp = 'Usage: python py3TranslateLLM --help Translation Engines: \n' + translationEnginesAvailable + '. Example: py3TranslateLLM -te KoboldCpp -f myInputFile.ks.xlsx -sl jpn -tl eng'
@@ -174,9 +174,9 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-c', '--cache', help='Toggles cache. Specifying this will disable using or updating the cache file for translated entries. Default=Use the cache file to fill in previously translated entries and update it with new entries to speed up future translations.', action='store_false' )
     commandLineParser.add_argument( '-cf', '--cacheFile', help='The location of the cache file. Must be in a spreadsheet format like .xlsx. Default=' + str( defaultCacheFileLocation ), default=None, type=str )
     commandLineParser.add_argument( '-cam', '--cacheAnyMatch', help='Use all translation engines when considering the cache. Default=Only consider the current translation engine as valid for cache hits.', action='store_true' )
-    commandLineParser.add_argument( '-owc', '--overrideWithCache', help='Override any already translated lines in mainSpreadsheet with results from the cache. Default=Do not override already translated lines. This setting is overridden by reTranslate. This setting takes precedence over overrideWithSpreadsheet.', action='store_true' )
-    commandLineParser.add_argument( '-ows', '--overrideWithSpreadsheet', help='Override any already translated lines in the cache using mainSpreadsheet. Default=Do not override the cache. This setting is overridden by reTranslate. overrideWithCache takes precedence over this setting.', action='store_true' )
-    commandLineParser.add_argument( '-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache and spreadsheet with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines. This setting takes precedence over overrideWithCache and overrideWithSpreadsheet.', action='store_true' )
+    commandLineParser.add_argument( '-owc', '--overwriteWithCache', help='Override any already translated lines in mainSpreadsheet with results from the cache. Default=Do not override already translated lines. This setting is overridden by reTranslate. This setting takes precedence over overwriteWithSpreadsheet.', action='store_true' )
+    commandLineParser.add_argument( '-ows', '--overwriteWithSpreadsheet', help='Override any already translated lines in the cache using mainSpreadsheet. Default=Do not override the cache. This setting is overridden by reTranslate. overwriteWithCache takes precedence over this setting.', action='store_true' )
+    commandLineParser.add_argument( '-rt', '--reTranslate', help='Translate all lines even if they already have translations or are in the cache. Update the cache and spreadsheet with the new translations. Default=Do not translate cells that already have entries. Use the cache to fill in previously translated lines. This setting takes precedence over overwriteWithCache and overwriteWithSpreadsheet.', action='store_true' )
     commandLineParser.add_argument( '-roc', '--readOnlyCache', help='Opens the cache file in read-only mode and disables updates to it or rebuilding it. This dramatically decreases the memory used by the cache file. Default=Read and write to the cache file. This setting takes precedence over rebuildCache.', action='store_true' )
     commandLineParser.add_argument( '-rbc', '--rebuildCache', help='If there is any error detected when generating cache, this rebuilds the cache based on an existing spreadsheet. Rebuilding cache means removing blank lines and duplicates. Use this if the cache ever becomes corrupt. Rebuilding the cache lowers memory usage. The first column will be used as the untranslated data. Default=Error out if there is any error reading the cache file. The cache cannot be rebuilt if readOnlyCache is enabled.', action='store_true' )
 
@@ -245,8 +245,8 @@ def createCommandLineOptions():
     userInput[ 'cache' ] = commandLineArguments.cache
     userInput[ 'cacheFile' ] = commandLineArguments.cacheFile
     userInput[ 'cacheAnyMatch' ] = commandLineArguments.cacheAnyMatch
-    userInput[ 'overrideWithCache' ] = commandLineArguments.overrideWithCache
-    userInput[ 'overrideWithSpreadsheet' ] = commandLineArguments.overrideWithSpreadsheet
+    userInput[ 'overwriteWithCache' ] = commandLineArguments.overwriteWithCache
+    userInput[ 'overwriteWithSpreadsheet' ] = commandLineArguments.overwriteWithSpreadsheet
     userInput[ 'reTranslate' ] = commandLineArguments.reTranslate
     userInput[ 'readOnlyCache' ] = commandLineArguments.readOnlyCache
     userInput[ 'rebuildCache' ] = commandLineArguments.rebuildCache
@@ -813,10 +813,10 @@ def validateUserInput( userInput=None ):
             print( ( 'cacheFile: \'' + str( userInput[ 'cacheFileName' ] ) ).encode( consoleEncoding ) )
             sys.exit( 1 )
 
-        # overrideWithCache means to ignore the current translation and fill it in with entries from the cache. overrideWithSpreadsheet means to ignore what is in the cache and replace it with a translation from mainSpreadsheet. reTranslate means to ignore the current translation and fill it in with fresh entries from the translation engine. These settings directly conflict. When then conflict, reTranslate should take precedence.
-        if userInput[ 'reTranslate' ] == True: # userInput[ 'overrideWithCache' ] == True ) and ()
-            userInput[ 'overrideWithCache' ] = False
-            userInput[ 'overrideWithSpreadsheet' ] = False
+        # overwriteWithCache means to ignore the current translation and fill it in with entries from the cache. overwriteWithSpreadsheet means to ignore what is in the cache and replace it with a translation from mainSpreadsheet. reTranslate means to ignore the current translation and fill it in with fresh entries from the translation engine. These settings directly conflict. When then conflict, reTranslate should take precedence.
+        if userInput[ 'reTranslate' ] == True: # userInput[ 'overwriteWithCache' ] == True ) and ()
+            userInput[ 'overwriteWithCache' ] = False
+            userInput[ 'overwriteWithSpreadsheet' ] = False
 
         # readOnlyCache means to not write/alter the current cache.xlsx. rebuildCache means to alter the current cache.xlsx. When these settings conflict, disable rebuildCache.
         if ( userInput[ 'readOnlyCache' ] == True ) and ( userInput[ 'rebuildCache' ] == True ):
@@ -1232,8 +1232,8 @@ def updateCache( userInput=None, programSettings=None, untranslatedEntry=None, t
         else:
             # Does this still make sense?
             # Then only update the cache if reTranslate == True
-            #if ( ( userInput[ 'reTranslate' ] == True ) or ( userInput[ 'overrideWithSpreadsheet' ] == True ) )  and ( programSettings[ 'cache' ].getCellValue( currentCellAddress ) != translation ): # overrideWithSpreadsheet is getting checked in the translate() function currently. Ther is not any need to check it again here.
-            if ( userInput[ 'reTranslate' ] == True ) and ( programSettings[ 'cache' ].getCellValue( currentCellAddress ) != translation ):
+            #if ( ( userInput[ 'reTranslate' ] == True ) or ( userInput[ 'overwriteWithSpreadsheet' ] == True ) )  and ( programSettings[ 'cache' ].getCellValue( currentCellAddress ) != translation ): # overwriteWithSpreadsheet is getting checked in the translate() function currently. Ther is not any need to check it again here. # Update: It also has to be checked here, otherwise it will be skipped.
+            if ( ( userInput[ 'reTranslate' ] == True ) or ( userInput[ 'overwriteWithSpreadsheet' ] == True ) ) and ( programSettings[ 'cache' ].getCellValue( currentCellAddress ) != translation ):
                 #print( 'Updated cache')
                 programSettings[ 'cache' ].setCellValue( currentCellAddress, translation )
                 if programSettings[ 'cacheWasUpdated' ] == False:
@@ -1393,7 +1393,7 @@ def getCellValueFromCache( userInput=None, programSettings=None, searchString=No
 # This function should:
 # 1) Fetch the rawUntranslatedList from mainSpreadsheet for the current batch.
 # 2) Update fetched items with translated values from cache.
-# 3) if any values were in mainSpreadsheet or only in cache, then update accordingly to what userInput says to do. Default behavior is to add to cache whatever is in mainSpreadsheet. If reTranslate == True, then wipe or ignore both. If overrideWithCache, then say the value is from cache and update mainSpreadsheet, here or later? Probably later since the entire list needs to be processed later anyway. No. this needs to occur right away because this is the only time both overrideUsingCache and overrideUsingSpreadsheet are checked while iterating through the contents of mainSpreadsheet. Otherwise, alreadyTranslated would need to be ignored and entries updated again. Technically, they could be done later, but there is no reason to wait that long. Are they going to be updated anyway? Only if re-translate is specified. Otherwise, if overrideUsingSpreadsheet
+# 3) if any values were in mainSpreadsheet or only in cache, then update accordingly to what userInput says to do. Default behavior is to add to cache whatever is in mainSpreadsheet. If reTranslate == True, then wipe or ignore both. If overwriteWithCache, then say the value is from cache and update mainSpreadsheet, here or later? Probably later since the entire list needs to be processed later anyway. No. this needs to occur right away because this is the only time both overrideUsingCache and overrideUsingSpreadsheet are checked while iterating through the contents of mainSpreadsheet. Otherwise, alreadyTranslated would need to be ignored and entries updated again. Technically, they could be done later, but there is no reason to wait that long. Are they going to be updated anyway? Only if re-translate is specified. Otherwise, if overrideUsingSpreadsheet
 # 4) After the list of items that needs to be translated have been extracted, decide if the translation should occur in batch mode or not in batch mode. Not batch mode supports history which needs to be handled in a special way. In addition, values that have translations either from cache or were already filled in mainSpreadsheet should not be submitted to the translation engines unless reTranslate == True.
 # 5) Translate the items using translateEngine.translate() or translateEngine.batchTranslate() For non-batch translations, implement history.
 # 6) Update the cache as needed.
@@ -1427,13 +1427,13 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
         # [ 'rawEntry', 'speakerName', alreadyTranslated, 'translatedData' ]
         # if the spreadsheet has data, but cache does not, then semi-silently update cache to include the spreadsheet data as long as reTranslate is not specified
         # if reTranslate is specified, then ignore all data currently in the spreadsheet and the cache and set alreadyTranslated to False for all entries.
-        # if overrideWithCache is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from the cache and update mainSpreadsheet. Use that as the 'translatedData'.
-        # if overrideWithSpreadsheet is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from mainSpreadsheet and update the cache.
+        # if overwriteWithCache is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from the cache and update mainSpreadsheet. Use that as the 'translatedData'.
+        # if overwriteWithSpreadsheet is specified and there is a value in both mainSpreadsheet and in the cache already, then take the value from mainSpreadsheet and update the cache.
         # By default, whatever is in the spreadsheet already is fudged as the 'translatedData' and 'alreadyTranslated' is set to True to avoid that value getting translated again.
         # if there is a contradiction between the value in the cache and the current spreadsheet because they are both present, then by default, neither is updated. alreadyTranslated is set to True regardless.
             # reTranslate will force both to get updated.
-            # overrideWithCache will override the spreadsheet.
-            # There is no option to override the cache without retranslating. Should there be? overrideWithSpreadsheet Might as well. # Update added.
+            # overwriteWithCache will override the spreadsheet.
+            # There is no option to override the cache without retranslating. Should there be? overwriteWithSpreadsheet Might as well. # Update added.
 
         # Goal is to create this:
         #listForThisBatchRaw.append( ( untranslatedData, speaker, alreadyTranslated, translatedData ) )
@@ -1487,19 +1487,19 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             continue
         # Both spreadsheet and cache have data.
         # if both spreadsheet and cache have data, what should happen?
-        # By default if both overrideWithCache and overrideWithSpreadsheet are false, then leave the data alone. That means taking the data from the spreadsheet and treating it as translated data.
+        # By default if both overwriteWithCache and overwriteWithSpreadsheet are false, then leave the data alone. That means taking the data from the spreadsheet and treating it as translated data.
         # if they are the same data, then do nothing as well. Just treat the data in the spreadsheet as translated and move on.
-        if ( ( ( userInput[ 'overrideWithCache' ] == False ) and ( userInput[ 'overrideWithSpreadsheet' ] == False ) ) or ( dataFromSpreadsheet == dataFromCache ) ):
+        if ( ( ( userInput[ 'overwriteWithCache' ] == False ) and ( userInput[ 'overwriteWithSpreadsheet' ] == False ) ) or ( dataFromSpreadsheet == dataFromCache ) ):
             listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromSpreadsheet ) )
             cacheHitCounter += 1
             continue
-        if userInput[ 'overrideWithCache' ] == True:
+        if userInput[ 'overwriteWithCache' ] == True:
             # then take the data from the cache, write it to the spreadsheet and add the data taken from the cache as the translated data. Set alreadyTranslated = True
             listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromCache ) )
             programSettings[ 'mainSpreadsheet' ].setCellValue( programSettings[ 'currentMainSpreadsheetColumn' ] + str( i ), dataFromCache )
             cacheHitCounter += 1
             continue
-        if userInput[ 'overrideWithSpreadsheet' ] == True:
+        if userInput[ 'overwriteWithSpreadsheet' ] == True:
             listForThisBatchRaw.append( ( untranslatedData, speaker, True, dataFromSpreadsheet ) )
             updateCache( userInput=userInput, programSettings=programSettings, untranslatedEntry=untranslatedData, translation=dataFromSpreadsheet )
             cacheHitCounter += 1
