@@ -139,6 +139,8 @@ elif sys.version_info.minor < 5:
 
 # TODO:
 # Implement -w --warning flag to warn if the spreadsheet has any None values by the end when it is time to output.
+# There is a bug related to adding entries to cache where sometimes entries that have new lines \n in the middle will have their non-newline and the original both added to cache as separate entries. It might be related to the sceneSummaryCache code. Need to test more. What could cause it is sending a pair to translate, the processing code adjusting the list it is sent in real time, and then that same list, with the preprocessed text, being used to update the cache. Need to fix this. The easiest way to be sure is with a fresh cache.
+
 def createCommandLineOptions():
     # Add command line options.
     commandLineParser = argparse.ArgumentParser( description='Description: Translates text using various NMT and LLM models.\n ' + usageHelp )
