@@ -38,6 +38,8 @@ metharmeStartSequence = '<|user|>'
 metharmeEndSequence = '<|model|>'
 llama2ChatStartSequence = '\n[INST]'
 llama2ChatEndSequence = '[/INST]\n'
+llama3InstructStartSequence = '\n<|begin_of_text|>'
+llama3InstructEndSequence = '<|eot_id|>\n'
 chatMLStartSequence = '<|im_end|>\n<|im_start|>user\n'
 chatMLEndSequence = '<|im_end|>\n<|im_start|>assistant\n'
 gemma2StartSequence = '<start_of_turn>'
@@ -120,7 +122,30 @@ qwen1_5_chatModels = qwen1_5_32B_chatModels + qwen1_5_72B_chatModels # Magic.
 # Has problems producing output consistently.
 # - It messes up when creating a sceneSummary a lot because it outputs its own stop token immediately. Likely a prompt or model settings issue.
 # - This model is heavily aligned/censored.
-# Conclusion: Superb quality. When it works, consistently better than mixtral8x7b. More consistant at producing quality summaries than mixtral8x7b.
+# Conclusion: Superb quality. When it works, consistently better than mixtral8x7b. More consistant at producing quality summaries than mixtral8x7b. However, it does have more times when it does not output anything at all compared to mixtral8x7b.
+
+# Meta-Llama 3.1
+#https://huggingface.co/bullerwins/Meta-Llama-3.1-8B-Instruct-GGUF/tree/main
+llama3_1InstructModels=[
+'Meta-Llama-3.1-8B-Instruct-Q2_K',
+'Meta-Llama-3.1-8B-Instruct-Q3_K_L',
+'Meta-Llama-3.1-8B-Instruct-Q3_K_M',
+'Meta-Llama-3.1-8B-Instruct-Q3_K_S',
+'Meta-Llama-3.1-8B-Instruct-Q4_K_M',
+'Meta-Llama-3.1-8B-Instruct-Q4_K_S',
+'Meta-Llama-3.1-8B-Instruct-Q5_K_M',
+'Meta-Llama-3.1-8B-Instruct-Q5_K_S',
+'Meta-Llama-3.1-8B-Instruct-Q6_K',
+'Meta-Llama-3.1-8B-Instruct-Q8_0',
+'Meta-Llama-3.1-8B-Instruct-bf16',
+]
+# Change to lower case.
+for counter,entry in enumerate( llama3_1InstructModels ):
+    llama3_1InstructModels[ counter ] = entry.lower()
+# - Poor quality compared to Mixtral8x7b and Gemma-27b.
+# - Quality is not better than Sugoi and mistranslates more than Sugoi.
+# - Performance is superb since CUDA can be used to generate tokens, instead of CPU, so it produces output 20-30x faster.
+# Conclusion: Quality is too poor. Do not use. If performance is more important than accuracy, then just use Sugoi NMT instead.
 
 
 #import sys                  # Default import.
@@ -410,7 +435,7 @@ class KoboldCppEngine:
         # Valid instruction formats are: autocomplete (default), instruct, chat
         if self.instructionFormat == None:
             # This is not entirely correct. There are some mixtral and llama models that are not instruct models. How is it possible to tell them apart except for a whitelist?
-            if ( self._modelOnly.find( 'instruct' ) != -1 ) or ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find( 'mixtral' ) != -1 ) or ( self._modelOnly.find( 'gemma-2' ) != -1 ):
+            if ( self._modelOnly.find( 'instruct' ) != -1 ) or ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find( 'mixtral' ) != -1 ) or ( self._modelOnly.find( 'gemma-2' ) != -1 ) or ( self._modelOnly in llama3_1InstructModels ) :
                 self.instructionFormat = 'instruct'
             elif self._modelOnly.lower().find( 'chat' ) != -1:
                 self.instructionFormat = 'chat'
@@ -419,7 +444,7 @@ class KoboldCppEngine:
                 self.instructionFormat = defaultInstructionFormat
 
         if self.instructionFormat == 'instruct':
-            if ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find( 'llama' ) != -1 ) or ( self._modelOnly.find( 'mixtral' ) != -1 ):
+            if ( self._modelOnly in mixtral8x7bInstructModels ) or ( self._modelOnly.find( 'llama2' ) != -1 ) or ( self._modelOnly.find( 'mixtral' ) != -1 ):
                 self._instructModelStartSequence = llama2ChatStartSequence
                 self._instructModelEndSequence = llama2ChatEndSequence
             elif self._modelOnly.find('gemma-2') != -1:
@@ -427,6 +452,9 @@ class KoboldCppEngine:
                 self._instructModelEndSequence = gemma2EndSequence
                 global instructSequenceIsAlsoForLLMOutput
                 instructSequenceIsAlsoForLLMOutput = True
+            elif ( self._modelOnly in llama3_1InstructModels ) or ( self._modelOnly.find( 'llama-3.1' ) != -1 ):
+                self._instructModelStartSequence = llama3InstructStartSequence
+                self._instructModelEndSequence = llama3InstructEndSequence
             #TODO: Add more model detection schemes here.
             else:
                 self._instructModelStartSequence = defaultInstructionFormatStartSequence
