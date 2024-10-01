@@ -140,6 +140,9 @@ elif sys.version_info.minor < 5:
 # TODO:
 # Implement -w --warning flag to warn if the spreadsheet has any None values by the end when it is time to output.
 # There is a bug related to adding entries to cache where sometimes entries that have new lines \n in the middle will have their non-newline and the original both added to cache as separate entries. It might be related to the sceneSummaryCache code. Need to test more. What could cause it is sending a pair to translate, the processing code adjusting the list it is sent in real time, and then that same list, with the preprocessed text, being used to update the cache. Need to fix this. The easiest way to be sure is with a fresh cache.
+# https://docs.python.org/3/library/copy.html  # Maybe fix it with
+# import copy
+# newDictionary=copy.deepcopy(oldDictionary)
 
 def createCommandLineOptions():
     # Add command line options.
@@ -1625,7 +1628,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             tempIterable = listForThisBatchRaw
         #elif tqdmAvailable == True:
         else:
-            tempIterable = tqdm.tqdm( listForThisBatchRaw )
+            tempIterable = tqdm.tqdm( listForThisBatchRaw, leave=False )
 
         # This counter points to the current entry in translateMe.
         translateMeCounter = 0
@@ -2193,18 +2196,25 @@ def main( userInput=None ):
         return
 
     # Now need to translate stuff.
-    if ( tqdmAvailable == False ) or ( programSettings[ 'batchModeEnabled' ] == False ):
+    if tqdmAvailable == False:
         if userInput[ 'batchSizeLimit' ] == 0:
             tempBatchIterable = untranslatedEntriesColumnFull
         else:
             tempBatchIterable = range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] )
-
-    #elif ( tqdmAvailable == True ) and ( programSettings[ 'batchModeEnabled' ] == True ):
+    #elif tdqmAvailable == True
     else:
-        if userInput[ 'batchSizeLimit' ] == 0:
-            tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
+        # This tdqm logic was originally only invoked for batchModeEnabled==True and then was updated to support nested progress bars for single translations allowing it to be used outside of batches, hence the redundancy.
+        if programSettings[ 'batchModeEnabled' ] == False ):
+            if userInput[ 'batchSizeLimit' ] == 0:
+                tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
+            else:
+                tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] ) )
+        #elif programSettings[ 'batchModeEnabled' ] == True:
         else:
-            tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] ) )
+            if userInput[ 'batchSizeLimit' ] == 0:
+                tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
+            else:
+                tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] ) )
 
     if userInput[ 'debug' ] == True:
         print( 'pie' )

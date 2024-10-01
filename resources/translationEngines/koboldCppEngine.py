@@ -467,6 +467,8 @@ class KoboldCppEngine:
         #elif self.instructionFormat == 'autocomplete':
             # What should happen here?
 
+        currentTimeout = self.timeout * defaultTimeoutMulitplierForFirstRun
+        print( 'Timeout for first request=' + str( int( currentTimeout / 60 ) ) + ' minutes' )
         # Now that the instruction format is known, 
         print( 'instructionFormat=' + self.instructionFormat )
 
@@ -554,8 +556,8 @@ class KoboldCppEngine:
             contextHistory = None
 
         if speakerName != None:
-            #if verbose == True:
-            print( ( 'speakerName=' + str( speakerName ) ).encode( consoleEncoding ) )
+            if verbose == True:
+                print( ( 'speakerName=' + str( speakerName ) ).encode( consoleEncoding ) )
 
         untranslatedString = self.preProcessText( untranslatedString )
 
@@ -697,7 +699,7 @@ class KoboldCppEngine:
 
         if self._pastFirstTranslation == False:
             currentTimeout = self.timeout * defaultTimeoutMulitplierForFirstRun
-            print( ' currentTimeout=' + str( int( currentTimeout / 60 ) ) + ' minutes' )
+            #print( 'currentTimeout=' + str( int( currentTimeout / 60 ) ) + ' minutes' )
         else:
             currentTimeout = self.timeout
 
@@ -724,8 +726,8 @@ class KoboldCppEngine:
         translatedText = returnedRequest.json()[ 'results' ][ 0 ][ 'text' ].strip()
 
         #verbose = True
-        #if verbose == True:
-        print( ( 'rawTranslatedText=' + translatedText ).encode( consoleEncoding ) )
+        if verbose == True:
+            print( ( 'rawTranslatedText=' + translatedText ).encode( consoleEncoding ) )
 
         # Submit the text for post processing which cleans up the formatting beyond just .strip().
         translatedText = self.postProcessText( translatedText, untranslatedString, speakerName )
