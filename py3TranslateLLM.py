@@ -1297,6 +1297,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     if isinstance( tempCellData, str ) == True:
         return tempCellData
 
+    #if userInput[ 'verbose' ] == True:
     print( ( 'Generating sceneSummary for ' + userInput[ 'fileToTranslateFileNameWithoutPath' ] + ':' + str( programSettings[ 'currentRow'] ) + '-' + str( programSettings[ 'currentRow'] + untranslatedListSize ) + ' ...' ).encode(consoleEncoding) )
 
     # Otherwise, need to generate it.
@@ -2204,7 +2205,7 @@ def main( userInput=None ):
     #elif tdqmAvailable == True
     else:
         # This tdqm logic was originally only invoked for batchModeEnabled==True and then was updated to support nested progress bars for single translations allowing it to be used outside of batches, hence the redundancy.
-        if programSettings[ 'batchModeEnabled' ] == False ):
+        if programSettings[ 'batchModeEnabled' ] == False:
             if userInput[ 'batchSizeLimit' ] == 0:
                 tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
             else:

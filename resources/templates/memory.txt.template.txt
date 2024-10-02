@@ -1,0 +1,4 @@
+Summary: This story is about...
+{scene}
+Character information:
+Japanese name=English name=gender=description

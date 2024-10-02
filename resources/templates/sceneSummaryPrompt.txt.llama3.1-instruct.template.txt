@@ -1,0 +1,2 @@
+<|begin_of_text|>In {targetLanguage} past tense, provide a concise summary of this story text: {scene}
+Output: In the past tense, the summary of the story is: <|eot_id|>

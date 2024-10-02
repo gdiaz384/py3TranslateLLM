@@ -163,8 +163,8 @@ class KoboldCppEngine:
             untranslatedText = untranslatedText.replace( '―', '' )
 
         # Example:
-        untranslatedText = untranslatedText.replace( r'\n',' ' ) # Remove hardcoded new lines and replace them with a single empty space.
-        untranslatedText = untranslatedText.replace( '\n',' ' ) # Remove new lines and replace them with a single empty space.
+        untranslatedText = untranslatedText.replace( r'\n','' ) # Remove hardcoded new lines and replace them with a single empty space. # Updated to empty string.
+        untranslatedText = untranslatedText.replace( '\n','' ) # Remove new lines and replace them with a single empty space. # Updated to empty string.
         untranslatedText = untranslatedText.strip()               # Remove any whitespaces along the edges.
         untranslatedText = untranslatedText.replace( '  ', ' ' ).replace( '  ', ' ' )  # In the middle, replace any two blank spaces with a single blank space.
 
@@ -176,7 +176,7 @@ class KoboldCppEngine:
 
         rawTranslatedText = rawTranslatedText.strip()
 
-        # This converts full width characters to their
+        # This converts full-width characters to their half-width versions.
         if self._targetLanguageIsHalfWidth == True:
             rawTranslatedText = unicodedata.normalize( 'NFKC', rawTranslatedText )
 
