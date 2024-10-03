@@ -72,7 +72,7 @@ Undetermined:
 
 ## Installation guide
 
-`Current version: 2024.08.01-alpha`
+`Current version: 2024.10.03-alpha`
 
 Warning: py3TranslateLLM is currently undergoing active development. The project in the alpha stages. Alpha means core functionality is currently under development.
 
@@ -200,7 +200,7 @@ Variable | Scope | Description
 --- | --- | ---
 `{untranslatedText}` | prompt.txt | The current line prior to translation.
 `{sourceLanguage}` | All | The source language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
-{targetLanguage} | All | The target language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
+`{targetLanguage}` | All | The target language specified at the command prompt. The literal text is the first entry in `languageCodes.csv`.
 `{history}` | prompt.txt | The rolling history buffer of previously untranslated/translated entry pairs. This gets formatted according to the LLM instruction type: chat, instruct, autocomplete.
 `{scene}` | sceneSummary.txt | The current batch of untranslated lines to use when generating a summary.
 `{scene}` | prompt.txt, memory.txt | The summary generated from the current untranslated lines.
@@ -233,9 +233,9 @@ Note: If the data inserted in the above variables is not formatted properly for 
     - For LLMs and DeepL, providing them with the history of previously translated text to ensure proper flow of dialogue.
     - For LLMs and DeepL, identifying any speakers by name, sex and optionally other metrics like age and occupation.
     - For LLMs and DeepL, providing other arbitrary bits of information in the prompt.
-    - Supporting dictionaries that allow removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples in-line text that should be removed or altered: [＠クロエ] [r] [repage] [heart].
+    - Supporting dictionaries that allow removing and/or substituting strings that should not be translated prior to forming paragraphs and prior to submitting text for translation. Examples in-line text that should be removed or altered: [r] [repage] [heart].
         - This should help the LLM/NMT understand the submitted text as contiguous 'paragraphs' better.
-        - Tip: To automate this, use [escapeLibrary.py] during parsing.
+        - Tip: To automate this, use [escapeLibrary.py](//github.com/gdiaz384/py3AnyText2Spreadsheet/blob/main/resources/escapeText.py) during parsing.
 - Other translation techniques omit one or all of the above. Providing this information _should_ dramatically increase the translation quality when translating languages that are heavily sensitive to context, like Japanese, where much or most of the meaning of the language is not found in the spoken or written words but rather in the surrounding context in which the words are spoken.
     - Aside: For Japanese in particular, context is very important as it is often the only way to identify who is speaking and whom they are talking about.
 - **If translating from context light languages, like English where most of the meaning of the language is found within the language itself, then there should not be any or only small differences in translation quality**. For such languages, use a translation engine that supports batch translations for the maximum possible speed.
@@ -340,32 +340,6 @@ Note: If the data inserted in the above variables is not formatted properly for 
     1. The spreadsheet file, .xlsx,  is written to output.
     1. For text file and .csv output only, `postWritingToFileDictionary` is considered. This file is intended to fix encoding errors when doing baseEncoding -> unicode -> baseEncoding conversions since codec conversions are not lossless.
 
-#### Regarding revertAfterTranslation.csv:
-
-- The `revertAfterTranslation.csv` dictionary is not a perfect solution to the problem it was intended to solve.
-- The actual functionality is as follows:
-    1. Entries in the first column of this dictionary will be replaced with the entries for the second column prior to text getting translated.
-    1. After the translated text returns, every entry matching the second column will be replaced back to the text in the first column.
-    1. If there is no entry in the second column, not even whitespace, then step 2/step b will be skipped and the text in the first column will simply be removed prior to translation.
-- Background:
-    - This dictionary was originally conceived from the notion that some dialogue scripts have entries like `[＠クロエ]`, `\N[1]`, `\N[2]` that represent replacable character names within the dialogue. The idea being the player gives a custom name to a character and the game engine will replace these placeholders that are within the dialogue with the chosen name during runtime.
-    - These placeholders, in essence, contain the true names of characters, so they have relevant information that should be considered when translating paragraphs. However, they do not contain that information while they are just placeholders. In addition, they should also be left untranslated in the final text to retain the original functionality of the placeholder.
-    - On a technical level, if left as-is, then in addition to not being allowed to consider the information they contain, these placeholders can also often distort the resulting translation because translation engines might split a paragraph into two fragments based upon the `[ ]`, especially fairseq/Sugoi. The translation engine might also change the placeholder in such a way as to cause the game engine to overtly crash.
-    - Thus, the idea of the `revertAfterTranslation.csv` dictionary was conceived. The idea is to specify that `[＠クロエ]` is `Chloe` during translation but revert `Chloe` back to `[＠クロエ]` after translation. This idea lead to the functionality described above getting integrated into py3TranslateLLM. However, this approach has a number of problems.
-- Problems:
-    - There is no gurantee that the translation engine will preserve the entries in the second column, e.g. leave `Chloe` as `Chloe`. If it changes the name of the character in any way, like using a pronoun, then there is no way to revert the substitution.
-    - The untranslated line now contains two languages.
-        - This will almost certainly mess with the translation engine's logic in unintended ways.
-        - This also creates uncertainty in how specifying a source language should be handled. Not specifying the source language all is asking for a lot of unrelated problems to crop up but specifying one source language is technically wrong because there are now two languages in the source text.
-        - However, leaving the name in the source language in the untranslated form `クロエ` to prevent a mixed language scenario will almost certainly cause the translation engine to mess up when it translates it different ways based upon the source context changing constantly. Sugoi NMT especially does this a lot.
-    - One not automated solution is to replace the substitution string `[＠クロエ]` with the name in the source language `クロエ` to prevent multiple languages from in the source text. Then tell the translation engine to explcitly translate that name/string of characters a very specific way `Chloe` using a translation engine specific dictionary. And finally, revert the translation back to the original substitution string after translation by the translation engine.
-    - This can be done in py3TranslateLLM by:
-        1. Specifying an entry in the `preTranslation.csv` dictionary to remove the [ ] and add the actual name in the source language: `[＠クロエ]` -> `クロエ`.
-        1. Tell the LLM translation engine to translate the name a specific way using the `prompt.txt` file or a DeepL dictionary `クロエ` -> `Chloe`.
-            - Note: DeepL dictionaries are not currently implemented in py3TranslateLLM.
-        1. Specifying an entry in the `postTranslation.csv` dictionary to revert back the translated text to the original placeholder text used by the game engine: `Chloe` -> `[＠クロエ]`.
-    - At this time, it is not clear which approach is 'better' because the 'problems' with the `revertAfterTranslation.csv` dictionary approach are entirely hypothetical and so might be non-existent for a particular translation engine.
-
 ### Regarding DeepL:
 
 - DeepL has quite a few quirks:
@@ -469,10 +443,10 @@ Note: If the data inserted in the above variables is not formatted properly for 
 Library name | Required, Recommended, or Optional | Description | Install command | Version used to develop py3TranslateLLM
 --- | --- | --- | --- | ---
 [openpyxl](//pypi.python.org/pypi/openpyxl) | Required. | Used for main data structure and Open Office XML (.xlsx) support. | `pip install openpyxl` | 3.1.2
-chocolate | Required. | Implements `openpyxl`. Has various functions to manage using it as a data structure. Also implements other spreadsheet libraries. | Included with py3TranslateLLM. | See [source].
-functions | Required. | Has various helper functions used in main program. | Included with py3TranslateLLM. | See [source].
+chocolate | Required. | Implements `openpyxl`. Has various functions to manage using it as a data structure. Also implements other spreadsheet libraries. | Included with py3TranslateLLM. | See [source](resources).
+functions | Required. | Has various helper functions used in main program. | Included with py3TranslateLLM. | See [source](resources).
 dealWithEncoding | Required. | Handles text codecs. Implements text codec detection libraries. | Included with py3TranslateLLM. | See [source](resources).
-translationEngines/* | Required. | Handles logic for translation services. | Included with py3TranslateLLM. | See [source](resources).
+translationEngines/* | Required. | Handles logic for translation services. | Included with py3TranslateLLM. | See [source](resources/translationEngines).
 [requests](//pypi.org/project/requests) | Required. | Used for HTTP get/post requests. Required by both py3TranslateLLM and DeepL. | `pip install requests` | 2.31.0
 [chardet](//pypi.org/project/chardet) | Recommended. | Detects text codecs. | `pip install chardet` | 5.2.0
 [charamel](//pypi.org/project/charamel) | Recommended. | Detects text codecs. | `pip install charamel` | 1.0.0
@@ -483,7 +457,7 @@ translationEngines/* | Required. | Handles logic for translation services. | Inc
 [odfpy](//pypi.org/project/odfpy) | Optional. | Provides interoperability for Open Document Spreadsheet (.ods). | `pip install odfpy` | 1.4.1
 [tdqm](//pypi.org/project/tqdm) | Optional. | Adds pretty progress bar to CLI. | `pip install tdqm` | 0.0.1
 [pykakasi](//codeberg.org/miurahr/pykakasi) | Optional. | Fast, simple, and lightweight JPN->Romaji dictionary based on [Kakasi](http://kakasi.namazu.org). | `pip install pykakasi` | 2.2.1
-[cutlet](//github.com/polm/cutlet) | Optional. | Accurate JPN->Romaji dictionary with [MeCab](//taku910.github.io/mecab) support. | `pip install cutlet` | n/a
+[cutlet](//github.com/polm/cutlet) | Optional. | Accurate JPN->Romaji dictionary with [MeCab](//taku910.github.io/mecab) support. | `pip install cutlet` | 0.4.0
 
 Libraries can also require other libraries.
 
@@ -525,5 +499,3 @@ Libraries can also require other libraries.
     - You are free to use the software as long as you do not infringe on the [freedoms](//www.gnu.org/philosophy/free-sw.en.html#four-freedoms) of other people.
     - Summary: Feel free to use it, modify it, and distribute it to an unlimited extent, but *if you distribute binary files of this program outside of your organization*, then please make the source code for those binaries available.
     - The imperative to make source code available also applies if using this program as part of a server *if that server can be accessed by people outside of your organization*. For additional details, consult the license text.
-    - Binaries for py3TranslateLLM.py made with pyinstaller, or another program that can make binaries, also fall under GNU Affero GPL v3.
-        - This assumes the licenses for libraries used in the binary are compatible with one another. If the licenses used for a particular binary are not compatible with one another, then the resulting binary is not considered redistributable. Only lawyers can determine that, and also only lawyers need to worry about it.

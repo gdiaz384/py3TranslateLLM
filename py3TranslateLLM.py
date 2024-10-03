@@ -11,7 +11,7 @@ License:
 - Exclusion: The libraries under resources/translationEngines/* may each have different licenses.
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 """
-__version__ = '2024.08.02-alpha'
+__version__ = '2024.10.03-alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -1656,7 +1656,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
             # Perform replacements specified by preDictionary.
             if userInput[ 'preDictionary' ] != None:
-                for key,items in userInput[ 'preDictionary' ].items():
+                for key,item in userInput[ 'preDictionary' ].items():
                     if untranslatedEntry.find( key ) != -1:
                         untranslatedEntry = untranslatedEntry.replace( key, item )
 
