@@ -162,7 +162,7 @@ def createCommandLineOptions():
     commandLineParser.add_argument( '-lcf', '--languageCodesFile', help='Specify a custom name and path for languageCodes.csv. Default=\'' + str( defaultLanguageCodesFile ) + '\'.', default=None, type=str )
     commandLineParser.add_argument( '-lcfe', '--languageCodesFileEncoding', help='The encoding of file languageCodes.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
     commandLineParser.add_argument( '-sl', '--sourceLanguage', help='Specify language of source text. Default=' + str( defaultSourceLanguage ), default=None, type=str )
-    commandLineParser.add_argument( '-tl', '--targetLanguage', help='Specify language of source text. Default=' + str( defaultTargetLanguage ), default=None, type=str )
+    commandLineParser.add_argument( '-tl', '--targetLanguage', help='Specify target language. Default=' + str( defaultTargetLanguage ), default=None, type=str )
 
     commandLineParser.add_argument( '-cnd', '--characterNamesDictionary', help='The file name and path of characterNames.csv', default=None, type=str )
     commandLineParser.add_argument( '-cnde', '--characterNamesDictionaryEncoding', help='The encoding of file characterNames.csv. Default=' + str( defaultTextEncoding ), default=None, type=str )
@@ -1276,6 +1276,17 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     untranslatedList = programSettings[ 'mainSpreadsheet' ].getColumn( 'A' )[ programSettings[ 'currentRow' ] -1 : programSettings[ 'currentRow' ] -1 + untranslatedListSize ]
     speakerList = programSettings[ 'mainSpreadsheet' ].getColumn( 'B' )[ programSettings[ 'currentRow' ] -1 : programSettings[ 'currentRow' ] -1 + untranslatedListSize ]
 
+    # untranslatedList should consider preTranslateDictionary and revertAfterTranslationDictionary since those dictionaries can contain fixes to the raw data.
+    for counter,string in enumerate(untranslatedList):
+        if userInput[ 'preDictionary' ] != None:
+            for key,value in userInput[ 'preDictionary' ].items():
+                if string.find( key ) != -1:
+                    untranslatedList[counter] = string.replace( key, value )
+        if userInput[ 'revertAfterTranslationDictionary' ] != None:
+            for key,value in userInput[ 'revertAfterTranslationDictionary' ].items():
+                if string.find( key ) != -1:
+                    untranslatedList[ counter ] = string.replace( key, value )
+
     # Calculate sha1 hash from untranslatedList.
     tempString = ''
     for entry in untranslatedList:
@@ -1290,7 +1301,7 @@ def getSceneSummary( userInput=None, programSettings=None, untranslatedListSize=
     # Right now, this will always check the cache in a specific order. if sceneSummaryCacheAnyMatch == True, then it will retrieve the summary and send it back. It might be better to try to re-create the summary using the current translation engine and only then check sceneSummaryCacheAnyMatch if both there is not one in the sceneSummaryCache and also if the current translation engine cannot produce. Of course, this still needs to be checked now for a perfect match.
     # Then again, is such a feature desirable? It is somewhat intended to modify the summary before using it, regardless of the translation engine used to generate it, so trying to generate a perfect match after the user adjusted the summary and deliberately enabled sceneSummaryCacheAnyMatch would ignore that manually checked valid data. It is also somewhat a given that some translation engines are better at generating summaries than others. Presumably, the best engine for translations is a different one so creating summaries with one engine and translating with another is a typical use case.
     # if not finding a perfect match means the software always tries to generate one over just using sceneSummaryCacheAnyMatch, then that has a high chance of going against the user's intent.
-    # Therefore, the above behavior change must not be implmented or available to alter to the user.
+    # Therefore, the above behavior change must not be implmented or must be implemented with an option alter the above behaviorr exposed to the user.
     # tempCellData can be a string or None if the string was not found.
     tempCellData = getCellValueFromSceneSummaryCache( userInput=userInput, programSettings=programSettings, searchString=hash )
 
