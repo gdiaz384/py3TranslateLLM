@@ -11,7 +11,7 @@ License:
 - Exclusion: The libraries under resources/translationEngines/* may each have different licenses.
 - For the various 3rd party libraries outside of resources/, see the Readme for their licenses, source code, and project pages.
 """
-__version__ = '2024.10.03-alpha'
+__version__ = '2024.11.17-alpha'
 
 # Set defaults and static variables.
 # Do not change the defaultTextEncoding. This is heavily overloaded.
@@ -1041,6 +1041,9 @@ def readInputFiles( userInput=None ):
     # This will either be 'None' if there was some sort of input error, like if the user did not specify one, or it will be a dictionary containing the charaName=value.
     if userInput[ 'characterNamesDictionaryFileName' ] != None:
         userInput[ 'characterNamesDictionary'] = functions.importDictionaryFromFile( userInput[ 'characterNamesDictionaryFileName' ], userInput[ 'characterNamesDictionaryEncoding' ] )
+        for key,value in userInput[ 'characterNamesDictionary' ].items():
+            if value == None:
+                userInput[ 'characterNamesDictionary' ][key] = key
     else:
         userInput[ 'characterNamesDictionary'] = None
 
@@ -1048,24 +1051,36 @@ def readInputFiles( userInput=None ):
     # The value entry in key=value in the revertAfterTranslationDictionary can be '' or None. Basically, this signifies that key contains a string that should be reverted after translation.
     if userInput[ 'revertAfterTranslationDictionaryFileName' ] != None:
         userInput[ 'revertAfterTranslationDictionary' ] = functions.importDictionaryFromFile( userInput[ 'revertAfterTranslationDictionaryFileName' ], userInput[ 'revertAfterTranslationDictionaryEncoding' ] )
+        for key,value in userInput[ 'revertAfterTranslationDictionary' ].items():
+            if value == None:
+                userInput[ 'revertAfterTranslationDictionary' ][key] = ''
     else:
         userInput[ 'revertAfterTranslationDictionary' ] = None
 
     # Read in pre dictionary.
     if userInput[ 'preDictionaryFileName' ] != None:
         userInput[ 'preDictionary' ] = functions.importDictionaryFromFile( userInput[ 'preDictionaryFileName' ], userInput[ 'preDictionaryEncoding' ] )
+        for key,value in userInput[ 'preDictionary' ].items():
+            if value == None:
+                userInput[ 'preDictionary' ][key] = ''
     else:
         userInput[ 'preDictionary' ] = None
 
     # Read in post dictionary.
     if userInput[ 'postDictionaryFileName' ] != None:
         userInput[ 'postDictionary' ] = functions.importDictionaryFromFile( userInput[ 'postDictionaryFileName' ], userInput[ 'postDictionaryEncoding' ] )
+        for key,value in userInput[ 'postDictionary' ].items():
+            if value == None:
+                userInput[ 'postDictionary' ][key] = ''
     else:
         userInput[ 'postDictionary' ] = None
 
     # Read in afterWritingToFile dictionary.
     if userInput[ 'postWritingToFileDictionaryFileName' ] != None:
         userInput[ 'postWritingToFileDictionary' ] = functions.importDictionaryFromFile( userInput[ 'postWritingToFileDictionaryFileName' ], userInput[ 'postWritingToFileDictionaryEncoding' ] )
+        for key,value in userInput[ 'postWritingToFileDictionary' ].items():
+            if value == None:
+                userInput[ 'postWritingToFileDictionary' ][key] = ''
     else:
         userInput[ 'postWritingToFileDictionary' ] = None
 
@@ -1640,7 +1655,8 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
             tempIterable = listForThisBatchRaw
         #elif tqdmAvailable == True:
         else:
-            tempIterable = tqdm.tqdm( listForThisBatchRaw, leave=False )
+            #tempIterable = tqdm.tqdm( listForThisBatchRaw, leave=False )
+            tempIterable = tqdm.tqdm( listForThisBatchRaw, leave=True )
 
         # This counter points to the current entry in translateMe.
         translateMeCounter = 0
@@ -1759,7 +1775,7 @@ def translate( userInput=None, programSettings=None, untranslatedListSize=None, 
 
             # Check with postDictionary, a Python dictionary for possible updates.
             if userInput[ 'postDictionary' ] != None:
-                for key,items in userInput[ 'postDictionary' ].items():
+                for key,item in userInput[ 'postDictionary' ].items():
                     if translatedEntry.find( key ) != -1:
                         translatedEntry = translatedEntry.replace( key, item )
 
@@ -2218,7 +2234,8 @@ def main( userInput=None ):
         # This tdqm logic was originally only invoked for batchModeEnabled==True and then was updated to support nested progress bars for single translations allowing it to be used outside of batches, hence the redundancy.
         if programSettings[ 'batchModeEnabled' ] == False:
             if userInput[ 'batchSizeLimit' ] == 0:
-                tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
+                tempBatchIterable = untranslatedEntriesColumnFull
+                #tempBatchIterable = tqdm.tqdm( untranslatedEntriesColumnFull )
             else:
                 tempBatchIterable = tqdm.tqdm( range( 0, len( untranslatedEntriesColumnFull ), userInput[ 'batchSizeLimit' ] ) )
         #elif programSettings[ 'batchModeEnabled' ] == True:

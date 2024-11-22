@@ -541,6 +541,8 @@ class KoboldCppEngine:
                 sceneSummary = settings[ 'sceneSummary' ]
                 if ( not isinstance( sceneSummary, str ) ) or ( sceneSummary == '' ):
                     sceneSummary = None
+                else:
+                    sceneSummary = sceneSummary.replace( '\n',' ' )
             else:
                 sceneSummary = None
         else:
@@ -794,8 +796,8 @@ class KoboldCppEngine:
 
         summaryText = returnedRequest.json()[ 'results' ][ 0 ][ 'text' ].strip()
 
-        if summaryText.find( '\n\n' ) != -1:
-            summaryText = summaryText.replace( '\n\n','\n' ).replace( '\n\n','\n' )
+        #if summaryText.find( '\n\n' ) != -1:
+        summaryText = summaryText.replace( '\n\n','\n' ).replace( '\n\n','\n' ).replace( '\r\n',' ' ).replace( '\n',' ' ).replace( '  ',' ' ).replace( '  ',' ' )
 
         #if verbose == True:
             #print( summaryText.encode( consoleEncoding ) )
